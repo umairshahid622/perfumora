@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens — §3.3 Color Palette / §3.2 Typography
+   Raw values live on :root so `--accent` (and its derived values) can be
+   swapped at runtime by the Hero's variant changer. Tailwind reads them via
+   `@theme inline`, which keeps utilities pointing at the live var instead of
+   inlining a static hex at build time.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* Surfaces */
+  --bg-light: #F9F5F0; /* warm parchment */
+  --bg-dark: #0b0b0c; /* near-black */
+
+  /* Text */
+  --ink: #1b1712; /* primary text on light */
+  --paper: #f3ece0; /* primary text on dark */
+  --muted-on-light: rgba(27, 23, 18, 0.35);
+  --muted-on-dark: rgba(243, 236, 224, 0.35);
+
+  /* Hairlines */
+  --hairline-on-light: rgba(27, 23, 18, 0.12);
+  --hairline-on-dark: rgba(243, 236, 224, 0.12);
+
+  /* Accent — dynamic per variant; defaults to the amber SKU.
+     --accent-contrast always resolves to --ink or --paper (never a new colour):
+     it carries the per-variant contrast decision for button labels (§3.3).
+     --accent-glow is the accent at low opacity, for the Hero glow only. */
+  --accent: #b87333;
+  --accent-contrast: var(--paper);
+  --accent-glow: rgba(184, 115, 51, 0.3);
+  /* The accent floored for legibility as a foreground on the light parchment
+     (see readableAccent). Fills/glow/liquid keep --accent; only text/borders on
+     light use this. Defaults to the floored amber; swapped live per variant. */
+  --accent-on-light: #ae6c30;
+  /* The foreground accent over the near-black sections (see readableAccentOnDark).
+     Sits brighter than the on-light form, which goes quiet beside --paper text.
+     The default amber is already under the ceiling, so here it is the true accent;
+     the near-clear SKUs are the ones this pulls down. */
+  --accent-on-dark: #b87333;
+}
+
+@theme inline {
+  /* Colour roles — components reference the role, never a raw hex */
+  --color-bg-light: var(--bg-light);
+  --color-bg-dark: var(--bg-dark);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-muted-on-light: var(--muted-on-light);
+  --color-muted-on-dark: var(--muted-on-dark);
+  --color-hairline-on-light: var(--hairline-on-light);
+  --color-hairline-on-dark: var(--hairline-on-dark);
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-glow: var(--accent-glow);
+  --color-accent-on-light: var(--accent-on-light);
+  --color-accent-on-dark: var(--accent-on-dark);
+
+  /* Families — Khand for h1/h2 + price, Switzer for body + micro-labels */
+  --font-display: var(--font-khand), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-switzer), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale (§3.2) */
+  --text-display: clamp(3rem, 10vw, 9rem);
+  --text-display--line-height: 0.9;
+  --text-display--letter-spacing: -0.03em;
+
+  --text-section: clamp(2rem, 5vw, 4rem);
+  --text-section--line-height: 1;
+  --text-section--letter-spacing: -0.02em;
+
+  --text-price: clamp(2rem, 4vw, 3.25rem);
+  --text-price--line-height: 1;
+  --text-price--letter-spacing: -0.02em;
+
+  --text-body: clamp(0.95rem, 1vw, 1.05rem);
+  --text-body--line-height: 1.7;
+  --text-body--letter-spacing: 0.01em;
+
+  --text-micro: 0.75rem;
+  --text-micro--line-height: 1.2;
+  --text-micro--letter-spacing: 0.14em;
+
+  /* Tracking helpers for the two extremes of the scale */
+  --tracking-display: -0.03em;
+  --tracking-micro: 0.14em;
+}
+
+/* ---------------------------------------------------------------------------
+   Base layer — §3.2 family scoping: Khand is reserved for h1/h2; everything
+   else (including any future h3–h6) falls back to Switzer.
+--------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg-light);
+    color: var(--ink);
+    font-family: var(--font-switzer), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 400;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-khand), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+}
