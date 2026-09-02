@@ -81,6 +81,19 @@ export function AdminLayout() {
           ))}
         </nav>
 
+        {/* Storefront link — sits below nav, above user section */}
+        <div className="border-t border-white/10 px-3 py-3">
+          <a
+            href="http://localhost:3000"
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            <Icon name="eye" className="h-5 w-5" />
+            View storefront
+          </a>
+        </div>
+
         <div className="border-t border-white/10 p-3">
           <div className="flex items-center gap-3 rounded-lg px-3 py-2">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
@@ -105,27 +118,6 @@ export function AdminLayout() {
 
       {/* Main column */}
       <div className="lg:pl-64">
-        {/* Top bar (mobile menu toggle lives here) */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur lg:px-8">
-          <button
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-            className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 lg:hidden"
-          >
-            <Icon name="menu" className="h-5 w-5" />
-          </button>
-          <div className="flex-1" />
-          <a
-            href="http://localhost:3000"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900 sm:inline-flex"
-          >
-            <Icon name="eye" className="h-4 w-4" />
-            View storefront
-          </a>
-        </header>
-
         <main className="px-4 py-6 lg:px-8 lg:py-8">
           <Outlet />
         </main>
