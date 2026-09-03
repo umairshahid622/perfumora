@@ -1,26 +1,38 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../auth/context";
+import { errorMessage } from "../lib/errors";
 import { Icon } from "../components/Icon";
 import { Button } from "../components/Button";
 import { TextField } from "../components/Field";
 import { AuthShell } from "./Login";
 
-/* Forgot password — design only. "Sends" nothing; on submit we just show the
-   success confirmation state that a real reset flow would land on. */
+/* Forgot password — asks Supabase to email a recovery link. The link lands on
+   /reset-password, where the new password is actually set.
+
+   The confirmation is deliberately vague about whether the address exists, and
+   Supabase's own response is too: that's what stops this form being used to
+   discover accounts. */
 
 export function ForgotPassword() {
+  const { sendPasswordReset } = useAuth();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    // Mimic a network round-trip, then flip to the confirmation state.
-    setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+    try {
+      await sendPasswordReset(email);
       setSent(true);
-    }, 600);
+    } catch (err) {
+      setError(errorMessage(err, "Could not send the reset link."));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -48,6 +60,14 @@ export function ForgotPassword() {
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
+          {error && (
+            <p
+              role="alert"
+              className="animate-fade-in rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
+            >
+              {error}
+            </p>
+          )}
           <TextField
             id="email"
             type="email"

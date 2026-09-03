@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local environment (Supabase keys) — .env.example is committed instead
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -26,3 +31,4 @@ dist-ssr
 # Claude Code
 .claude/settings.local.json
 .claude/hooks/node_modules/
+.claude/tsc-cache/

@@ -4,9 +4,9 @@ import { Icon, type IconName } from "../components/Icon";
 import { useAuth } from "../auth/context";
 import { cn } from "../lib/cn";
 
-/* App shell for every authenticated page: a dark slate sidebar (collapsible on
-   mobile) + a top bar + the routed content. Kept deliberately plain — this is
-   a working tool, not a showcase. */
+/* App shell for every authenticated page: a dark slate sidebar (pinned on
+   desktop, slide-over on mobile) + the routed content. Kept deliberately plain
+   — this is a working tool, not a showcase. */
 
 interface NavItem {
   to: string;
@@ -27,13 +27,24 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate("/login", { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-slate-100">
+      {/* Mobile sidebar toggle. On desktop the sidebar is always visible, so
+          this only exists below lg. */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open menu"
+        aria-expanded={mobileOpen}
+        className="fixed left-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:text-slate-900 lg:hidden"
+      >
+        <Icon name="menu" className="h-5 w-5" />
+      </button>
+
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
@@ -106,7 +117,7 @@ export function AdminLayout() {
               <p className="truncate text-xs text-slate-400">{user?.email}</p>
             </div>
             <button
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               aria-label="Log out"
               className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
             >
@@ -118,7 +129,7 @@ export function AdminLayout() {
 
       {/* Main column */}
       <div className="lg:pl-64">
-        <main className="px-4 py-6 lg:px-8 lg:py-8">
+        <main className="px-4 pb-6 pt-16 lg:px-8 lg:py-8">
           <Outlet />
         </main>
       </div>

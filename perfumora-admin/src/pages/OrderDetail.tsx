@@ -19,8 +19,21 @@ const FLOW: OrderStatus[] = ["pending", "processing", "delivered"];
 
 export function OrderDetail() {
   const { id } = useParams();
-  const { getOrder, updateStatus } = useOrders();
+  const { getOrder, updateStatus, loading, error } = useOrders();
   const order = id ? getOrder(id) : undefined;
+
+  // On a direct hit or a refresh the list hasn't arrived yet — wait for it
+  // before deciding the order doesn't exist.
+  if (loading) {
+    return (
+      <div className="animate-fade-in">
+        <BackLink />
+        <div className="mt-4 flex justify-center rounded-2xl border border-slate-200 bg-white py-20">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-accent" />
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -30,7 +43,7 @@ export function OrderDetail() {
           <EmptyState
             icon="bag"
             title="Order not found"
-            message="It may have been removed, or the link is wrong."
+            message={error ?? "It may have been removed, or the link is wrong."}
             action={
               <Link to="/orders">
                 <Button variant="secondary">Back to orders</Button>
@@ -54,6 +67,16 @@ export function OrderDetail() {
         description={formatDateTime(order.createdAt)}
         actions={<StatusBadge status={order.status} />}
       />
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-5 flex items-center gap-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+        >
+          <Icon name="alert" className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left: items + status controls */}
@@ -153,7 +176,7 @@ export function OrderDetail() {
                 return (
                   <button
                     key={s}
-                    onClick={() => updateStatus(order.id, s)}
+                    onClick={() => void updateStatus(order.id, s)}
                     disabled={active}
                     className={cn(
                       "rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors disabled:cursor-default",

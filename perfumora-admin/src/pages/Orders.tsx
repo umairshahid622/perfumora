@@ -56,7 +56,7 @@ function exportCsv(orders: Order[]) {
 }
 
 export function Orders() {
-  const { orders } = useOrders();
+  const { orders, loading, error, refresh } = useOrders();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const status = (searchParams.get("status") as OrderStatus | "all") || "all";
@@ -95,14 +95,34 @@ export function Orders() {
     <div className="animate-fade-in">
       <PageHeader
         title="Orders"
-        description={`${orders.length} total`}
+        description={loading ? "Loading…" : `${orders.length} total`}
         actions={
-          <Button variant="secondary" onClick={() => exportCsv(filtered)}>
+          <Button
+            variant="secondary"
+            onClick={() => exportCsv(filtered)}
+            disabled={filtered.length === 0}
+          >
             <Icon name="download" className="h-4 w-4" />
             Export CSV
           </Button>
         }
       />
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-5 flex items-center gap-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+        >
+          <Icon name="alert" className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => void refresh()}
+            className="font-medium underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Status tabs */}
       <div className="mb-4 flex flex-wrap gap-1 border-b border-slate-200">
@@ -145,11 +165,19 @@ export function Orders() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-accent" />
+          </div>
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon="bag"
-            title="No orders match"
-            message="Try a different status or search term."
+            title={orders.length === 0 ? "No orders yet" : "No orders match"}
+            message={
+              orders.length === 0
+                ? "New orders will appear here as they come in."
+                : "Try a different status or search term."
+            }
           />
         ) : (
           <div className="overflow-x-auto">

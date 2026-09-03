@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/context";
+import { errorMessage } from "../lib/errors";
 import { Icon } from "../components/Icon";
 import { Button } from "../components/Button";
 import { TextField } from "../components/Field";
 
-/* Login — design only. Any email/password "works" (see AuthContext). On
-   success we return the user to wherever ProtectedRoute bounced them from,
-   defaulting to the dashboard. */
+/* Login — Supabase email + password. On success we return the user to wherever
+   ProtectedRoute bounced them from, defaulting to the dashboard. */
 
 export function Login() {
   const { login } = useAuth();
@@ -15,15 +15,23 @@ export function Login() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? "/";
 
-  const [email, setEmail] = useState("admin@perfumora.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    await login(email, password);
-    navigate(from, { replace: true });
+    setError(null);
+    try {
+      await login(email, password);
+      // This unmounts on navigate, so `submitting` is left as-is on purpose.
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(errorMessage(err, "Could not sign in. Try again."));
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -32,6 +40,14 @@ export function Login() {
       subtitle="Sign in to manage your store."
     >
       <form onSubmit={onSubmit} className="space-y-4">
+        {error && (
+          <p
+            role="alert"
+            className="animate-fade-in rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700"
+          >
+            {error}
+          </p>
+        )}
         <TextField
           id="email"
           type="email"

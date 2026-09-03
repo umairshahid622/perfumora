@@ -7,82 +7,20 @@ import { TextField } from "../components/Field";
 import { Modal } from "../components/Modal";
 import { EmptyState } from "../components/EmptyState";
 import { FragranceForm } from "./FragranceForm";
+import { useFragrances } from "../fragrances/context";
 import { formatPrice } from "../lib/format";
 import type { Fragrance } from "../lib/types";
-import { LOW_STOCK_THRESHOLD, SIZE_KEYS } from "../lib/types";
+import { LOW_STOCK_THRESHOLD, offeredSizes } from "../lib/types";
 import { cn } from "../lib/cn";
 
 /* ---------------------------------------------------------------------------
    Fragrance inventory.
 
-   Seed data is hardcoded inline and shaped exactly like Firestore docs
-   (see lib/types → Fragrance). A dozen here stand in for the ~25 real SKUs.
-   `useState` makes add / edit / delete / toggle work for the session (resets
-   on reload) — the same handlers will later call Firestore mutations.
+   Reads and writes the catalog through FragrancesProvider, which is backed by
+   the `fragrances` + `fragrance_sizes` tables. Add / edit / delete / toggle all
+   hit Postgres; the grid updates immediately and rolls back to the server's
+   version if a write is refused.
 --------------------------------------------------------------------------- */
-
-const SEED: Fragrance[] = [
-  {
-    id: "frag_001", name: "Midnight Oud", imageUrl: "/images/midnight-oud.jpg",
-    color: "#2E2A24", description: "Deep, smoky, warm.", active: true,
-    sizes: { "30ml": { price: 2500, stock: 4 }, "50ml": { price: 3800, stock: 2 } },
-  },
-  {
-    id: "frag_002", name: "White Musk", imageUrl: "/images/white-musk.jpg",
-    color: "#e7e0d5", description: "Clean, soft, powdery.", active: true,
-    sizes: { "30ml": { price: 2200, stock: 9 }, "50ml": { price: 3500, stock: 6 } },
-  },
-  {
-    id: "frag_004", name: "Rose Taif", imageUrl: "/images/rose-taif.jpg",
-    color: "#8c3b4a", description: "Bright rose, dewy petals.", active: true,
-    sizes: { "30ml": { price: 2900, stock: 3 }, "50ml": { price: 4100, stock: 5 } },
-  },
-  {
-    id: "frag_005", name: "Citrus Bloom", imageUrl: "/images/citrus-bloom.jpg",
-    color: "#d8a13a", description: "Zesty bergamot and neroli.", active: true,
-    sizes: { "30ml": { price: 2300, stock: 12 }, "50ml": { price: 3400, stock: 8 } },
-  },
-  {
-    id: "frag_007", name: "Sandalwood Dusk", imageUrl: "/images/sandalwood-dusk.jpg",
-    color: "#a56a3f", description: "Creamy sandalwood, dry cedar.", active: true,
-    sizes: { "30ml": { price: 2600, stock: 7 }, "50ml": { price: 3900, stock: 4 } },
-  },
-  {
-    id: "frag_009", name: "Amber Noir", imageUrl: "/images/amber-noir.jpg",
-    color: "#3b2f2f", description: "Resinous amber, dark vanilla.", active: true,
-    sizes: { "30ml": { price: 3000, stock: 5 }, "50ml": { price: 4200, stock: 1 } },
-  },
-  {
-    id: "frag_012", name: "Vetiver Green", imageUrl: "/images/vetiver-green.jpg",
-    color: "#3f5e3a", description: "Earthy vetiver, crushed leaves.", active: true,
-    sizes: { "30ml": { price: 2400, stock: 2 }, "50ml": { price: 3600, stock: 6 } },
-  },
-  {
-    id: "frag_014", name: "Jasmine Veil", imageUrl: "/images/jasmine-veil.jpg",
-    color: "#eae3c9", description: "Heady jasmine, white florals.", active: true,
-    sizes: { "30ml": { price: 2700, stock: 10 }, "50ml": { price: 3800, stock: 7 } },
-  },
-  {
-    id: "frag_016", name: "Leather Bound", imageUrl: "/images/leather-bound.jpg",
-    color: "#5a3d2b", description: "Supple leather, smoked tea.", active: false,
-    sizes: { "30ml": { price: 3100, stock: 0 }, "50ml": { price: 4400, stock: 0 } },
-  },
-  {
-    id: "frag_018", name: "Sea Salt & Sage", imageUrl: "/images/sea-salt-sage.jpg",
-    color: "#7f9aa6", description: "Cool salt air, green sage.", active: true,
-    sizes: { "30ml": { price: 2500, stock: 14 }, "50ml": { price: 3700, stock: 9 } },
-  },
-  {
-    id: "frag_021", name: "Fig & Cedar", imageUrl: "/images/fig-cedar.jpg",
-    color: "#6b6244", description: "Milky fig, warm cedarwood.", active: true,
-    sizes: { "30ml": { price: 2600, stock: 3 }, "50ml": { price: 3900, stock: 11 } },
-  },
-  {
-    id: "frag_023", name: "Saffron Ember", imageUrl: "/images/saffron-ember.jpg",
-    color: "#a8452a", description: "Spiced saffron, glowing amber.", active: false,
-    sizes: { "30ml": { price: 3200, stock: 6 }, "50ml": { price: 4600, stock: 2 } },
-  },
-];
 
 type Filter = "all" | "low-stock" | "inactive";
 
@@ -92,12 +30,19 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "inactive", label: "Inactive" },
 ];
 
-/** Lowest stock across a fragrance's sizes (drives the low-stock chip/filter). */
+/**
+ * Lowest stock across the sizes a fragrance actually sells (drives the
+ * low-stock chip/filter). Sizes it doesn't sell are skipped, so a 30ml-only
+ * fragrance isn't permanently "low" on a 50ml it never had. A fragrance with
+ * no sizes at all gives Infinity — not low stock, just misconfigured, which
+ * the card surfaces on its own.
+ */
 const minStock = (f: Fragrance) =>
-  Math.min(...SIZE_KEYS.map((s) => f.sizes[s].stock));
+  Math.min(...offeredSizes(f.sizes).map(({ variant }) => variant.stock));
 
 export function Fragrances() {
-  const [items, setItems] = useState<Fragrance[]>(SEED);
+  const { fragrances, loading, error, refresh, save, remove, setActive } =
+    useFragrances();
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -113,34 +58,26 @@ export function Fragrances() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((f) => {
+    return fragrances.filter((f) => {
       if (filter === "low-stock" && minStock(f) > LOW_STOCK_THRESHOLD) return false;
       if (filter === "inactive" && f.active) return false;
       if (q && !f.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [items, query, filter]);
+  }, [fragrances, query, filter]);
 
-  // ---- Mutations (session-only; swap bodies for Firestore writes later) ----
-  const upsert = (frag: Fragrance) => {
-    setItems((prev) => {
-      const exists = prev.some((f) => f.id === frag.id);
-      return exists
-        ? prev.map((f) => (f.id === frag.id ? frag : f))
-        : [frag, ...prev];
-    });
+  // ---- Mutations. Each resolves false on failure, with `error` explaining. ----
+  const upsert = async (frag: Fragrance) => {
+    if (!(await save(frag))) return; // Keep the form open so nothing is lost.
     setShowForm(false);
     setEditing(null);
   };
 
-  const toggleActive = (id: string) =>
-    setItems((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, active: !f.active } : f)),
-    );
-
-  const remove = (id: string) => {
-    setItems((prev) => prev.filter((f) => f.id !== id));
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    const id = toDelete.id;
     setToDelete(null);
+    await remove(id);
   };
 
   const openAdd = () => {
@@ -156,7 +93,7 @@ export function Fragrances() {
     <div className="animate-fade-in">
       <PageHeader
         title="Fragrances"
-        description={`${items.length} in catalog`}
+        description={loading ? "Loading…" : `${fragrances.length} in catalog`}
         actions={
           <Button onClick={openAdd}>
             <Icon name="plus" className="h-4 w-4" />
@@ -164,6 +101,22 @@ export function Fragrances() {
           </Button>
         }
       />
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-5 flex items-center gap-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+        >
+          <Icon name="alert" className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => void refresh()}
+            className="font-medium underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Search + filters toolbar */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -195,12 +148,20 @@ export function Fragrances() {
       </div>
 
       {/* Grid */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center rounded-2xl border border-slate-200 bg-white py-16">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-accent" />
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white">
           <EmptyState
             icon="droplet"
             title="No fragrances found"
-            message="Try a different search or filter."
+            message={
+              fragrances.length === 0
+                ? "Add your first fragrance to get started."
+                : "Try a different search or filter."
+            }
           />
         </div>
       ) : (
@@ -210,7 +171,7 @@ export function Fragrances() {
               key={f.id}
               frag={f}
               onEdit={() => openEdit(f)}
-              onToggle={() => toggleActive(f.id)}
+              onToggle={() => void setActive(f.id, !f.active)}
               onDelete={() => setToDelete(f)}
             />
           ))}
@@ -226,7 +187,7 @@ export function Fragrances() {
       >
         <FragranceForm
           initial={editing ?? undefined}
-          onSubmit={upsert}
+          onSubmit={(frag) => void upsert(frag)}
           onCancel={() => setShowForm(false)}
         />
       </Modal>
@@ -241,7 +202,7 @@ export function Fragrances() {
             <Button variant="secondary" onClick={() => setToDelete(null)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={() => toDelete && remove(toDelete.id)}>
+            <Button variant="danger" onClick={() => void confirmDelete()}>
               <Icon name="trash" className="h-4 w-4" />
               Delete
             </Button>
@@ -272,8 +233,10 @@ function FragranceCard({
   onDelete: () => void;
 }) {
   const low = minStock(frag) <= LOW_STOCK_THRESHOLD;
-  const isPreviewable =
-    frag.imageUrl.startsWith("blob:") || frag.imageUrl.startsWith("http");
+  const sizes = offeredSizes(frag.sizes);
+  // Uploaded images are absolute Storage URLs; anything else falls back to the
+  // accent colour as the tile.
+  const isPreviewable = frag.imageUrl.startsWith("http");
 
   return (
     <div
@@ -316,10 +279,9 @@ function FragranceCard({
           {frag.description}
         </p>
 
-        {/* Size rows */}
+        {/* Size rows — only the sizes this fragrance actually sells. */}
         <div className="mt-3 space-y-1.5">
-          {SIZE_KEYS.map((size) => {
-            const v = frag.sizes[size];
+          {sizes.map(({ size, variant: v }) => {
             const sizeLow = v.stock <= LOW_STOCK_THRESHOLD;
             return (
               <div
@@ -347,6 +309,9 @@ function FragranceCard({
               </div>
             );
           })}
+          {sizes.length === 0 && (
+            <p className="text-sm text-rose-600">No sizes set — edit to add one.</p>
+          )}
         </div>
 
         {/* Actions */}

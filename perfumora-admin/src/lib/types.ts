@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
-   Domain types — shaped to match how records will live in Firestore, so the
-   hardcoded design-phase data drops in with minimal rework once the backend
-   is wired up. These are type declarations only (no data, no runtime code).
+   Domain types — the camelCase shape the UI works in. lib/api.ts maps these to
+   and from the snake_case Postgres tables in supabase/schema.sql, so nothing
+   below has to mirror the database layout.
 --------------------------------------------------------------------------- */
 
 /** The two sizes we sell. No sample size. */
@@ -15,17 +15,44 @@ export interface SizeVariant {
   stock: number;
 }
 
+/**
+ * Which sizes a fragrance sells, and at what price.
+ *
+ * Deliberately partial: a key is present only if we actually sell that size.
+ * Some fragrances come in 30ml only, some in 50ml only, most in both. An
+ * absent key means "not sold" — which is NOT the same as being present with
+ * `stock: 0`, meaning "sold, but we've run out". Keeping them distinct is why
+ * this is `Partial` rather than a full record: the storefront must hide a size
+ * it never sells, while showing a sold-out one as unavailable.
+ */
+export type SizeMap = Partial<Record<SizeKey, SizeVariant>>;
+
+/**
+ * The sizes a fragrance actually sells, always smallest first.
+ *
+ * Use this instead of iterating SIZE_KEYS and indexing, so absent sizes are
+ * skipped rather than read as zeroes — and so the variant comes back narrowed
+ * to non-undefined.
+ */
+export function offeredSizes(sizes: SizeMap): { size: SizeKey; variant: SizeVariant }[] {
+  return SIZE_KEYS.flatMap((size) => {
+    const variant = sizes[size];
+    return variant ? [{ size, variant }] : [];
+  });
+}
+
 export interface Fragrance {
   id: string;
   name: string;
-  /** Storage URL in production; may be a blob: preview in the design phase. */
+  /** Storage URL, or "" when no image has been uploaded yet. */
   imageUrl: string;
   /** Hex used as the fragrance's UI accent (card border / swatch). */
   color: string;
   description: string;
   /** Hidden from the storefront when false, without deleting the record. */
   active: boolean;
-  sizes: Record<SizeKey, SizeVariant>;
+  /** At least one size — a fragrance with none is unbuyable. See SizeMap. */
+  sizes: SizeMap;
 }
 
 export type OrderStatus = "pending" | "processing" | "delivered" | "canceled";
