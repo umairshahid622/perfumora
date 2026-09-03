@@ -51,20 +51,67 @@ export interface BottleWaypoint {
   id: string;
   pose: BottlePose;
   /**
-   * Where the leg into this waypoint *begins*, as a ScrollTrigger `start`. Every
-   * leg ends at `top top` — the frame this section fills the screen — so the whole
-   * move happens on the approach and the bottle is already docked when its beat
-   * lands. This is the pacing lever: a percentage further down the viewport
-   * (`"top 85%"`) starts the move earlier, making it longer and more gradual;
-   * closer to the top (`"top 55%"`) holds the previous pose for longer and then
-   * moves faster. Only read for legs after the first — the opening waypoint is a
-   * resting pose with nothing to travel from.
+   * Optional override for where the leg into this waypoint *begins*, as a
+   * ScrollTrigger `start`. Unset on every waypoint below, which is the journey's
+   * rule: the leg sets off at the *measured* midpoint of the section it is leaving
+   * (`halfwayOut`). Set it to a viewport-relative string to give one leg a pace of
+   * its own — `"top 85%"` starts earlier and travels more gradually, `"top 55%"`
+   * holds the previous pose longer and then moves faster.
+   *
+   * Every leg ends at `top top` — the frame this section fills the screen —
+   * whatever the start, so the move always happens on the approach and the bottle is
+   * already docked when its beat lands. Only read for legs after the first: the
+   * opening waypoint is a resting pose with nothing to travel from.
    */
   approach?: string;
 }
 
-/** Default start for a leg's approach — see `BottleWaypoint.approach`. */
-const DEFAULT_APPROACH = "top 70%";
+/**
+ * The scroll position at which the section named by `id` is half scrolled away —
+ * where every leg of the journey sets off. A beat is therefore *dead still* for the
+ * whole of its first half, and only starts handing the bottle on once you are
+ * visibly leaving it. Starting anywhere earlier is what made the drift read as a
+ * reaction to the wheel rather than to the section change.
+ *
+ * Measured off the element rather than expressed as a fraction of the viewport
+ * (`"top center"`, which this replaced). The two agree only while a section is
+ * exactly one screen tall — which these are at the moment, but every one of them is
+ * `min-h-screen`, so any can grow past a screen when its copy needs the room, and on
+ * the way out of a taller section a viewport fraction fires early: at 120vh,
+ * `"top center"` is 58% of the way through, not 50%. Reading the real height keeps
+ * the rule true whatever the copy does.
+ *
+ * `getBoundingClientRect().top + scrollY` rather than `offsetTop`: that sum is the
+ * document offset wherever the page happens to be scrolled when ScrollTrigger
+ * evaluates this, and it is indifferent to the offset parent. Returned as a number,
+ * which ScrollTrigger reads as an absolute scroll position — and returned from a
+ * *function*, so it is re-measured on every refresh instead of stranding the leg on
+ * the geometry the page had when it loaded.
+ */
+const halfwayOut = (id: string) => () => {
+  const el = document.getElementById(id);
+  if (!el) return 0;
+  const rect = el.getBoundingClientRect();
+  return rect.top + window.scrollY + rect.height / 2;
+};
+
+/**
+ * Easing for every scrubbed leg — the shape of the drift in *scroll* space rather
+ * than in time.
+ *
+ * Linear (`"none"`) is the tempting choice under `scrub`, and it is what made the
+ * move read as sudden however late it started: the bottle sits at a dead stop for
+ * half a section, then goes to full drift speed within a frame — a step change in
+ * velocity, with no distance covered to disguise it. `inOut` feathers both ends
+ * instead. The opening few percent of the leg barely move the vessel, the middle
+ * carries it, and it settles into the dock rather than stopping dead.
+ *
+ * Symmetric deliberately. An ease-*out* alone would smooth the arrival and leave the
+ * onset exactly as abrupt, and it would trail the bottle behind the cursor for the
+ * whole second half — the lag that `scrub`'s own smoothing already provides in a
+ * form that ends when the scrolling does.
+ */
+const LEG_EASE = "power1.inOut";
 
 /**
  * The bottle's journey, in scroll order — the storytelling itself (§4.1–4.3).
@@ -78,8 +125,9 @@ const DEFAULT_APPROACH = "top 70%";
  * Each pose is a *resting* state, not a pass-through: the leg into it finishes as
  * its section reaches the top of the screen, so for the whole time a section owns
  * the viewport the bottle sits still in that section's pose, and the travel happens
- * in the handover between two beats. Scroll to any of these three and the vessel is
- * already where that beat wants it.
+ * in the handover between two beats — the outgoing section's second half, so a beat
+ * is dead still until you are halfway out of it (see `halfwayOut`). Scroll to
+ * any of these three and the vessel is already where that beat wants it.
  *
  * The list ends at the Ritual because the journey does. Nothing here carries the
  * bottle off the screen afterwards: `PersistentBottle` releases its layer from
@@ -106,13 +154,12 @@ const DEFAULT_APPROACH = "top 70%";
 export const BOTTLE_WAYPOINTS: BottleWaypoint[] = [
   { id: SECTION_IDS.hero, pose: { x: 0, y: 0.15, scale: 0.62, rotY: 0 } },
   {
-    // The longest journey of the three — sideways *and* smaller — so it is given
-    // the longest runway. It only *recedes*, though: this is still the product, and
-    // at much under ~46vh it stops reading as a presence beside the copy column
-    // (~51vh here) and starts reading as an ornament in an empty half of the screen.
+    // The longest journey of the three — sideways *and* smaller. It only *recedes*,
+    // though: this is still the product, and at much under ~46vh it stops reading as
+    // a presence beside the copy column (~51vh here) and starts reading as an
+    // ornament in an empty half of the screen.
     id: SECTION_IDS.manifesto,
     pose: { x: 1.55, y: 0, scale: 0.54, rotY: 0.35 },
-    approach: "top 75%",
   },
   {
     // The largest the vessel gets, level with the Hero and the widest turn of the
@@ -123,7 +170,6 @@ export const BOTTLE_WAYPOINTS: BottleWaypoint[] = [
     // beneath it. Hence a y just *above* centre rather than below it.
     id: SECTION_IDS.ritual,
     pose: { x: 0, y: 0.02, scale: 0.62, rotY: 0.95 },
-    approach: "top 70%",
   },
 ];
 
@@ -146,12 +192,10 @@ export const BOTTLE_WAYPOINTS_COMPACT: BottleWaypoint[] = [
   {
     id: SECTION_IDS.manifesto,
     pose: { x: 0, y: 0.75, scale: 0.24, rotY: 0.35 },
-    approach: "top 75%",
   },
   {
     id: SECTION_IDS.ritual,
     pose: { x: 0, y: 0.61, scale: 0.22, rotY: 0.95 },
-    approach: "top 70%",
   },
 ];
 
@@ -223,12 +267,11 @@ export function useBottleScroll(
           scrollTrigger: {
             trigger: `#${waypoints[i].id}`,
             // The leg runs on the *approach* and lands exactly as the section
-            // does: it begins while the previous beat still holds the screen (this
-            // section's top is `approach` of the way down the viewport) and ends
-            // the frame that top reaches the viewport top. So the vessel is docked
-            // where it belongs for the whole time a section owns the screen —
-            // scroll to any beat and it is already in place — and the move itself
-            // reads as the handover between two beats.
+            // does: it begins once the section before it is half scrolled away and
+            // ends the frame this section's top reaches the viewport top. So the
+            // vessel is docked where it belongs for the whole time a section owns
+            // the screen — scroll to any beat and it is already in place — and the
+            // move itself reads as the handover between two beats.
             //
             // Beginning the leg *at* `top top` instead, running past it as an
             // offset span, is the tempting reading and the wrong one: every
@@ -236,7 +279,7 @@ export function useBottleScroll(
             // section's pose and slide it into place under you. The Manifesto
             // would land with the vessel still centred over its own copy, and the
             // Ritual with it still off to the right of the 01/02/03 stage.
-            start: waypoints[i].approach ?? DEFAULT_APPROACH,
+            start: waypoints[i].approach ?? halfwayOut(waypoints[i - 1].id),
             end: "top top",
             // A smoothing number, not `true`. `true` ties the playhead to raw
             // scroll frame-for-frame, so wheel/trackpad steps read as jitter; a
@@ -246,10 +289,10 @@ export function useBottleScroll(
           },
         });
 
-        // `ease: "none"` on every axis: under `scrub` the easing *is* the scroll,
-        // so a smoothing ease here would only lag the bottle behind the cursor.
-        // All three axes share one timeline and start at 0, so the drift, the
-        // resize and the turn arrive at the dock together as one gesture.
+        // One `LEG_EASE` on every axis — the feathered onset that keeps the drift
+        // from starting as a jolt (see the constant). All three axes share one
+        // timeline, start at 0 and carry the same ease, so the drift, the resize
+        // and the turn move as one gesture rather than three overlapping ones.
         //
         // `immediateRender: false` is load-bearing, not a nicety. A `fromTo`
         // renders its `from` values the moment it is built, so without this every
@@ -261,7 +304,7 @@ export function useBottleScroll(
         tl.fromTo(
           group.position,
           { x: from.x, y: from.y },
-          { x: to.x, y: to.y, ease: "none", immediateRender: false },
+          { x: to.x, y: to.y, ease: LEG_EASE, immediateRender: false },
           0,
         )
           .fromTo(
@@ -271,7 +314,7 @@ export function useBottleScroll(
               x: to.scale,
               y: to.scale,
               z: to.scale,
-              ease: "none",
+              ease: LEG_EASE,
               immediateRender: false,
             },
             0,
@@ -279,7 +322,7 @@ export function useBottleScroll(
           .fromTo(
             group.rotation,
             { y: from.rotY },
-            { y: to.rotY, ease: "none", immediateRender: false },
+            { y: to.rotY, ease: LEG_EASE, immediateRender: false },
             0,
           );
       }
