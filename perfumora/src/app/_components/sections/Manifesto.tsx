@@ -17,9 +17,11 @@ import { useReveal } from "../../_hooks/useReveal";
  * drifts into the right-hand column as this section takes the screen *and recedes*
  * as it goes, so the copy is deliberately held to the left of it and given a hard
  * measure — the bottle is present in peripheral vision while the philosophy is
- * read, never over it, and no longer the subject. The reserved column is sized to
- * the pose that lands in it (~36vh) rather than to the screen, which is what keeps
- * the whole beat inside one viewport height.
+ * read, never over it, and no longer the subject. It still has to hold that half of
+ * the screen on its own, though, so the pose that lands here (~46vh) is set against
+ * the height of this copy column rather than shrunk as far as the story allows; the
+ * grid row takes whichever of the two is taller, which is what keeps the whole beat
+ * inside one viewport height.
  *
  * Below `md` there is no room to sit beside anything: the bottle lifts into a
  * shallow band at the top of the screen instead, so the column order flips and the
@@ -65,10 +67,12 @@ export function Manifesto() {
             </div>
 
             {/* Reserved space the persistent bottle drifts into while this section
-                is in view — the model is the fixed layer, never mounted here. */}
+                is in view — the model is the fixed layer, never mounted here. Sized
+                to the pose that lands in it, which is in turn sized against the copy
+                column beside it: the row takes whichever of the two is taller. */}
             <div
               aria-hidden="true"
-              className="order-1 h-[24vh] w-full md:order-2 md:h-[40vh]"
+              className="order-1 h-[24vh] w-full md:order-2 md:h-[46vh]"
             />
           </div>
         </Container>

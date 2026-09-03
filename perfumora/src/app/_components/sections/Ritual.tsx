@@ -51,9 +51,15 @@ const STEP_PLACEMENT = [
  * Held to one screen (`full`, so this owns its own padding rather than taking the
  * Section's default rhythm). Every piece of furniture here is therefore sized
  * against the viewport: the heading takes the top-left, 02's caption takes the
- * bottom-centre, and the `1fr` row between them is what is left for the bottle —
- * which is why the pose in `BOTTLE_WAYPOINTS` sits slightly *below* centre, where
- * that row's middle actually is.
+ * bottom-centre, and the `1fr` row between them is the bottle's slot.
+ *
+ * The vessel is deliberately allowed to stand *taller* than that row. It is a fixed
+ * canvas layer that nothing clips, and the heading is held to `max-w-xl` on the
+ * left, so it can rise past the heading's row in the free space to the right of it —
+ * which is what lets this beat be the largest the bottle gets (§4.3's lean-in)
+ * inside a single screen. Its only hard floor is 02's caption below it, so the pose
+ * in `BOTTLE_WAYPOINTS` sits a touch *above* centre rather than in the middle of the
+ * row, and 01 and 03 flank it slightly below its midpoint.
  *
  * Below `md` there is no room to flank anything: the steps stack, and since three
  * of them plus a heading is very nearly a screen on their own, the bottle gets the

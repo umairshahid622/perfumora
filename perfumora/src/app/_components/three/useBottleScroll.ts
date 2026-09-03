@@ -81,34 +81,48 @@ const DEFAULT_APPROACH = "top 70%";
  * in the handover between two beats. Scroll to any of these three and the vessel is
  * already where that beat wants it.
  *
- * Each y is set so the bottle lands in the middle of the *empty slot* its section
- * reserves, not the middle of the viewport: the canvas is centred on the screen,
- * but every one of these sections puts furniture above or below its slot (the
- * Hero's counter and product bar, the Ritual's heading and its 02 caption). These
- * are the first knobs to check on a real screen.
+ * The list ends at the Ritual because the journey does. Nothing here carries the
+ * bottle off the screen afterwards: `PersistentBottle` releases its layer from
+ * `fixed` to `absolute` at the Ritual's middle, and from that point the page itself
+ * takes the vessel away, at exactly the page's own speed and with no pose to tune.
  *
- *  1. Hero — dead centre, dead still, and the largest it will be until the Ritual.
- *     The product under glass; only the variant arrows turn it. It holds that pose
- *     until the Hero itself begins to leave.
+ * Each y is set against the *empty slot* its section reserves rather than the middle
+ * of the viewport: the canvas is centred on the screen, but every one of these
+ * sections puts furniture above or below its slot (the Hero's counter and product
+ * bar, the Ritual's heading and its 02 caption). The scales are set against the copy
+ * standing next to the vessel, so that it reads as that copy's counterweight rather
+ * than as decoration. Both are the first knobs to check on a real screen.
+ *
+ *  1. Hero — dead centre, dead still, and as large as it ever gets. The product
+ *     under glass; only the variant arrows turn it. It holds that pose until the
+ *     Hero itself begins to leave.
  *  2. Manifesto — drifts right into the reserved column *and recedes*, ceding the
  *     screen to the philosophy copy, and the idle float wakes: present, but no
  *     longer the subject.
- *  3. Ritual — returns to centre, swells back past what it was in the Manifesto
- *     and turns furthest of all: a lean-in to the vessel as the three application
- *     steps are read around it.
+ *  3. Ritual — returns to centre, swells back to its full Hero size and turns
+ *     furthest of all: a lean-in to the vessel as the three application steps are
+ *     read around it.
  */
 export const BOTTLE_WAYPOINTS: BottleWaypoint[] = [
   { id: SECTION_IDS.hero, pose: { x: 0, y: 0.15, scale: 0.62, rotY: 0 } },
   {
     // The longest journey of the three — sideways *and* smaller — so it is given
-    // the longest runway.
+    // the longest runway. It only *recedes*, though: this is still the product, and
+    // at much under ~46vh it stops reading as a presence beside the copy column
+    // (~51vh here) and starts reading as an ornament in an empty half of the screen.
     id: SECTION_IDS.manifesto,
-    pose: { x: 1.55, y: 0, scale: 0.42, rotY: 0.35 },
+    pose: { x: 1.55, y: 0, scale: 0.54, rotY: 0.35 },
     approach: "top 75%",
   },
   {
+    // The largest the vessel gets, level with the Hero and the widest turn of the
+    // three. Unlike the other two this pose is *not* confined to the empty slot its
+    // section reserves: the canvas is a fixed layer that nothing clips, and the
+    // Ritual's heading is held to `max-w-xl` on the left, so the bottle is free to
+    // rise past that heading's row on the right and only has to clear 02's caption
+    // beneath it. Hence a y just *above* centre rather than below it.
     id: SECTION_IDS.ritual,
-    pose: { x: 0, y: -0.11, scale: 0.48, rotY: 0.95 },
+    pose: { x: 0, y: 0.02, scale: 0.62, rotY: 0.95 },
     approach: "top 70%",
   },
 ];

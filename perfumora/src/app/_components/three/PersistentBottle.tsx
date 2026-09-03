@@ -4,7 +4,6 @@ import { useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
 import { useScent } from "../../_lib/scent-context";
 import { BottleSceneMount } from "./BottleSceneMount";
@@ -22,10 +21,11 @@ gsap.registerPlugin(ScrollTrigger);
  * scroll. That is what makes the journey continuous: nothing is ever torn down and
  * rebuilt between sections, so the model can simply *move*.
  *
- * Fixed, not absolute. An absolutely-positioned layer scrolls away with the
- * document, which would mean the travel had to fight the page's own scrolling to
- * stay on screen; fixed pins it to the viewport so the waypoint poses are read
- * directly as screen position.
+ * Fixed, not absolute — for the length of the journey. An absolutely-positioned
+ * layer scrolls away with the document, which would mean the travel had to fight the
+ * page's own scrolling to stay on screen; fixed pins it to the viewport so the
+ * waypoint poses are read directly as screen position. Once the journey is over that
+ * property is exactly what is wanted, and the effect below switches to it.
  *
  * `pointer-events-none` (and the matching switch-off inside `BottleScene`, which
  * R3F needs separately) keeps this full-viewport layer from swallowing clicks
@@ -40,48 +40,51 @@ export function PersistentBottle() {
   const layer = useRef<HTMLDivElement>(null);
 
   /**
-   * The Ritual is the last beat the bottle appears in, so the layer has to leave
-   * with it — a fixed canvas has no end of its own and would otherwise hang over
-   * Craft, Gallery and everything below. Scrubbed against the Ritual's exit so the
-   * product dissolves as the section it belongs to scrolls away, and comes back on
-   * the way up.
+   * The Ritual is the last beat the bottle appears in, and this is where the layer
+   * stops being pinned to the viewport and is handed to the page.
    *
-   * `autoAlpha` (not `opacity`) so a faded-out layer is `visibility: hidden` too,
-   * which stops the browser compositing a full-viewport transparent canvas over
-   * every section below it.
+   * A fixed layer has no end of its own: left alone it would hang in the middle of
+   * the screen over Craft, Gallery and everything below. Rather than animate it out —
+   * which means deriving an off-screen pose and a rise that matches the page's speed,
+   * both of which have to be re-derived per viewport — the layer is simply *released*
+   * at the Ritual's middle: `fixed` becomes `absolute` at the document offset it was
+   * already occupying, and from that frame the document carries the vessel away.
+   * Perfectly in step with the section it belongs to, because it *is* the section's
+   * scrolling doing the work, at any screen size and with nothing to tune.
+   *
+   * `self.start` rather than `window.scrollY`: it is the scroll position the trigger
+   * is defined at, so the handover lands on the intended offset even if the callback
+   * fires a frame late during a fast scroll. `bottom: auto` with an explicit height
+   * because the `inset-0` that sizes the fixed layer would otherwise stretch the
+   * released one from that offset to the foot of the document.
+   *
+   * Nothing needs to move for reduced motion — this is a position handover, not an
+   * animation, and it is what stops the bottle covering the rest of the page.
    */
   useGSAP(() => {
-    const trigger = `#${SECTION_IDS.ritual}`;
+    /**
+     * Released: parked at the document offset the viewport had reached, so the page
+     * scrolls it away. Pinned: back to what `inset-0` gives the fixed layer.
+     */
+    const setReleased = (released: boolean, offset: number) =>
+      gsap.set(
+        layer.current,
+        released
+          ? { position: "absolute", top: offset, bottom: "auto", height: "100vh" }
+          : { position: "fixed", top: 0, bottom: 0, height: "auto" },
+      );
 
-    // The fade is load-bearing, not a flourish — without it the bottle sits over
-    // the rest of the page — so reduced motion still gets the state change, just
-    // switched at the boundary instead of scrubbed across it.
-    if (prefersReducedMotion()) {
-      ScrollTrigger.create({
-        trigger,
-        start: "bottom center",
-        onEnter: () => gsap.set(layer.current, { autoAlpha: 0 }),
-        onLeaveBack: () => gsap.set(layer.current, { autoAlpha: 1 }),
-      });
-      return;
-    }
-
-    gsap.fromTo(
-      layer.current,
-      { autoAlpha: 1 },
-      {
-        autoAlpha: 0,
-        ease: "none",
-        scrollTrigger: {
-          trigger,
-          // Begins once the Ritual's bottom passes the middle of the screen — the
-          // steps have been read — and completes as that edge leaves the top.
-          start: "bottom center",
-          end: "bottom top",
-          scrub: 1,
-        },
-      },
-    );
+    ScrollTrigger.create({
+      trigger: `#${SECTION_IDS.ritual}`,
+      start: "center center",
+      onEnter: (self) => setReleased(true, self.start),
+      onLeaveBack: (self) => setReleased(false, self.start),
+      // Runs on creation and after every resize, which is what makes the handover
+      // stateless: a reload part-way down the page starts released instead of
+      // pinning the bottle over Craft, and a resize while released re-parks it at
+      // the recomputed offset instead of stranding it at the old one.
+      onRefresh: (self) => setReleased(self.scroll() >= self.start, self.start),
+    });
   });
 
   return (
