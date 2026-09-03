@@ -6,6 +6,7 @@ import { Footer } from "./_components/sections/Footer";
 import { Gallery } from "./_components/sections/Gallery";
 import { Manifesto } from "./_components/sections/Manifesto";
 import { Ritual } from "./_components/sections/Ritual";
+import { PersistentBottle } from "./_components/three/PersistentBottle";
 
 /**
  * The home route (§2.9). Its sections are reached by in-page anchor, never by a
@@ -15,13 +16,17 @@ import { Ritual } from "./_components/sections/Ritual";
  * every route), and the sections pass through as children, so only the
  * interactive pieces opt into the client.
  *
- * Deferred (§6.3): idle float + fragrance-changer spin on the 3D bottle, and the
- * scroll-driven reveals / nav colour transition across these sections. The
- * layout and local-state interactions are complete here.
+ * The 3D bottle is mounted here rather than inside the Hero, as one fixed layer
+ * over the whole route: the Hero, Manifesto and Ritual each reserve empty space
+ * for it and it *travels* between them on scroll, so a single WebGL context and a
+ * single glTF serve all three beats instead of one per section. It lives at this
+ * level — not in the root layout — because the journey is specific to this page's
+ * sections; `/checkout` and `/collection` have no bottle.
  */
 export default function Home() {
   return (
     <>
+      <PersistentBottle />
       <main>
         <Hero />
         <Manifesto />

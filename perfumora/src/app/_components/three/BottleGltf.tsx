@@ -180,6 +180,13 @@ interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
    * variant before the change timeline had a chance to cross-fade it (§6.3 #10).
    */
   liquidColor: string;
+  /**
+   * Fired once the refs below are wired. The glTF resolves long after first
+   * render, inside a `<Suspense>`, and that resolution does not re-run the
+   * caller's motion hooks on its own — this is how they learn there is finally a
+   * `refs.root` to animate.
+   */
+  onReady?: () => void;
 }
 
 /**
@@ -195,6 +202,7 @@ interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
 export function BottleGltf({
   refs,
   liquidColor,
+  onReady,
   ...groupProps
 }: BottleGltfProps) {
   const gltf = useLoader(GLTFLoader, MODEL_URL);
@@ -280,7 +288,9 @@ export function BottleGltf({
     refs.cap.current = gltf.nodes[NODE.cap];
 
     invalidate();
-  }, [gltf, refs, invalidate]);
+    // Last, so the motion hooks that react to this only ever see fully wired refs.
+    onReady?.();
+  }, [gltf, refs, invalidate, onReady]);
 
   return (
     <group ref={refs.root} {...groupProps}>

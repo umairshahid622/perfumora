@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { BottleSceneMount } from "../three/BottleSceneMount";
 import { Container } from "../ui/Container";
 import { Eyebrow } from "../ui/Eyebrow";
 import { RippleButton } from "../ui/RippleButton";
@@ -22,13 +21,13 @@ import { priceFor, type SizeMl } from "../../_lib/variants";
  * washes up from beneath it, and the product controls (price, size, add-to-bag)
  * line the base. Prev/next arrows flank the vessel and drive the live variant.
  *
- * The `<BottleSceneMount>` is the reserved slot the finished model drops into —
- * its geometry/materials are frozen (per the current pass) and its per-variant
- * colour tween + idle float + change spin are the deferred 3D modules (§6.3
- * #9–10). Everything around it here is static layout.
+ * The model itself is *not* mounted here. It is the one persistent
+ * `<PersistentBottle>` layer over the whole route, so it can travel on into the
+ * Manifesto and the Ritual instead of being torn down with this section; what the
+ * stage below holds is the empty space it rests in while the Hero is on screen.
  */
 export function Hero() {
-  const { variant, index, direction } = useScent();
+  const { variant } = useScent();
   const { addItem } = useCart();
   const [size, setSize] = useState<SizeMl>(50);
 
@@ -63,18 +62,16 @@ export function Hero() {
           {/* Oversized variant name, behind the bottle */}
           <FragranceName />
 
-          {/* Reserved 3D bottle slot */}
-          <div className="relative z-10 h-[54vh] w-full max-w-lg md:h-[60vh]">
-            {/* Fragrance colour comes from the variant itself rather than the
-                `--accent` token: <ScentProvider> writes that token in an effect,
-                so reading it during this render trails one variant behind. */}
-            <BottleSceneMount
-              className="absolute inset-0"
-              liquidColor={variant.hex}
-              variantIndex={index}
-              spinDirection={direction}
-            />
-          </div>
+          {/* Reserved space the persistent bottle rests over while the Hero is in
+              view. Kept as a real box, not a bare gap, so the stage keeps its
+              height and the arrows and product bar stay where they were. The
+              phone value is the tighter one on purpose: below `md` the product bar
+              breaks into three stacked rows, and this box plus those rows plus the
+              counter have to stay inside one screen. */}
+          <div
+            aria-hidden="true"
+            className="relative z-10 h-[46vh] w-full max-w-lg md:h-[60vh]"
+          />
 
           {/* Flanking prev/next arrows */}
           <div className="pointer-events-none absolute inset-0 z-20">
