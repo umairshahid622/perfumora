@@ -6,10 +6,12 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useCart } from "../../_lib/cart-context";
+import { currentCustomer, type Customer } from "../../_lib/auth";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { scrollToSection } from "../../_lib/scroll-to";
 import { SECTION_IDS } from "../../_lib/sections";
 import { useRouteTransition } from "../providers/RouteTransition";
+import { AccountMenu } from "./AccountMenu";
 import { AuthModal } from "./AuthModal";
 import { CartDrawer } from "./CartDrawer";
 import { ChevronIcon, BagIcon, PersonIcon } from "./icons";
@@ -18,7 +20,9 @@ import { SoundToggle } from "./SoundToggle";
 
 gsap.registerPlugin(ScrollTrigger);
 
-type Panel = "menu" | "cart" | "auth" | null;
+/** What the header has open. The account button owns two of these: the login card
+ *  when nobody is signed in, the dropdown when someone is. */
+type Panel = "menu" | "cart" | "auth" | "account" | null;
 
 /**
  * The centre links' shared shape. A plain string, deliberately not run through
@@ -43,6 +47,10 @@ const linkTone = (current: boolean, tone: "light" | "dark") => {
     return current ? "text-accent-on-dark" : "hover:text-accent-on-dark";
   return current ? "text-accent-on-light" : "hover:text-accent-on-light";
 };
+
+/** The letter in the account avatar. `name` is resolved server-side and falls back
+ *  to the email address, so there is always a first character to take. */
+const initial = (name: string) => name.charAt(0).toUpperCase();
 
 /**
  * Persistent header (§4.0): three zones — wordmark, four centre links (the Home and
@@ -79,12 +87,44 @@ export function Navigation() {
   // to suit it; the accent doesn't tween — it has a form per tone, and this says
   // which one the links should be wearing.
   const [toneBehind, setToneBehind] = useState<"light" | "dark">("light");
+  // Who is signed in, or null. Owned here rather than inside <AuthModal> because the
+  // account button wears the answer too, and read on the client rather than passed
+  // down from the root layout: that layout carries `revalidate = 300`, so anything
+  // about the visitor rendered there would be cached and handed to the next one.
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const chevronRef = useRef<SVGSVGElement>(null);
   const navRef = useRef<HTMLElement>(null);
 
   const close = () => setPanel(null);
   const toggle = (next: Exclude<Panel, null>) =>
     setPanel((current) => (current === next ? null : next));
+
+  const authOpen = panel === "auth";
+
+  // Asked on mount, and again whenever the account card opens or closes, because the
+  // session is a cookie: it can expire, or a tab elsewhere can sign out, and nothing
+  // here would hear about it. <AuthModal> reports a sign-in or sign-out straight back
+  // through `onCustomer`, so the re-ask on close is only a backstop — it costs one
+  // Server Action call on a click the customer made deliberately.
+  useEffect(() => {
+    let live = true;
+    currentCustomer().then((who) => {
+      if (live) setCustomer(who);
+    });
+    return () => {
+      live = false;
+    };
+  }, [authOpen]);
+
+  /** The dropdown's Log out row, once the session is actually gone. Clearing the
+   *  customer puts the person glyph back in place of the initial, and the panel goes
+   *  with it — it is a menu for an account that no longer has a session. Unmounting
+   *  it instead would cut its close animation off mid-play, which is why <AccountMenu>
+   *  stays mounted whether or not anyone is signed in. */
+  const signedOut = () => {
+    setCustomer(null);
+    close();
+  };
 
   // The Fragrances button. The panel counts as on screen from this click either way:
   // on the way in that is the point, and on the way out it is already true and stays
@@ -322,14 +362,46 @@ export function Navigation() {
 
           {/* Right — three icons only */}
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => toggle("auth")}
-              aria-label="Account"
-              className="hover:text-accent-on-light grid size-10 place-items-center transition-colors"
-            >
-              <PersonIcon className="size-5" />
-            </button>
+            {/* Signed in, the person glyph gives way to the customer's initial in a
+                ring, and the click opens the account dropdown instead of the login
+                card. Drawn in `currentColor` like the two icons beside it, so it
+                rides the nav's ink↔paper tween and stays legible over both the
+                parchment and the near-black sections. A filled copper disc was the
+                first instinct, but `--accent` behind `--accent-contrast` is about
+                3.4:1 — under AA at this size — and the cart badge is already the
+                one accent-filled thing in the header.
+
+                `relative` because <AccountMenu> anchors to this button rather than
+                to the viewport: it is the one header panel that hangs off its
+                trigger instead of covering the page. */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => toggle(customer ? "account" : "auth")}
+                aria-expanded={customer ? panel === "account" : undefined}
+                aria-label={
+                  customer ? `Account, signed in as ${customer.name}` : "Account"
+                }
+                className="hover:text-accent-on-light grid size-10 place-items-center transition-colors"
+              >
+                {customer ? (
+                  <span
+                    aria-hidden="true"
+                    className="grid size-7 place-items-center rounded-full border border-current text-[0.8rem] leading-none font-medium"
+                  >
+                    {initial(customer.name)}
+                  </span>
+                ) : (
+                  <PersonIcon className="size-5" />
+                )}
+              </button>
+
+              <AccountMenu
+                open={panel === "account"}
+                onClose={close}
+                onSignedOut={signedOut}
+              />
+            </div>
 
             <button
               type="button"
@@ -364,7 +436,12 @@ export function Navigation() {
         onCheckout={onCheckOut}
       />
 
-      <AuthModal open={panel === "auth"} onClose={close} />
+      <AuthModal
+        open={authOpen}
+        onClose={close}
+        customer={customer}
+        onCustomer={setCustomer}
+      />
     </>
   );
 }

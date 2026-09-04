@@ -5,11 +5,15 @@
 -- Safe to re-run: every statement is guarded.
 --
 -- SECURITY NOTE: the anon key shipped in the client bundle is public by
--- design — Row Level Security below is the real boundary. Because the admin
--- policies grant full access to ANY signed-in user, you MUST disable public
--- sign-ups (Dashboard → Authentication → Sign In / Providers → uncheck
--- "Allow new users to sign up") and create your admin user by hand. Otherwise
--- anyone who registers gets write access to your catalog and orders.
+-- design — Row Level Security below is the real boundary. Admin rights come
+-- from a row in `user_roles`, NOT from merely being signed in, so public
+-- sign-ups are safe to leave on: a new account is a customer, and a customer
+-- can read its own orders and nothing else. Becoming staff is a deliberate act
+-- — the seeding block below, which you must edit before this file will run.
+--
+-- PostgREST answers from a cached schema, so after changing anything here run
+-- `notify pgrst, 'reload schema';` — the last statement in this file. A
+-- function it hasn't cached comes back as 404 PGRST202 however correct the SQL.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -23,6 +27,57 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   create type bottle_size as enum ('30ml', '50ml');
 exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type user_role as enum ('admin', 'customer');
+exception when duplicate_object then null; end $$;
+
+-- ---------------------------------------------------------------------------
+-- user_roles — who is staff, and who is a shopper.
+--
+-- An EXCEPTIONS table: a row exists only to record a role granted on purpose.
+-- No row means customer, so a brand-new sign-up holds the least privilege there
+-- is without anything having to run on its behalf — which is why there is
+-- deliberately no trigger on auth.users here. A trigger that threw would break
+-- sign-up itself, and all it could write is the default already assumed.
+-- ---------------------------------------------------------------------------
+
+create table if not exists user_roles (
+  user_id uuid      primary key references auth.users(id) on delete cascade,
+  role    user_role not null default 'customer'
+);
+
+-- `security definer` so a policy can consult user_roles without user_roles
+-- itself needing a policy that lets everyone read it; `stable` so Postgres may
+-- call it once per statement rather than once per row; search_path pinned for
+-- the same reason place_order pins it.
+create or replace function is_admin() returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (
+    select 1 from user_roles where user_id = auth.uid() and role = 'admin'
+  )
+$$;
+
+-- >>> EDIT THIS: your admin address, exactly as it appears under Dashboard →
+-- Authentication → Users. Without it every policy below locks you out of your
+-- own panel, so this block refuses to run rather than letting that happen
+-- quietly — RLS does not raise a permission error, it just returns no rows, and
+-- an empty Orders page is a miserable thing to debug.
+do $$
+declare
+  v_email text := 'you@example.com';
+  v_id    uuid;
+begin
+  select id into v_id from auth.users where email = v_email;
+  if v_id is null then
+    raise exception
+      'No auth user with email %. Set v_email in this block to your admin address (Dashboard → Authentication → Users), then re-run this file.', v_email;
+  end if;
+
+  insert into user_roles (user_id, role) values (v_id, 'admin')
+  on conflict (user_id) do update set role = 'admin';
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- fragrances — one row per SKU.
@@ -103,6 +158,12 @@ create table if not exists orders (
 alter table orders add column if not exists city  text not null default '';
 alter table orders add column if not exists notes text not null default '';
 
+-- Re-runnable upgrade: which account placed the order, when one did. Null is the
+-- normal case — guest checkout needs no sign-in — and `on delete set null` means
+-- removing a customer never removes the sale.
+alter table orders add column if not exists user_id uuid
+  references auth.users(id) on delete set null;
+
 -- ---------------------------------------------------------------------------
 -- order_items — one row per fragrance+size line on an order.
 --
@@ -126,6 +187,7 @@ create table if not exists order_items (
 create index if not exists order_items_order_id_idx on order_items (order_id);
 create index if not exists orders_status_idx         on orders (status);
 create index if not exists orders_created_at_idx     on orders (created_at desc);
+create index if not exists orders_user_id_idx        on orders (user_id, created_at desc);
 create index if not exists fragrances_active_idx     on fragrances (active);
 
 -- ---------------------------------------------------------------------------
@@ -136,35 +198,70 @@ alter table fragrances      enable row level security;
 alter table fragrance_sizes enable row level security;
 alter table orders          enable row level security;
 alter table order_items     enable row level security;
+alter table user_roles      enable row level security;
 
--- Admin: any signed-in user gets full control. See the security note at the
--- top — this is only safe with public sign-ups disabled.
+-- Admin: full control, granted by `is_admin()` rather than by the bare fact of
+-- holding a session. That distinction is the point of this whole section — a
+-- customer carries an `authenticated` token too.
 drop policy if exists "admin full access" on fragrances;
 create policy "admin full access" on fragrances
-  for all to authenticated using (true) with check (true);
+  for all to authenticated using (is_admin()) with check (is_admin());
 
 drop policy if exists "admin full access" on fragrance_sizes;
 create policy "admin full access" on fragrance_sizes
-  for all to authenticated using (true) with check (true);
+  for all to authenticated using (is_admin()) with check (is_admin());
 
 drop policy if exists "admin full access" on orders;
 create policy "admin full access" on orders
-  for all to authenticated using (true) with check (true);
+  for all to authenticated using (is_admin()) with check (is_admin());
 
 drop policy if exists "admin full access" on order_items;
 create policy "admin full access" on order_items
-  for all to authenticated using (true) with check (true);
+  for all to authenticated using (is_admin()) with check (is_admin());
 
--- Storefront (anonymous visitors): read-only, and only what's on sale.
--- Orders stay invisible to anon entirely — customer checkout should insert via
--- an Edge Function using the service-role key, not from the browser.
+-- Customers: their own orders, read-only. Postgres ORs permissive policies
+-- together, so these sit beside the admin ones rather than competing with them —
+-- an admin still sees every row, a customer only rows carrying their id. Both are
+-- `for select`, so neither grants a customer a single write.
+drop policy if exists "customer read own orders" on orders;
+create policy "customer read own orders" on orders
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "customer read own order items" on order_items;
+create policy "customer read own order items" on order_items
+  for select to authenticated using (
+    exists (
+      select 1 from orders o
+      where o.id = order_items.order_id and o.user_id = auth.uid()
+    )
+  );
+
+-- Roles: read your own, and only an admin hands one out. No insert, update or
+-- delete for a customer anywhere — being able to write this table is being able
+-- to make yourself staff.
+drop policy if exists "read own role" on user_roles;
+create policy "read own role" on user_roles
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "admin manage roles" on user_roles;
+create policy "admin manage roles" on user_roles
+  for all to authenticated using (is_admin()) with check (is_admin());
+
+-- Storefront: read-only, and only what's on sale. `anon, authenticated` covers a
+-- visitor and a signed-in customer alike — a customer's token is `authenticated`,
+-- so naming only `anon` here would hand every logged-in shopper an empty shop now
+-- that "admin full access" no longer catches them.
+--
+-- Orders stay invisible to anon entirely. A guest checkout reaches them through
+-- place_order with the service-role key (perfumora/src/app/_lib/orders.ts), never
+-- from the browser.
 drop policy if exists "public read active fragrances" on fragrances;
 create policy "public read active fragrances" on fragrances
-  for select to anon using (active = true);
+  for select to anon, authenticated using (active = true);
 
 drop policy if exists "public read active fragrance sizes" on fragrance_sizes;
 create policy "public read active fragrance sizes" on fragrance_sizes
-  for select to anon using (
+  for select to anon, authenticated using (
     exists (
       select 1 from fragrances f
       where f.id = fragrance_sizes.fragrance_id and f.active
@@ -175,7 +272,8 @@ create policy "public read active fragrance sizes" on fragrance_sizes
 -- Storage — fragrance images
 --
 -- Public-read so both the panel and the storefront can use a plain <img src>;
--- writes stay behind the same signed-in check as the tables above.
+-- writes stay behind the same `is_admin()` check as the tables above, so a
+-- signed-in customer cannot replace or delete your product photography.
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public)
@@ -188,15 +286,18 @@ create policy "public read fragrance images" on storage.objects
 
 drop policy if exists "admin upload fragrance images" on storage.objects;
 create policy "admin upload fragrance images" on storage.objects
-  for insert to authenticated with check (bucket_id = 'fragrance-images');
+  for insert to authenticated
+  with check (bucket_id = 'fragrance-images' and is_admin());
 
 drop policy if exists "admin replace fragrance images" on storage.objects;
 create policy "admin replace fragrance images" on storage.objects
-  for update to authenticated using (bucket_id = 'fragrance-images');
+  for update to authenticated
+  using (bucket_id = 'fragrance-images' and is_admin());
 
 drop policy if exists "admin delete fragrance images" on storage.objects;
 create policy "admin delete fragrance images" on storage.objects
-  for delete to authenticated using (bucket_id = 'fragrance-images');
+  for delete to authenticated
+  using (bucket_id = 'fragrance-images' and is_admin());
 
 -- ---------------------------------------------------------------------------
 -- place_order — the storefront's one write.
@@ -219,9 +320,19 @@ create policy "admin delete fragrance images" on storage.objects
 -- Returns the total it computed — the figure the confirmation screen shows.
 -- ---------------------------------------------------------------------------
 
+-- The 7-argument version has to go rather than be replaced: `create or replace`
+-- cannot change an argument list, and leaving it behind would keep a second path
+-- open that writes orders with no owner.
+drop function if exists place_order(text,text,text,text,text,text,jsonb);
+
 create or replace function place_order(
   p_id text, p_name text, p_phone text, p_address text,
-  p_city text, p_notes text, p_lines jsonb
+  p_city text, p_notes text, p_lines jsonb,
+  -- Who placed it, or null for a guest — still the normal path. Defaulted so this
+  -- file and the storefront need not deploy in step: PostgREST resolves an RPC by
+  -- argument name, and a parameter with no default would make a call that omits
+  -- it fail to match the function at all.
+  p_user_id uuid default null
 ) returns integer
 language plpgsql
 -- Pinned, so an unqualified name below can't be resolved through a caller's
@@ -239,8 +350,8 @@ begin
   -- Inserted at 0 and corrected at the end: the total is the sum of the prices
   -- read below, and there is nothing to sum until the loop has run.
   insert into orders (id, customer_name, customer_phone,
-                      shipping_address, city, notes, total)
-  values (p_id, p_name, p_phone, p_address, p_city, p_notes, 0);
+                      shipping_address, city, notes, total, user_id)
+  values (p_id, p_name, p_phone, p_address, p_city, p_notes, 0, p_user_id);
 
   for v_line in select * from jsonb_array_elements(p_lines) loop
     v_id   := v_line->>'fragrance_id';
@@ -283,8 +394,8 @@ end $$;
 -- by default; an anon or signed-in caller would get nowhere anyway (the function
 -- runs as its invoker, so the policies above still apply to them), but saying so
 -- outright is cheaper than reasoning about it.
-revoke all on function place_order(text,text,text,text,text,text,jsonb) from public;
-grant execute on function place_order(text,text,text,text,text,text,jsonb) to service_role;
+revoke all on function place_order(text,text,text,text,text,text,jsonb,uuid) from public;
+grant execute on function place_order(text,text,text,text,text,text,jsonb,uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Audit — the one invariant the database can't enforce itself.
@@ -300,3 +411,8 @@ grant execute on function place_order(text,text,text,text,text,text,jsonb) to se
 --   order by f.name;
 --
 -- ---------------------------------------------------------------------------
+
+-- Last, and not optional: PostgREST serves the REST and RPC endpoints from a
+-- cached picture of the schema, and it will report a function it hasn't cached as
+-- 404 PGRST202 no matter how correct the SQL above is.
+notify pgrst, 'reload schema';

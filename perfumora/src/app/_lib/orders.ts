@@ -139,6 +139,12 @@ export async function placeOrder(
       p_city: customer.city,
       p_notes: customer.notes,
       p_lines: payload,
+      // No `p_user_id` key here, deliberately. PostgREST matches an RPC by the
+      // argument names in the body, so sending one the deployed function does not
+      // declare is a 404 (PGRST202) rather than a harmless extra — the schema has to
+      // gain the parameter before this file may send it. Omitting it is the only form
+      // that works against both signatures, since the 8-argument `place_order`
+      // defaults `p_user_id` to null. Pass 2 adds it back, guarded by a real session.
     });
     if (error) throw new Error(error.message);
 
