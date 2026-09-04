@@ -29,7 +29,7 @@ const STATUS_TABS: { key: OrderStatus | "all"; label: string }[] = [
 function exportCsv(orders: Order[]) {
   const header = [
     "Order ID", "Customer", "Email", "Phone", "Status",
-    "Created", "Items", "Total (Rs)", "Shipping address",
+    "Created", "Items", "Total (Rs)", "Shipping address", "City", "Delivery notes",
   ];
   const rows = orders.map((o) => [
     o.id,
@@ -41,6 +41,8 @@ function exportCsv(orders: Order[]) {
     o.items.map((i) => `${i.fragranceName} ${i.size} x${i.qty}`).join("; "),
     String(o.total),
     o.shippingAddress,
+    o.city,
+    o.notes,
   ]);
   // Quote every field and escape embedded quotes.
   const csv = [header, ...rows]

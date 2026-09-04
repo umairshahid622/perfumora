@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  VARIANTS,
   accentGlow,
   readableAccent,
   readableAccentOnDark,
@@ -21,6 +20,13 @@ import {
  * Owns the single piece of "which fragrance is selected" state and lifts it to
  * the page root (§5) so the nav, the Hero and any section below can read it,
  * while the Hero's arrows remain the only thing that calls the setter.
+ *
+ * It is also where the catalogue itself lands. The fragrance list is read from
+ * Supabase on the server (`catalogue.ts`) and handed down through
+ * `<AppProviders>`, so this provider re-publishes it on the context: every client
+ * component that needs the list — the mega menu, the home gallery — reads it from
+ * here rather than importing a module-level array, and there is exactly one copy
+ * of it in the tree.
  *
  * Its side effect is the design system's live wiring: whenever the variant
  * changes it rewrites `--accent`, `--accent-contrast`, `--accent-glow` and the two
@@ -34,6 +40,8 @@ import {
  * the 3D bottle can turn that way; the colour/sparkle beats layer on later.
  */
 interface ScentContextValue {
+  /** The whole catalogue, in scroll/arrow order. Never empty. */
+  variants: readonly Variant[];
   variant: Variant;
   index: number;
   count: number;
@@ -50,11 +58,17 @@ interface ScentContextValue {
 
 const ScentContext = createContext<ScentContextValue | null>(null);
 
-export function ScentProvider({ children }: { children: ReactNode }) {
+export function ScentProvider({
+  variants,
+  children,
+}: {
+  variants: readonly Variant[];
+  children: ReactNode;
+}) {
   const [index, setIndexRaw] = useState(0);
   const [direction, setDirection] = useState(1);
-  const count = VARIANTS.length;
-  const variant = VARIANTS[index];
+  const count = variants.length;
+  const variant = variants[index];
 
   // Direction is recorded by the caller that knows it rather than derived from
   // the index delta, and travels with the new index so both land in one render.
@@ -89,8 +103,8 @@ export function ScentProvider({ children }: { children: ReactNode }) {
   }, [variant]);
 
   const value = useMemo<ScentContextValue>(
-    () => ({ variant, index, count, direction, setIndex, next, prev }),
-    [variant, index, count, direction, setIndex, next, prev],
+    () => ({ variants, variant, index, count, direction, setIndex, next, prev }),
+    [variants, variant, index, count, direction, setIndex, next, prev],
   );
 
   return <ScentContext.Provider value={value}>{children}</ScentContext.Provider>;

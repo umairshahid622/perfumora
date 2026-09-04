@@ -13,7 +13,7 @@ import { VariantArrows } from "./VariantArrows";
 import { useCart } from "../../_lib/cart-context";
 import { useScent } from "../../_lib/scent-context";
 import { SECTION_IDS } from "../../_lib/sections";
-import { priceFor, type SizeMl } from "../../_lib/variants";
+import { defaultSize, offeredSizes, type SizeMl } from "../../_lib/variants";
 
 /**
  * Hero / product showcase (§4.1). The 3D bottle is the centre of gravity; the
@@ -29,9 +29,20 @@ import { priceFor, type SizeMl } from "../../_lib/variants";
 export function Hero() {
   const { variant } = useScent();
   const { addItem } = useCart();
-  const [size, setSize] = useState<SizeMl>(50);
+  // What the customer last *chose*, which is not always what is on screen: the
+  // arrows change fragrance under this control, and the new fragrance may not sell
+  // the size that was picked. So the choice is remembered and the effective size
+  // derived from it below, rather than corrected in an effect — an effect would
+  // paint one frame of the old fragrance's price against the new one's name.
+  const [picked, setPicked] = useState<SizeMl | null>(null);
 
-  const price = priceFor(size);
+  const offered = offeredSizes(variant.sizes);
+  const size =
+    picked && offered.includes(picked) ? picked : defaultSize(variant.sizes);
+  // Present by construction: `offered` and `defaultSize` only ever name a size
+  // this fragrance sells, and a fragrance with no sizes never reaches the UI.
+  const { price, stock } = variant.sizes[size]!;
+  const soldOut = stock === 0;
 
   const addToBag = () => {
     addItem({
@@ -90,12 +101,20 @@ export function Hero() {
           </div>
 
           <div className="order-1 flex justify-start md:order-2 md:justify-center">
-            <SizeSelector value={size} onChange={setSize} />
+            <SizeSelector value={size} onChange={setPicked} sizes={variant.sizes} />
           </div>
 
           <div className="order-3 flex sm:justify-end">
-            <RippleButton onClick={addToBag} aria-label={`Add ${variant.name} to bag`}>
-              Add to Bag
+            <RippleButton
+              onClick={addToBag}
+              disabled={soldOut}
+              aria-label={
+                soldOut
+                  ? `${variant.name}, ${size}ml, sold out`
+                  : `Add ${variant.name} to bag`
+              }
+            >
+              {soldOut ? "Sold Out" : "Add to Bag"}
             </RippleButton>
           </div>
         </div>

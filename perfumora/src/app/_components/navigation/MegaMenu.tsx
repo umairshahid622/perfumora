@@ -6,7 +6,7 @@ import gsap from "gsap";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { useScent } from "../../_lib/scent-context";
-import { VARIANTS, accentGlow, juiceColor } from "../../_lib/variants";
+import { accentGlow, juiceColor } from "../../_lib/variants";
 import { BottlePreview } from "./BottlePreview";
 
 interface MegaMenuProps {
@@ -32,7 +32,7 @@ interface MegaMenuProps {
  * variant and hands off to `onSelect` for the trip to the Hero.
  */
 export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
-  const { setIndex, index } = useScent();
+  const { variants, setIndex, index } = useScent();
   const [hovered, setHovered] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLButtonElement>(null);
@@ -98,7 +98,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
 
   // The vessel previews the hovered row, falling back to the committed selection.
   const displayIndex = hovered ?? index;
-  const displayVariant = VARIANTS[displayIndex];
+  const displayVariant = variants[displayIndex];
 
   return (
     <div ref={rootRef} aria-hidden={!open}>
@@ -203,7 +203,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
             }}
             className="grid min-h-0 grid-cols-1 content-start gap-2 self-stretch overflow-y-auto sm:grid-cols-2 lg:grid-cols-3"
           >
-            {VARIANTS.map((variant, i) => (
+            {variants.map((variant, i) => (
               <li key={variant.id}>
                 <button
                   type="button"

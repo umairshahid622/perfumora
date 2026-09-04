@@ -3,8 +3,8 @@
 import { useState, type CSSProperties } from "react";
 import { useCart } from "../../_lib/cart-context";
 import {
+  defaultSize,
   formatPrice,
-  priceFor,
   readableAccent,
   type SizeMl,
   type Variant,
@@ -41,10 +41,15 @@ export function GalleryCard({
   position: string;
 }) {
   const { addItem } = useCart();
-  const [size, setSize] = useState<SizeMl>(50);
+  // Unlike the Hero's, this card's fragrance never changes under the selection —
+  // the grid keys each card by variant id — so the opening size is an initialiser
+  // and there is nothing to reconcile on re-render.
+  const [size, setSize] = useState<SizeMl>(() => defaultSize(variant.sizes));
 
   const accent = readableAccent(variant.hex);
-  const price = priceFor(size);
+  // Present by construction: `size` only ever holds a size this fragrance sells.
+  const { price, stock } = variant.sizes[size]!;
+  const soldOut = stock === 0;
 
   const add = () =>
     addItem({
@@ -120,13 +125,22 @@ export function GalleryCard({
             </div>
 
             <div className="mt-5 flex flex-col gap-4">
-              <SizeSelector value={size} onChange={setSize} />
+              <SizeSelector
+                value={size}
+                onChange={setSize}
+                sizes={variant.sizes}
+              />
               <RippleButton
                 onClick={add}
+                disabled={soldOut}
                 className="w-full"
-                aria-label={`Add ${variant.name}, ${size}ml, to bag`}
+                aria-label={
+                  soldOut
+                    ? `${variant.name}, ${size}ml, sold out`
+                    : `Add ${variant.name}, ${size}ml, to bag`
+                }
               >
-                Add to Bag
+                {soldOut ? "Sold Out" : "Add to Bag"}
               </RippleButton>
             </div>
           </div>

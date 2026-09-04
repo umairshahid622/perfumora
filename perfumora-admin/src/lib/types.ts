@@ -80,6 +80,12 @@ export interface Order {
   customerEmail: string;
   customerPhone: string;
   shippingAddress: string;
+  /** Kept apart from `shippingAddress` rather than appended to it, so the list
+   *  can group by city later without parsing a free-text blob. */
+  city: string;
+  /** Whatever the customer told the courier — a landmark, a preferred time. May
+   *  well be empty; it is the one field checkout does not require. */
+  notes: string;
   status: OrderStatus;
   /** ISO 8601 timestamp. */
   createdAt: string;

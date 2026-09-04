@@ -241,6 +241,25 @@ export function OrderDetail() {
             <p className="text-sm leading-relaxed text-slate-600">
               {order.shippingAddress}
             </p>
+            {/* City sits under the address in the panel's value treatment: it is
+                the line a courier routes on, not another sentence of the blob. */}
+            {order.city && (
+              <p className="mt-1 text-sm font-medium text-slate-900">
+                {order.city}
+              </p>
+            )}
+            {/* Ruled off, because a "leave at the back gate" read as part of the
+                address is how a parcel goes to the wrong place. */}
+            {order.notes && (
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  Delivery notes
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                  {order.notes}
+                </p>
+              </div>
+            )}
           </section>
         </aside>
       </div>

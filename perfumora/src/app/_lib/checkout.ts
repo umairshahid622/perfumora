@@ -1,9 +1,11 @@
 /**
- * The cash-on-delivery order payload (§4.0) — types and assembly only. Nothing
- * here leaves the browser: there is no order backend, no mailer and no payment
- * provider (§1). <Checkout> logs this object when the order is placed, so the one
- * change a real destination needs is a request at that call site, with the shape
- * already settled here.
+ * The cash-on-delivery order payload (§4.0) — types and assembly only.
+ *
+ * This is the *confirmation screen's* view of an order. The record itself is a
+ * row in Supabase, written by `placeOrder` (./orders.ts); `buildOrder` below
+ * freezes the reviewed bag around the reference and total that write returned, so
+ * what the customer reads back is provably the order that landed. Still no
+ * mailer and no payment provider (§1).
  */
 
 import type { CartLine } from "./cart-context";
@@ -56,15 +58,19 @@ export interface Order {
   currency: "PKR";
   customer: CustomerDetails;
   lines: OrderLine[];
-  /** Integer PKR — the sum of every `lineTotal`. No delivery fee or tax exists. */
+  /** Integer PKR, as the database computed it — not necessarily the sum of
+   *  `lines`. The two differ only if a price changed while the bottle sat in the
+   *  bag, and this is the figure the courier will collect. */
   total: number;
 }
 
 /**
  * A reference the customer can quote back: `PRF-M3K9X4-7Q1B`. The timestamp in
  * base 36 keeps it short and roughly sortable; the random tail separates two
- * orders placed in the same millisecond. Call this from an event handler only —
- * generated during render, the server and the client would disagree.
+ * orders placed in the same millisecond.
+ *
+ * Called on the server, inside `placeOrder`, and nowhere else: this is the order
+ * row's primary key, so it is not the client's to choose.
  */
 export function orderReference(): string {
   const stamp = Date.now().toString(36).toUpperCase();
@@ -75,8 +81,15 @@ export function orderReference(): string {
   return `PRF-${stamp}-${tail}`;
 }
 
-/** Freeze the entered details and the current cart into one order payload. */
+/**
+ * Freeze the entered details and the current cart around what the write returned.
+ *
+ * `placed` is the server's half — the stored reference and the total it computed —
+ * which is why they are passed in rather than derived here. Everything else is the
+ * bag as the customer reviewed it.
+ */
 export function buildOrder(
+  placed: { reference: string; total: number },
   details: CustomerDetails,
   items: readonly CartLine[],
 ): Order {
@@ -90,7 +103,7 @@ export function buildOrder(
   }));
 
   return {
-    reference: orderReference(),
+    reference: placed.reference,
     placedAt: new Date().toISOString(),
     paymentMethod: "cod",
     currency: "PKR",
@@ -102,6 +115,6 @@ export function buildOrder(
       notes: details.notes.trim(),
     },
     lines,
-    total: lines.reduce((sum, line) => sum + line.lineTotal, 0),
+    total: placed.total,
   };
 }

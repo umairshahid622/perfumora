@@ -1,55 +1,64 @@
 /**
- * The twenty-four SKUs. Per §0 the *only* thing that changes across products is the
- * liquid colour — bottle, cap and jar geometry never change — so a variant is
- * essentially a name + a colour. That colour drives both the live `--accent`
- * token and the 3D fragrance: one shared liquid mesh whose material is tinted
- * per variant (never re-meshed).
+ * Everything the storefront knows about a fragrance *besides* which ones exist.
  *
- * Each `hex` is matched to that product's real juice, read from the reference
- * bottle photos (and cross-checked against the known inspirations — Bombshell's
- * pink, LV Imagination's turquoise, Arabian Oud Madawi's gold). Prices are
- * placeholder (see SIZE_PRICES) — no real catalogue exists yet.
+ * The catalogue itself now comes from Supabase — see `catalogue.ts`, which is the
+ * only place that talks to the database. What lives here is the maths that turns
+ * one `fragrances.color` hex into every colour the page needs (`readableAccent`,
+ * `readableAccentOnDark`, `juiceColor`, `accentGlow`, `contrastToken`), plus the
+ * small helpers for reading a variant's per-size prices and stock.
+ *
+ * Per §0 the *only* thing that changes across products is the liquid colour —
+ * bottle, cap and jar geometry never change — so a variant is essentially a name +
+ * a colour + what sizes it sells. That colour drives both the live `--accent`
+ * token and the 3D fragrance: one shared liquid mesh whose material is tinted per
+ * variant (never re-meshed).
  */
 
-export type VariantId =
-  | "madawi"
-  | "shay_oud"
-  | "boom_shell"
-  | "ahojas_oud"
-  | "imperial_vally"
-  | "rose_vanilla"
-  | "tahnoun_oud"
-  | "abdul_majeed"
-  | "walaya_d_marly"
-  | "tyger"
-  | "parada"
-  | "strong_with_you"
-  | "marj"
-  | "creed_aventus"
-  | "gucci_flora"
-  | "hacivat_nishane"
-  | "shay_shay"
-  | "tuxedo"
-  | "miss_dior"
-  | "dubai_maydan"
-  | "delna_de_marly"
-  | "angels_share"
-  | "sauwage_dior"
-  | "vanila_28_kayal";
-// madavi: unisex
-// shay_oud: men
-// boom_shell: female
-// ahojas_oud: male
+/**
+ * A `fragrances.id` — free text in the database, set by whoever created the row in
+ * the admin panel. Kept as a named alias rather than bare `string` because it is
+ * the key the cart and the order payload join on.
+ */
+export type VariantId = string;
+
 export type SizeMl = 30 | 50;
+
+/**
+ * What one size of one fragrance costs and how many are left.
+ *
+ * Sparse on purpose, mirroring `fragrance_sizes` and the admin's own `SizeMap`: a
+ * size with no entry is a size we don't sell, so it stays absent rather than
+ * becoming `{ price: 0, stock: 0 }`. Filling it in would make a 30ml-only
+ * fragrance look like it also sells a free, sold-out 50ml. "Sold but out of stock"
+ * is a present entry with `stock: 0` — a different state, and the UI shows it.
+ */
+export type SizeMap = Partial<Record<SizeMl, { price: number; stock: number }>>;
 
 export interface Variant {
   id: VariantId;
-  /** Display name — the Hero background type and cart line label. Placeholder. */
+  /** Display name — the Hero background type and cart line label. */
   name: string;
   /** The saturated variant colour (§3.3) — the only saturated colour on the page. */
   hex: string;
   /** Which text token stays legible on a button filled with `hex` (§3.3). */
   contrast: "ink" | "paper";
+  /** Price + stock per size sold. Never empty: `getCatalogue` drops fragrances
+   *  with no size rows, since they have no price and cannot be bought. */
+  sizes: SizeMap;
+}
+
+/** The sizes this fragrance actually sells, ascending. */
+export function offeredSizes(sizes: SizeMap): SizeMl[] {
+  return ([30, 50] as const).filter((size) => sizes[size] !== undefined);
+}
+
+/**
+ * The size a fresh selector opens on: 50ml where it is sold, otherwise the only
+ * other option. Non-optional because every variant that reaches the UI sells at
+ * least one size (see `Variant.sizes`).
+ */
+export function defaultSize(sizes: SizeMap): SizeMl {
+  return sizes[50] ? 50 : 30;
 }
 
 /** WCAG relative luminance of an sRGB hex, 0 (black) … 1 (white). */
@@ -63,7 +72,7 @@ function relativeLuminance(hex: string): number {
 }
 
 /** Button label token: light `--paper` on dark accents, dark `--ink` on light. */
-function contrastToken(hex: string): "ink" | "paper" {
+export function contrastToken(hex: string): "ink" | "paper" {
   return relativeLuminance(hex) > 0.45 ? "ink" : "paper";
 }
 
@@ -165,53 +174,6 @@ export function juiceColor(hex: string): string {
       .toString(16)
       .padStart(2, "0");
   return `#${push(ch[0])}${push(ch[1])}${push(ch[2])}`;
-}
-
-const PALETTE: ReadonlyArray<Pick<Variant, "id" | "name" | "hex">> = [
-  { id: "madawi", name: "Madawi", hex: "#CBA23C" }, // golden amber (unisex)
-  { id: "shay_oud", name: "Shay Oud", hex: "#D7CD80" }, // pale tea-straw
-  { id: "boom_shell", name: "Boom Shell", hex: "#E492A6" }, // candy rose pink
-  { id: "ahojas_oud", name: "Ahojas Oud", hex: "#CF9138" }, // warm amber
-  { id: "imperial_vally", name: "Imperial Vally", hex: "#2EA39A" }, // turquoise
-  { id: "rose_vanilla", name: "Rose Vanilla", hex: "#D2837A" }, // warm coral rose
-  { id: "tahnoun_oud", name: "Tahnoun Oud", hex: "#F4F5F6" }, // near-clear
-  { id: "abdul_majeed", name: "Abdul Majeed", hex: "#C9A94A" }, // golden honey
-  { id: "walaya_d_marly", name: "Walaya de Marly", hex: "#EAEDE9" }, // near-clear, faint cool
-  { id: "tyger", name: "Tyger", hex: "#C6C574" }, // pale yellow-green
-  { id: "parada", name: "Parada", hex: "#BFA23A" }, // deep golden
-  { id: "strong_with_you", name: "Strong With You", hex: "#EDE3E2" }, // near-clear, faint rose
-  { id: "marj", name: "Marj", hex: "#D6A78D" }, // warm peach-rose
-  { id: "creed_aventus", name: "Creed Aventus", hex: "#E8EBE6" }, // near-clear, faint green-grey
-  { id: "gucci_flora", name: "Gucci Flora", hex: "#EFF1F0" }, // crystal clear
-  { id: "hacivat_nishane", name: "Hacivat Nishane", hex: "#C2C168" }, // chartreuse green-yellow
-  { id: "shay_shay", name: "Shay Shay", hex: "#D5CC74" }, // pale straw yellow
-  { id: "tuxedo", name: "Tuxedo", hex: "#B9AF4E" }, // olive-chartreuse
-  { id: "miss_dior", name: "Miss Dior", hex: "#EAE7E4" }, // near-clear, faint warm
-  { id: "dubai_maydan", name: "Dubai Maydan", hex: "#C9C578" }, // pale yellow-green
-  { id: "delna_de_marly", name: "Delna de Marly", hex: "#EEF0EE" }, // crystal clear
-  { id: "angels_share", name: "Angel's Share", hex: "#C2A542" }, // golden olive
-  { id: "sauwage_dior", name: "Sauvage Dior", hex: "#EDF0F0" }, // crystal clear, faint cool
-  { id: "vanila_28_kayal", name: "Vanilla 28 Kayali", hex: "#C59733" }, // deep golden amber
-];
-
-export const VARIANTS: readonly Variant[] = PALETTE.map((v) => ({
-  ...v,
-  contrast: contrastToken(v.hex),
-}));
-
-export const SIZES: readonly SizeMl[] = [30, 50];
-
-/**
- * Placeholder pricing — a function of size only, identical across variants
- * (nothing in the brief prices SKUs differently). NOT final catalogue pricing.
- */
-export const SIZE_PRICES: Record<SizeMl, number> = {
-  30: 2000,
-  50: 3000,
-};
-
-export function priceFor(size: SizeMl): number {
-  return SIZE_PRICES[size];
 }
 
 export function formatPrice(amount: number): string {

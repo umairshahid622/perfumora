@@ -1,7 +1,7 @@
 "use client";
 
 import { SECTION_IDS } from "../../_lib/sections";
-import { VARIANTS } from "../../_lib/variants";
+import { useScent } from "../../_lib/scent-context";
 import { useRouteTransition } from "../providers/RouteTransition";
 import { Container } from "../ui/Container";
 import { RippleButton } from "../ui/RippleButton";
@@ -14,7 +14,7 @@ const HOME_PREVIEW_COUNT = 4;
 /**
  * Gallery (§4.5) — the home page's teaser for the collection: the first few
  * fragrances as product cards, then a CTA through to the full catalogue. Showing
- * all twenty-four here buried a long scroll in the middle of the one-page
+ * the whole catalogue here buried a long scroll in the middle of the one-page
  * narrative, so the complete set moved to its own `/collection` route; this beat
  * shows {@link HOME_PREVIEW_COUNT} and links onward.
  *
@@ -25,11 +25,14 @@ const HOME_PREVIEW_COUNT = 4;
  */
 export function Gallery() {
   const { navigate } = useRouteTransition();
+  // The catalogue as the page root published it, so the teaser shows the same
+  // first four the DB's order puts first — no second source of truth.
+  const { variants } = useScent();
 
   return (
     <Section id={SECTION_IDS.gallery} tone="light">
       <GalleryGrid
-        variants={VARIANTS.slice(0, HOME_PREVIEW_COUNT)}
+        variants={variants.slice(0, HOME_PREVIEW_COUNT)}
         eyebrow="The Collection"
         title="Selected fragrances"
       />

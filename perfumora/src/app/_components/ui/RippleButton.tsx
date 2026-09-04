@@ -14,6 +14,9 @@ interface RippleButtonProps {
   /** Opt out of the shared click cue — for the CTAs inside the navigation
    *  panels (cart, auth), which the sound spec excludes. */
   silent?: boolean;
+  /** Inert and visibly so — an out-of-stock Add to Bag. The hover ripple is
+   *  skipped too: a fill that still animates reads as "try me". */
+  disabled?: boolean;
   "aria-label"?: string;
 }
 
@@ -46,6 +49,7 @@ export function RippleButton({
   type = "button",
   className,
   silent = false,
+  disabled = false,
   ...rest
 }: RippleButtonProps) {
   const ref = useRef<HTMLButtonElement>(null);
@@ -69,7 +73,10 @@ export function RippleButton({
     const el = ref.current;
     const fill = fillRef.current;
     const label = labelRef.current;
-    if (!el || !fill || !label || prefersReducedMotion()) return;
+    // `disabled` is checked here, not left to the browser: the spec only
+    // suppresses *click* on a disabled control, and Firefox still delivers the
+    // hover pair.
+    if (!el || !fill || !label || disabled || prefersReducedMotion()) return;
 
     // Take the resting label colour from the element's own computed `color`,
     // with any inline colour a previous leave left behind cleared first, rather
@@ -115,7 +122,7 @@ export function RippleButton({
     const el = ref.current;
     const fill = fillRef.current;
     const label = labelRef.current;
-    if (!el || !fill || !label || prefersReducedMotion()) return;
+    if (!el || !fill || !label || disabled || prefersReducedMotion()) return;
 
     const rect = el.getBoundingClientRect();
     gsap.set(fill, {
@@ -146,6 +153,7 @@ export function RippleButton({
     <button
       ref={ref}
       type={type}
+      disabled={disabled}
       onClick={handleClick}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
@@ -158,7 +166,10 @@ export function RippleButton({
         // silhouette, turning the hover into filled → outlined.
         "bg-accent text-accent-contrast ring-1 ring-accent relative inline-flex items-center justify-center overflow-hidden rounded-full",
         "px-9 py-4 text-[0.8rem] font-semibold uppercase tracking-widest",
-        "cursor-pointer select-none",
+        "select-none",
+        // The same fade and cursor the sold-out size pill uses, so the two halves
+        // of an out-of-stock SKU read as one state.
+        disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer",
         className,
       )}
       {...rest}

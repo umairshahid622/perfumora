@@ -97,6 +97,12 @@ create table if not exists orders (
   created_at       timestamptz  not null default now()
 );
 
+-- Re-runnable upgrade: the storefront checkout collects a city and delivery
+-- notes, which earlier copies of this schema had nowhere to put. `default ''`
+-- like `customer_phone`, so rows written before this ran stay valid.
+alter table orders add column if not exists city  text not null default '';
+alter table orders add column if not exists notes text not null default '';
+
 -- ---------------------------------------------------------------------------
 -- order_items — one row per fragrance+size line on an order.
 --
@@ -191,6 +197,94 @@ create policy "admin replace fragrance images" on storage.objects
 drop policy if exists "admin delete fragrance images" on storage.objects;
 create policy "admin delete fragrance images" on storage.objects
   for delete to authenticated using (bucket_id = 'fragrance-images');
+
+-- ---------------------------------------------------------------------------
+-- place_order — the storefront's one write.
+--
+-- Customer checkout has no login, so it reaches the database through a Next.js
+-- Server Action holding the service-role key (perfumora/src/app/_lib/orders.ts).
+-- That action is a public HTTP endpoint, which is why this function is handed
+-- only WHAT was ordered — fragrance, size, quantity — and looks up every price
+-- itself. A forged payload cannot name its own price.
+--
+-- The whole body is one transaction: any `raise` below discards the order row,
+-- its line items and every stock decrement together. That is what makes the
+-- decrement safe when two customers reach for the last bottle at once.
+--
+-- Raised messages carry machine-readable prefixes (`OUT_OF_STOCK:`,
+-- `UNAVAILABLE:`, `EMPTY_ORDER`, `BAD_QTY`); orders.ts turns those into
+-- sentences a customer can act on, and hides anything else behind one generic
+-- line rather than showing internals to a shopper.
+--
+-- Returns the total it computed — the figure the confirmation screen shows.
+-- ---------------------------------------------------------------------------
+
+create or replace function place_order(
+  p_id text, p_name text, p_phone text, p_address text,
+  p_city text, p_notes text, p_lines jsonb
+) returns integer
+language plpgsql
+-- Pinned, so an unqualified name below can't be resolved through a caller's
+-- search_path to some other table.
+set search_path = public
+as $$
+declare
+  v_line jsonb; v_id text; v_size bottle_size; v_qty int;
+  v_price int; v_stock int; v_name text; v_total int := 0;
+begin
+  if p_lines is null or jsonb_array_length(p_lines) = 0 then
+    raise exception 'EMPTY_ORDER';
+  end if;
+
+  -- Inserted at 0 and corrected at the end: the total is the sum of the prices
+  -- read below, and there is nothing to sum until the loop has run.
+  insert into orders (id, customer_name, customer_phone,
+                      shipping_address, city, notes, total)
+  values (p_id, p_name, p_phone, p_address, p_city, p_notes, 0);
+
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    v_id   := v_line->>'fragrance_id';
+    v_size := (v_line->>'size')::bottle_size;
+    v_qty  := (v_line->>'qty')::int;
+    if v_qty is null or v_qty < 1 then raise exception 'BAD_QTY'; end if;
+
+    -- Locked here and held until this function returns, so the check below
+    -- cannot be overtaken between reading the stock and decrementing it.
+    select fs.price, fs.stock into v_price, v_stock
+      from fragrance_sizes fs
+     where fs.fragrance_id = v_id and fs.size = v_size
+       for update;
+    if not found then raise exception 'UNAVAILABLE:%', v_id; end if;
+
+    -- The name is denormalized onto the line item, and `active` is re-checked
+    -- while we're here: the storefront only offers active fragrances, but a
+    -- forged POST needn't.
+    select name into v_name from fragrances where id = v_id and active;
+    if not found then raise exception 'UNAVAILABLE:%', v_id; end if;
+
+    if v_stock < v_qty then
+      raise exception 'OUT_OF_STOCK:% %', v_name, v_size;
+    end if;
+
+    update fragrance_sizes set stock = stock - v_qty
+     where fragrance_id = v_id and size = v_size;
+
+    insert into order_items (order_id, fragrance_id, fragrance_name, size, qty, price)
+    values (p_id, v_id, v_name, v_size, v_qty, v_price);
+
+    v_total := v_total + v_price * v_qty;
+  end loop;
+
+  update orders set total = v_total where id = p_id;
+  return v_total;
+end $$;
+
+-- Only the service-role key may call this. Postgres grants execute to `public`
+-- by default; an anon or signed-in caller would get nowhere anyway (the function
+-- runs as its invoker, so the policies above still apply to them), but saying so
+-- outright is cheaper than reasoning about it.
+revoke all on function place_order(text,text,text,text,text,text,jsonb) from public;
+grant execute on function place_order(text,text,text,text,text,text,jsonb) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Audit — the one invariant the database can't enforce itself.

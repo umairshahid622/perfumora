@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { useCart, type CartLine } from "../../_lib/cart-context";
@@ -11,6 +11,7 @@ import {
   type Order,
 } from "../../_lib/checkout";
 import { prefersReducedMotion } from "../../_lib/motion";
+import { placeOrder } from "../../_lib/orders";
 import { formatPrice } from "../../_lib/variants";
 import { useRouteTransition } from "../providers/RouteTransition";
 import { AppInput } from "../ui/AppInput";
@@ -113,10 +114,17 @@ function StepBack({
  * the `/checkout` route; the cart drawer's button closes itself and routes here,
  * so the bag is step 0 rather than a screen the customer passes through twice.
  *
- * UI ONLY. Placing an order logs the assembled payload and shows a locally
- * generated reference — no request, no mail, no payment provider, and no
- * persistence, so a reload starts over (§1). Online payment joins the review
- * step's single "Cash on Delivery" row when it exists.
+ * Placing an order writes it to Supabase through the `placeOrder` Server Action,
+ * which decrements the stock in the same transaction and hands back the stored
+ * reference and the total the database computed. Only that success advances to
+ * the confirmation and empties the bag; a refusal — a bottle that sold out while
+ * it sat in the cart — is shown inline with the bag intact, so the customer can
+ * drop the line and try again. Still cash on delivery only: online payment joins
+ * the review step's single "Cash on Delivery" row when it exists.
+ *
+ * The steps themselves are not persisted, so a reload starts the flow over. The
+ * placed order is not lost by that — it is a row in the database — but the
+ * reference is only ever shown once (§1).
  *
  * The step change is the flow's one animation: the panel slides in from the
  * side travelled toward, so stepping forward and stepping back read differently.
@@ -128,6 +136,10 @@ export function Checkout() {
   const [direction, setDirection] = useState(1);
   const [details, setDetails] = useState<CustomerDetails>(EMPTY_DETAILS);
   const [order, setOrder] = useState<Order | null>(null);
+  /** The server's refusal, shown on the review step. Cleared on every attempt so
+   *  a stale "sold out" can't outlive the line that caused it. */
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Direction is recorded by whoever moves the step, never derived from the index
@@ -174,20 +186,47 @@ export function Checkout() {
   };
 
   const place = () => {
-    if (!items.length) return; // <RippleButton> has no `disabled`; guard here
-    const placed = buildOrder(details, items);
-    // The whole order in one object — send it from here once a backend exists (§1).
-    console.log("Perfumora order (COD)", placed);
-    // Held as a snapshot because `clear()` empties the cart: the confirmation
-    // below reads this, never `items`/`subtotal`.
-    setOrder(placed);
-    clear();
-    go(3, 1);
+    // Both of these are already reflected in the button's `disabled`, so this is
+    // the second lock rather than the first — a double submit would write a second
+    // order, which is not a race worth leaving to the DOM alone.
+    if (!items.length || pending) return;
+    setFailure(null);
+
+    // Captured before the await: `clear()` below empties the cart, and the
+    // confirmation is built from the bag as it was reviewed.
+    const reviewed = items;
+
+    startTransition(async () => {
+      const result = await placeOrder(
+        details,
+        // What was ordered, never what it costs — the database prices the order
+        // itself, so a forged request cannot name its own total (orders.ts).
+        reviewed.map((line) => ({
+          variantId: line.variantId,
+          size: line.size,
+          qty: line.quantity,
+        })),
+      );
+
+      // Failure leaves the bag and the step exactly as they were: the fix for
+      // "that one sold out" is to remove it here and press the button again.
+      if (!result.ok) {
+        setFailure(result.message);
+        return;
+      }
+
+      // Held as a snapshot because `clear()` empties the cart: the confirmation
+      // below reads this, never `items`/`subtotal`.
+      setOrder(buildOrder(result, details, reviewed));
+      clear();
+      go(3, 1);
+    });
   };
 
   const restart = () => {
     setDetails(EMPTY_DETAILS);
     setOrder(null);
+    setFailure(null);
     go(0, -1);
   };
 
@@ -354,9 +393,28 @@ export function Checkout() {
                 </div>
               </div>
 
+              {/* The server's refusal, in the accent the page already uses for
+                  attention — a border and a sentence rather than a colour alone,
+                  since the reason is the actionable part. `role="alert"` so it is
+                  announced: the button that caused it keeps focus. */}
+              {failure && (
+                <p
+                  role="alert"
+                  className="border-accent-on-light text-body text-accent-on-light border-l-2 pl-4"
+                >
+                  {failure}
+                </p>
+              )}
+
               <div className="flex flex-wrap items-center gap-6">
-                <RippleButton onClick={place} aria-label="Place order">
-                  Place order
+                <RippleButton
+                  onClick={place}
+                  disabled={pending}
+                  // Dropped while pending so the accessible name is the visible
+                  // "Placing order…" rather than contradicting it.
+                  aria-label={pending ? undefined : "Place order"}
+                >
+                  {pending ? "Placing order…" : "Place order"}
                 </RippleButton>
                 <StepBack onClick={() => go(1, -1)}>Back to details</StepBack>
               </div>
@@ -377,9 +435,10 @@ export function Checkout() {
               </div>
 
               <p className="text-body text-muted-on-light max-w-sm">
-                {/* Static confirmation: the reference is generated in the
-                    browser and nothing was transmitted (§1). */}
-                Thank you — the atelier will call to confirm your delivery.
+                {/* The reference and the total above are the database's own —
+                    quoting either back identifies the stored order. */}
+                Thank you — the atelier will call to confirm your delivery. Keep
+                this reference for any questions about your order.
               </p>
 
               <StepBack onClick={restart}>Start a new order</StepBack>

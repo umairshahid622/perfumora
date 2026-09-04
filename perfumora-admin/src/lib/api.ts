@@ -44,6 +44,8 @@ interface OrderRow {
   customer_email: string;
   customer_phone: string;
   shipping_address: string;
+  city: string;
+  notes: string;
   status: OrderStatus;
   total: number;
   created_at: string;
@@ -86,6 +88,10 @@ function toOrder(row: OrderRow): Order {
     customerEmail: row.customer_email,
     customerPhone: row.customer_phone,
     shippingAddress: row.shipping_address,
+    // Both are `not null default ''` in Postgres, but an order written before
+    // those columns existed comes back without the keys at all.
+    city: row.city ?? "",
+    notes: row.notes ?? "",
     status: row.status,
     createdAt: row.created_at,
     total: row.total,
@@ -223,8 +229,8 @@ export async function uploadFragranceImage(file: File): Promise<string> {
 /* -------------------------------- orders -------------------------------- */
 
 const ORDER_SELECT =
-  "id, customer_name, customer_email, customer_phone, shipping_address, status, " +
-  "total, created_at, order_items ( fragrance_id, fragrance_name, size, qty, price )";
+  "id, customer_name, customer_email, customer_phone, shipping_address, city, notes, " +
+  "status, total, created_at, order_items ( fragrance_id, fragrance_name, size, qty, price )";
 
 /** Newest first — the dashboard and the list both want recent orders on top. */
 export async function fetchOrders(): Promise<Order[]> {
