@@ -436,7 +436,10 @@ export function Checkout() {
             ))}
 
           {step === 1 && (
-            <form onSubmit={submitDetails} className="flex flex-col gap-6">
+            /* `lg:gap-5` rather than one gap everywhere: from `lg` this step is meant
+               to sit inside one viewport, and four pixels off each of five gaps is
+               room the field boxes don't have to give up. */
+            <form onSubmit={submitDetails} className="flex flex-col gap-6 lg:gap-5">
               <div className="grid gap-6 sm:grid-cols-2">
                 <AppInput
                   label="Full name"
@@ -456,11 +459,14 @@ export function Checkout() {
                   placeholder="3xx xxx xxxx"
                 />
               </div>
+              {/* Two rows, not three: "house, street, area" wraps onto a second line
+                  and stops, so the third was empty box paid for out of the one screen
+                  this step has. It still scrolls inside itself for a longer address. */}
               <AppInput
                 label="Address"
                 variant="textarea"
                 required
-                rows={3}
+                rows={2}
                 autoComplete="street-address"
                 value={details.address}
                 onChange={setField("address")}
@@ -522,7 +528,7 @@ export function Checkout() {
                       label="Billing address"
                       variant="textarea"
                       required
-                      rows={3}
+                      rows={2}
                       autoComplete="billing street-address"
                       value={details.billingAddress}
                       onChange={setField("billingAddress")}

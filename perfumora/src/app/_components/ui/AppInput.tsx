@@ -186,7 +186,13 @@ export function AppInput({
       ? "pl-4 pr-12"
       : "px-4";
   const vert = isArea ? "pt-6 pb-3" : "pt-6 pb-2";
-  const field = `w-full resize-none bg-transparent ${horiz} ${vert} text-base text-ink outline-none placeholder:text-transparent focus:placeholder:text-muted-on-light`;
+  // The control repeats the box's radius, a pixel tighter so it sits concentric inside
+  // the 1px border. `border-radius` clips an element's own background but never its
+  // descendants, so without this the browser's autofill fill — an opaque square the
+  // full size of the control — paints into the corners the box's curve cuts away and
+  // reads as leaking past the border. Clipping the box instead (`overflow-hidden`)
+  // would cost the focus glow and the outer half of the drawn border stroke.
+  const field = `w-full resize-none rounded-[11px] bg-transparent ${horiz} ${vert} text-base text-ink outline-none placeholder:text-transparent focus:placeholder:text-muted-on-light`;
 
   const shared = {
     id,
