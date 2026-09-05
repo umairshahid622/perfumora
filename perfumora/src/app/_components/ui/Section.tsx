@@ -14,6 +14,13 @@ interface SectionProps {
    * content within the screen.
    */
   full?: boolean;
+  /**
+   * A beat that lays *over* the one before it rather than replacing it. It stamps no
+   * `data-tone`, so the nav goes on reading the tone — and the active link — of the
+   * beat underneath, which is the one still on screen. `tone` still sets this beat's
+   * own text colour.
+   */
+  overlay?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -32,13 +39,14 @@ export function Section({
   id,
   tone = "light",
   full = false,
+  overlay = false,
   className,
   children,
 }: SectionProps) {
   return (
     <section
       id={id}
-      data-tone={tone}
+      data-tone={overlay ? undefined : tone}
       className={cn(
         "relative w-full overflow-hidden",
         tone === "light" ? "bg-bg-light text-ink" : "bg-bg-dark text-paper",

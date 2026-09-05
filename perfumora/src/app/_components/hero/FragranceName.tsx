@@ -59,8 +59,23 @@ export function FragranceName() {
     <span
       ref={scopeRef}
       aria-hidden="true"
-      style={{ fontSize: `${sizeVw.toFixed(1)}vw` }}
-      className="font-display text-ink pointer-events-none absolute inset-0 flex select-none items-center justify-center leading-none uppercase opacity-[0.055] tracking-tight"
+      style={{
+        fontSize: `${sizeVw.toFixed(1)}vw`,
+        // 0.055 is the watermark's resting weight and lives only here.
+        // `--name-presence` is how much of it is left: <OpeningStage> scrubs it 1 → 0
+        // to erase the word as the Manifesto's copy arrives over the Hero, so the two
+        // layers of text take turns in the same space. Fallback 1, so with the script
+        // gone — or before the stage's effect has run — the word rests at full weight
+        // instead of invisible.
+        //
+        // Read through a variable rather than tweened on this element on purpose:
+        // React owns this `style` attribute (`fontSize` is re-derived from the variant
+        // on every step), so an inline `opacity` written here by GSAP has a second
+        // author. The stage writes the variable on its own element, which React never
+        // styles, and this stays a pure function of the variant.
+        opacity: "calc(0.055 * var(--name-presence, 1))",
+      }}
+      className="font-display text-ink pointer-events-none absolute inset-0 flex select-none items-center justify-center leading-none uppercase tracking-tight"
     >
       {/* One wrapper so the glyphs share a baseline — as individual flex items
           they would each be centred on their own box instead. */}

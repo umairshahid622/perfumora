@@ -5,78 +5,83 @@ import { Eyebrow } from "../ui/Eyebrow";
 import { RevealHeading } from "../ui/RevealHeading";
 import { Section } from "../ui/Section";
 import { SECTION_IDS } from "../../_lib/sections";
-import { useReveal } from "../../_hooks/useReveal";
 
 /**
- * Manifesto (§4.2): the brand's philosophy beat — a large statement set against
- * the dark tone, with supporting text. The copy frames the daily ritual of
- * choosing and wearing the scent, and the vessel made for that moment; wording
+ * Manifesto (§4.2): the brand's philosophy beat. The copy frames the daily ritual
+ * of choosing and wearing the scent, and the vessel made for that moment; wording
  * is a working draft pending brand sign-off.
  *
- * Laid out around the travelling bottle. The persistent `<PersistentBottle>` layer
- * drifts into the right-hand column as this section takes the screen *and recedes*
- * as it goes, so the copy is deliberately held to the left of it and given a hard
- * measure — the bottle is present in peripheral vision while the philosophy is
- * read, never over it, and no longer the subject. It still has to hold that half of
- * the screen on its own, though, so the pose that lands here (~46vh) is set against
- * the height of this copy column rather than shrunk as far as the story allows; the
- * grid row takes whichever of the two is taller, which is what keeps the whole beat
- * inside one viewport height.
+ * This beat has no surface of its own. It is a *layer over the Hero* — `bg-transparent`,
+ * light tone — and `<OpeningStage>` fades it in where the Hero's oversized fragrance
+ * name fades out. So the Hero does not go anywhere while this is read: the vessel, the
+ * arrows, the counter, the price and Add to Bag are all still there and still live, and
+ * the only thing that changes on the screen is the words behind the glass. That is why
+ * the tone is `light` — the parchment underneath belongs to the Hero, and painting
+ * `bg-bg-light` here would hide it, glow and watermark and product bar together.
  *
- * Below `md` there is no room to sit beside anything: the bottle lifts into a
- * shallow band at the top of the screen instead, so the column order flips and the
- * copy takes everything under it. The vertical rhythm tightens there too — the two
- * paragraphs run to four lines each on a phone, and they plus that band are the
- * whole screen.
+ * `overlay` follows from the same fact and is what keeps the nav still through the
+ * beat. The header re-colours itself and moves its active link per `[data-tone]`
+ * section, but nothing behind it has changed here — the Hero's parchment is still the
+ * surface under the nav, and the Hero is still the section on screen. So this beat
+ * stamps no tone of its own and the header simply goes on reading the Hero's.
+ *
+ * It does not carry the page's `useReveal` gesture, and that is deliberate rather than
+ * an omission. Every other beat scrolls into view and earns a one-shot rise; this one
+ * is cross-faded in place by the stage, which slides the whole block in from the left
+ * on the customer's own scroll and takes it back out to the left on the way up. A
+ * 32px vertical rise underneath a horizontal slide is two entrances arguing, and the
+ * one-shot would fire at whatever point the section's *document* position crosses the
+ * trigger — a screen away from where it visually is. The heading keeps `RevealHeading`
+ * because that is scrubbed to the same scroll and works at the word level, so it reads
+ * as detail inside the arrival instead of a second version of it.
+ *
+ * The measure is a fraction of the viewport rather than a fixed `max-w`, and that is
+ * load-bearing: the vessel it must stay clear of is centred in the viewport, so the
+ * gap between the copy and the glass only holds if the copy scales with the same unit
+ * the gap is measured in. `ml-20` clears the Hero's left arrow, which sits at the
+ * container's edge on the same midline as this copy. Both are `md:` only — on a phone
+ * neither the arrow nor the centred vessel can be cleared at 327px of container, and
+ * the copy is laid over the glass.
+ *
+ * Nothing here is selectable: the stage's lifted wrapper is `pointer-events-none` for
+ * its whole life so that the Hero's controls behind it stay clickable through the beat.
  */
 export function Manifesto() {
-  const scope = useReveal<HTMLDivElement>();
   return (
-    <Section id={SECTION_IDS.manifesto} tone="dark">
-      <div ref={scope}>
-        <Container>
-          <div className="grid items-center gap-6 md:grid-cols-[1.15fr_1fr] md:gap-20">
-            {/* Copy column — second in the source order on a phone, so the
-                reserved bottle space above it takes the top of the screen. */}
-            <div className="order-2 flex flex-col md:order-1">
-              <Eyebrow tone="dark" className="reveal">
-                Manifesto
-              </Eyebrow>
+    <Section
+      id={SECTION_IDS.manifesto}
+      tone="light"
+      overlay
+      className="bg-transparent"
+    >
+      <Container>
+        <div className="flex max-w-md flex-col md:ml-20 md:max-w-[min(28rem,30vw)]">
+          <Eyebrow>Manifesto</Eyebrow>
 
-              {/* Working copy — final wording pending brand sign-off. */}
-              <RevealHeading className="text-section mt-6 max-w-[14ch] text-balance md:mt-9">
-                First, the ritual.
-              </RevealHeading>
+          {/* Working copy — final wording pending brand sign-off. */}
+          <RevealHeading className="text-section mt-6 max-w-[14ch] text-balance md:mt-9">
+            First, the ritual.
+          </RevealHeading>
 
-              {/* A hairline instead of more space: it gives the statement a base
-                  to sit on and reads as editorial structure rather than padding. */}
-              <div className="reveal border-hairline-on-dark mt-6 border-t md:mt-11" />
+          {/* A hairline instead of more space: it gives the statement a base
+              to sit on and reads as editorial structure rather than padding.
+              Bounded by the measure above, so it stops short of the glass. */}
+          <div className="border-hairline-on-light mt-6 border-t md:mt-11" />
 
-              <div className="mt-6 flex max-w-md flex-col gap-4 md:mt-9 md:gap-5">
-                <p className="reveal text-body text-muted-on-dark">
-                  The lift of the cap, the press to the wrist, the pause before
-                  the day begins. A fragrance is worn — but first, each morning,
-                  it is chosen.
-                </p>
-                <p className="reveal text-body text-muted-on-dark">
-                  The vessel is made for that moment: weighted in the hand,
-                  sculpted to be reached for, a small ceremony repeated at the
-                  start of each day.
-                </p>
-              </div>
-            </div>
-
-            {/* Reserved space the persistent bottle drifts into while this section
-                is in view — the model is the fixed layer, never mounted here. Sized
-                to the pose that lands in it, which is in turn sized against the copy
-                column beside it: the row takes whichever of the two is taller. */}
-            <div
-              aria-hidden="true"
-              className="order-1 h-[24vh] w-full md:order-2 md:h-[46vh]"
-            />
+          <div className="mt-6 flex flex-col gap-4 md:mt-9 md:gap-5">
+            <p className="text-body text-muted-on-light">
+              The lift of the cap, the press to the wrist, the pause before the
+              day begins. A fragrance is worn — but first, each morning, it is
+              chosen.
+            </p>
+            <p className="text-body text-muted-on-light">
+              The vessel is made for that moment: weighted in the hand, sculpted
+              to be reached for, a small ceremony repeated at the start of each
+              day.
+            </p>
           </div>
-        </Container>
-      </div>
+        </div>
+      </Container>
     </Section>
   );
 }

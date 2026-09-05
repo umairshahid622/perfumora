@@ -1,12 +1,10 @@
-import { Hero } from "./_components/hero/Hero";
 import { Contact } from "./_components/sections/Contact";
 import { Craft } from "./_components/sections/Craft";
 import { Cta } from "./_components/sections/Cta";
 import { Footer } from "./_components/sections/Footer";
 import { Gallery } from "./_components/sections/Gallery";
-import { Manifesto } from "./_components/sections/Manifesto";
+import { OpeningStage } from "./_components/sections/OpeningStage";
 import { Ritual } from "./_components/sections/Ritual";
-import { PersistentBottle } from "./_components/three/PersistentBottle";
 
 /**
  * The home route (§2.9). Its sections are reached by in-page anchor, never by a
@@ -16,20 +14,17 @@ import { PersistentBottle } from "./_components/three/PersistentBottle";
  * every route), and the sections pass through as children, so only the
  * interactive pieces opt into the client.
  *
- * The 3D bottle is mounted here rather than inside the Hero, as one fixed layer
- * over the whole route: the Hero, Manifesto and Ritual each reserve empty space
- * for it and it *travels* between them on scroll, so a single WebGL context and a
- * single glTF serve all three beats instead of one per section. It lives at this
- * level — not in the root layout — because the journey is specific to this page's
- * sections; `/checkout` and `/collection` have no bottle.
+ * The first two beats are one unit. `OpeningStage` holds the Hero and the Manifesto
+ * both on screen and dissolves between them, and it owns the 3D bottle for the same
+ * reason: the bottle stands still through both and then leaves with the Manifesto,
+ * which only works if it lives inside the stage that releases them. From the Ritual
+ * down this is an ordinary stack of sections with no bottle in it.
  */
 export default function Home() {
   return (
     <>
-      <PersistentBottle />
       <main>
-        <Hero />
-        <Manifesto />
+        <OpeningStage />
         <Ritual />
         <Craft />
         <Gallery />

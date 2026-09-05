@@ -4,22 +4,15 @@ import { Suspense, useCallback, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { NeutralToneMapping, Color, type Group } from "three";
+import { NeutralToneMapping, Color } from "three";
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
-import { SECTION_IDS } from "../../_lib/sections";
 import { juiceColor } from "../../_lib/variants";
 import { useMediaQuery } from "../../_hooks/useMediaQuery";
 import { BottleGltf } from "./BottleGltf";
 import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
-import {
-  BOTTLE_WAYPOINTS,
-  BOTTLE_WAYPOINTS_COMPACT,
-  resolvePose,
-  useBottleScroll,
-} from "./useBottleScroll";
 
 /**
  * One full turn per fragrance change. A whole revolution rather than a part of
@@ -38,6 +31,25 @@ const SPIN_DURATION = 0.9;
 const COLOUR_DURATION = 0.4;
 const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
 
+/**
+ * Where the vessel rests — one pose, held for the whole page.
+ *
+ * Units are the canvas's own (camera z 7.2, 24° fov → ~3.06 world units of visible
+ * height, so one unit ≈ 33vh and a bottle of `scale` s stands ~85·s vh tall). Both
+ * values are set against the empty slot the Hero reserves rather than the middle of
+ * the viewport, because that section puts furniture beneath it — the position counter
+ * and the product bar. They are the first knobs to check on a real screen.
+ *
+ * Two of them because a phone has to hold the same copy in a third of the width, so
+ * the Hero's reserved box is the tighter one there (`h-[46vh]` against `md:h-[60vh]`)
+ * and the vessel sits higher and smaller to stay inside it.
+ *
+ * X and Y rotation are left at the identity pose, so they are not stated: the bottle
+ * faces the camera dead centre and only the variant-change spin below turns it.
+ */
+const REST = { y: 0.15, scale: 0.62 };
+const REST_COMPACT = { y: 0.4, scale: 0.46 };
+
 export interface BottleSceneProps {
   /** Variant colour for the fragrance; defaults to the live `--accent` token. */
   liquidColor?: string;
@@ -55,12 +67,16 @@ export interface BottleSceneProps {
  *
  * This is the site's single persistent bottle: mounted once (by `PersistentBottle`)
  * over the whole home route and never unmounted, so the model exists exactly once
- * and *travels* between sections rather than being copied into each. Three motions
- * compose on nested groups, none of them authored inside the 3D components
- * themselves (§5): the scroll-driven travel on the outer *dock* group
- * (`useBottleScroll`), and on the inner assembly root the variant-change spin
- * (below) plus the idle float (`useBottleFloat`). The canvas is transparent so the
- * DOM layers show behind it (§4.1).
+ * and one WebGL context, one glTF and one environment map serve the page.
+ *
+ * Nothing here reads the scroll position. The vessel is parked at `REST` and the
+ * only motion left is the variant-change spin below, which a press on the Hero's
+ * arrows drives — so the bottle is dead still until somebody changes the fragrance.
+ * The idle float is wired but switched off (see its call), which is what the Hero
+ * showed anyway; it is one word away if the next idea wants it back. None of this
+ * motion is authored inside the 3D components themselves (§5): they expose refs and
+ * GSAP does the work. The canvas is transparent so the DOM layers show behind it
+ * (§4.1).
  */
 export default function BottleScene({
   liquidColor,
@@ -69,12 +85,9 @@ export default function BottleScene({
   className,
 }: BottleSceneProps) {
   const refs = useBottleRefs();
-  // The outer group the scroll travel drives. Wraps the model's <Suspense>, so it
-  // exists from first render even while the glTF is still downloading.
-  const dockRef = useRef<Group>(null);
-  // Flipped once the glTF resolves and `refs.root` is wired, so the idle float can
-  // start against a root that exists — the model loads well after first render, and
-  // that resolution doesn't re-run the hooks here on its own.
+  // Flipped once the glTF resolves and `refs.root` is wired, so a motion that needs
+  // the assembly root can start against one that exists — the model loads well after
+  // first render, and that resolution doesn't re-run the hooks here on its own.
   const [ready, setReady] = useState(false);
   const handleReady = useCallback(() => setReady(true), []);
   const isCompact = useMediaQuery("(max-width: 767px)");
@@ -85,11 +98,8 @@ export default function BottleScene({
   // set on the material itself, so only the colour changes here.
   const juice = juiceColor(accent);
   const firstRun = useRef(true);
-  // Portrait viewports get their own journey — no room for the sideways drift.
-  const waypoints = isCompact ? BOTTLE_WAYPOINTS_COMPACT : BOTTLE_WAYPOINTS;
-  // Where the bottle rests through the Hero — the first waypoint. Seeds the dock
-  // group's transform so the model is already correct on the frame it first paints.
-  const home = resolvePose(waypoints[0].pose);
+  // Portrait viewports rest higher and smaller — see `REST_COMPACT`.
+  const rest = isCompact ? REST_COMPACT : REST;
 
   /**
    * The change timeline (§6.3 #10): the bottle turns the way the arrow pointed
@@ -159,21 +169,13 @@ export default function BottleScene({
     { dependencies: [variantIndex] },
   );
 
-  // Ambient idle drift (§6.3 #9), on the assembly root. Gated to the Manifesto →
-  // Ritual span: through the Hero the bottle is dead still (it turns only on a
-  // variant change), the float wakes as the Manifesto takes the screen, and it
-  // sleeps again once the Ritual has scrolled past. Its bob (`position.y`) and roll
-  // (`rotation.z`) never touch the axes the spin above and the dock travel below
-  // drive, so all three layer cleanly.
-  useBottleFloat(refs, {
-    enabled: true,
-    ready,
-    trigger: `#${SECTION_IDS.manifesto}`,
-    endTrigger: `#${SECTION_IDS.ritual}`,
-  });
-
-  // Scroll-driven section-to-section travel, on the outer dock group.
-  useBottleScroll(dockRef, { ready, waypoints });
+  // Ambient idle drift (§6.3 #9), on the assembly root — wired, but off. It used to
+  // be gated by a ScrollTrigger to the Manifesto → Ritual span, which meant it never
+  // ran while the Hero was on screen; now that the Hero is the only beat the bottle
+  // has, that gate would have been the last piece of scroll-driven motion left, and
+  // switching the hook off keeps exactly the stillness the Hero always showed. Its
+  // `enabled` flag is the hook's own opt-in, so this is a one-word change to revisit.
+  useBottleFloat(refs, { enabled: false, ready });
 
   return (
     <Canvas
@@ -184,11 +186,11 @@ export default function BottleScene({
          Hero's arrows and buttons beneath it. The bottle is purely scroll-driven —
          it never needs DOM pointer events — so switch the wrapper back off. */
       style={{ pointerEvents: "none" }}
-      /* `always`, not `demand`. Every motion here is authored in GSAP — the
-         variant-change spin, the idle float and the scroll-driven travel all write
-         the bottle's transform on GSAP's own ticker, which R3F has no way to know
-         about. Without a frame every tick the canvas would render once and then sit
-         still while the object moved underneath it. */
+      /* `always`, not `demand`. The variant-change spin and the liquid cross-fade
+         are authored in GSAP, which writes the bottle's transform on GSAP's own
+         ticker — something R3F has no way to know about. Without a frame every tick
+         the canvas would render once and then sit still while the object moved
+         underneath it. */
       frameloop="always"
       dpr={[1, isCompact ? 1.6 : 2]}
       gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
@@ -207,17 +209,13 @@ export default function BottleScene({
       {/* Rim, behind, lights the glass edges and the liquid from within */}
       <directionalLight position={[0, 1.2, -4]} intensity={1.1} />
 
-      {/* The dock group: the scroll travel's target, seeded with the Hero pose so
-          the bottle starts in the right place. Wraps the model's own suspense
-          boundary — kept in here so the download cannot suspend the canvas itself,
-          which would tear the WebGL context and the environment map down with it
-          and rebuild both. */}
-      <group
-        ref={dockRef}
-        position={[home.x, home.y, 0]}
-        scale={home.scale}
-        rotation={[0, home.rotY, 0]}
-      >
+      {/* The resting pose, set once as plain props — there is no longer a timeline
+          writing this group, so React owns the transform outright and no ref is
+          needed. Still a group rather than posing the model directly: it wraps the
+          model's own suspense boundary, kept in here so the download cannot suspend
+          the canvas itself, which would tear the WebGL context and the environment
+          map down with it and rebuild both. */}
+      <group position={[0, rest.y, 0]} scale={rest.scale}>
         <Suspense fallback={null}>
           <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
         </Suspense>
