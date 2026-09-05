@@ -242,10 +242,12 @@ export function OrderDetail() {
               {order.shippingAddress}
             </p>
             {/* City sits under the address in the panel's value treatment: it is
-                the line a courier routes on, not another sentence of the blob. */}
+                the line a courier routes on, not another sentence of the blob. The
+                postal code joins it there rather than getting a row of its own —
+                "Rawalpindi 46000" is how the line gets read. */}
             {order.city && (
               <p className="mt-1 text-sm font-medium text-slate-900">
-                {order.city}
+                {[order.city, order.postalCode].filter(Boolean).join(" ")}
               </p>
             )}
             {/* Ruled off, because a "leave at the back gate" read as part of the
@@ -261,6 +263,29 @@ export function OrderDetail() {
               </div>
             )}
           </section>
+
+          {/* Only when the customer said it differed. Ticked is the ordinary case —
+              cash on delivery has no card issuer to check an address against, so the
+              checkout box ships ticked — and a card reading "same as shipping" on
+              nearly every order would be a card worth nothing. Headed without an icon,
+              like Customer and Update status above. */}
+          {!order.billingSame && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-3 font-semibold text-slate-900">
+                Billing address
+              </h2>
+              <p className="text-sm leading-relaxed text-slate-600">
+                {order.billingAddress}
+              </p>
+              {order.billingCity && (
+                <p className="mt-1 text-sm font-medium text-slate-900">
+                  {[order.billingCity, order.billingPostalCode]
+                    .filter(Boolean)
+                    .join(" ")}
+                </p>
+              )}
+            </section>
+          )}
         </aside>
       </div>
     </div>

@@ -1,8 +1,15 @@
 "use client";
 
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { currentCustomer } from "../../_lib/auth";
 import { useCart, type CartLine } from "../../_lib/cart-context";
 import {
   EMPTY_DETAILS,
@@ -30,6 +37,15 @@ const STEPS = ["Cart", "Details", "Review", "Done"] as const;
  * form fields themselves are now <AppInput>, which owns its own chrome.
  */
 const LABEL = "text-micro text-muted-on-light font-medium uppercase";
+
+/**
+ * The keys of <CustomerDetails> that hold text — every one but `billingSame`.
+ * Derived rather than listed, so a field added to the interface later cannot quietly
+ * get a non-string past `setField`.
+ */
+type TextField = {
+  [K in keyof CustomerDetails]: CustomerDetails[K] extends string ? K : never;
+}[keyof CustomerDetails];
 
 /** The bag, listed the way the cart drawer lists it. `onRemove` is omitted on the
  *  review step, where the list is a recap rather than an editable bag. */
@@ -108,6 +124,68 @@ function StepBack({
   );
 }
 
+/** The check mark for the box below. Local, the way <AppInput> keeps its own eye
+ *  glyph, rather than added to `navigation/icons` — that file is the header's set. */
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5"
+      aria-hidden="true"
+    >
+      <path d="m5 13 5 5L19 7" />
+    </svg>
+  );
+}
+
+/**
+ * The flow's one checkbox. A real `<input type="checkbox">` kept in the accessibility
+ * tree by `sr-only` rather than swapped out for a styled div — so the space bar, the
+ * label's own click target and a screen reader's "checked" all come for free — with
+ * the visible box drawn by its sibling so the mark can wear the accent.
+ * `peer-focus-visible` puts the ring on that sibling, since the input it belongs to is
+ * the invisible one. `py-3` rather than tighter: with the 20px box that is a 44px
+ * target, which is the floor for something a thumb has to hit.
+ *
+ * Deliberately not an <AppInput> variant: that component's floating label, drawn
+ * border and reveal toggle are all built around a field holding a string, and a
+ * boolean has none of that chrome to inherit.
+ */
+function CheckField({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 py-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="border-hairline-on-light text-accent-on-light peer-checked:border-accent-on-light peer-focus-visible:ring-accent-on-light/40 grid size-5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2"
+      >
+        {checked && <CheckIcon />}
+      </span>
+      <span className="text-micro text-muted-on-light font-medium uppercase">
+        {children}
+      </span>
+    </label>
+  );
+}
+
 /**
  * Checkout (§4.0) — the whole cash-on-delivery flow as four steps: the bag,
  * delivery details, a review, and a confirmation. It's the one client island on
@@ -135,6 +213,10 @@ export function Checkout() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [details, setDetails] = useState<CustomerDetails>(EMPTY_DETAILS);
+  /** The signed-in customer's name, or `""` for a guest. Held separately from
+   *  `details` so that "start a new order" can seed the form again without asking
+   *  the server a second time. */
+  const [accountName, setAccountName] = useState("");
   const [order, setOrder] = useState<Order | null>(null);
   /** The server's refusal, shown on the review step. Cleared on every attempt so
    *  a stale "sold out" can't outlive the line that caused it. */
@@ -152,6 +234,12 @@ export function Checkout() {
 
   useGSAP(
     () => {
+      // Every step starts at the top of the flow. The page is a single scroll
+      // context, so the position reached part-way down a long details step would
+      // otherwise carry straight into the review and open it half read. Above the
+      // reduced-motion return, because it isn't motion.
+      window.scrollTo({ top: 0 });
+
       // Skipped outright rather than run at `duration: 0`: a `fromTo` that never
       // plays would leave the from-values applied with nothing to clear them.
       if (prefersReducedMotion()) return;
@@ -175,8 +263,43 @@ export function Checkout() {
     { dependencies: [step], revertOnUpdate: false },
   );
 
-  const setField = (field: keyof CustomerDetails) => (value: string) =>
+  // The one delivery field the account already knows, filled in so a signed-in
+  // customer doesn't retype what they gave us at sign-up. Asked for here rather
+  // than handed down: <Navigation> holds the same answer, but it is a sibling of
+  // this island rather than an ancestor, and a context carrying one string would
+  // be more plumbing than the string is worth.
+  //
+  // `.then` rather than `await` in the effect body, matching <Navigation>: a
+  // synchronous setState inside an effect is the cascading render that
+  // `set-state-in-effect` is about, and resolving a promise later is not. The
+  // `live` flag drops the answer if the route was left before it arrived.
+  useEffect(() => {
+    let live = true;
+    currentCustomer().then((customer) => {
+      if (!live || !customer) return;
+      setAccountName(customer.name);
+      // Never over something already typed. A signed-in shopper may well be
+      // sending a bottle to someone else, and the name they entered has to
+      // survive both this answer arriving late and every later re-render.
+      setDetails((current) =>
+        current.name ? current : { ...current, name: customer.name },
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const setField = (field: TextField) => (value: string) =>
     setDetails((current) => ({ ...current, [field]: value }));
+
+  // Unticking is what reveals the billing fields. Whatever was typed into them is left
+  // alone on re-tick rather than wiped: the server ignores those three while this flag
+  // is true — it copies the shipping address over them — and the review step reads the
+  // flag too, so nothing stale can be shown or stored. Ticking twice by accident
+  // therefore costs nothing.
+  const setBillingSame = (same: boolean) =>
+    setDetails((current) => ({ ...current, billingSame: same }));
 
   const submitDetails = (event: FormEvent<HTMLFormElement>) => {
     // The advance needs no validation of its own: every required field is native,
@@ -224,7 +347,9 @@ export function Checkout() {
   };
 
   const restart = () => {
-    setDetails(EMPTY_DETAILS);
+    // Back to blank except for the name, which the account still knows — the same
+    // state a signed-in customer's first visit to the details step starts from.
+    setDetails({ ...EMPTY_DETAILS, name: accountName });
     setOrder(null);
     setFailure(null);
     go(0, -1);
@@ -233,7 +358,14 @@ export function Checkout() {
   return (
     <Container>
       <div className="grid gap-12 md:grid-cols-2 md:gap-20">
-        <div>
+        {/* Sticks under the header from `lg` up, so the heading and the step counter
+            stay in view while a long details step scrolls past them. `self-start` is
+            the load-bearing half: a grid item stretches to its row by default, and an
+            item exactly as tall as the row it sits in has nowhere to travel, so
+            `sticky` would resolve to no movement at all. The offset clears the fixed
+            header's `h-[4.75rem]` with a gap rather than tucking under it, and is
+            written as the sum so the header's height stays legible. */}
+        <div className="lg:sticky lg:top-[calc(4.75rem+2rem)] lg:self-start">
           <Eyebrow>Checkout</Eyebrow>
           <RevealHeading className="text-section mt-4 max-w-[14ch] text-balance">
             Complete your order
@@ -334,14 +466,28 @@ export function Checkout() {
                 onChange={setField("address")}
                 placeholder="House, street, area"
               />
-              <AppInput
-                label="City"
-                required
-                autoComplete="address-level2"
-                value={details.city}
-                onChange={setField("city")}
-                placeholder="Lahore"
-              />
+              {/* Paired the way name/phone are: the postal code belongs beside the
+                  city it narrows, and both are short. Not required — a five-digit
+                  code is something most people here would have to go and look up,
+                  while the courier is routing on the city and the landmark anyway. */}
+              <div className="grid gap-6 sm:grid-cols-2">
+                <AppInput
+                  label="City"
+                  required
+                  autoComplete="address-level2"
+                  value={details.city}
+                  onChange={setField("city")}
+                  placeholder="Lahore"
+                />
+                <AppInput
+                  label="Postal code"
+                  optional
+                  autoComplete="postal-code"
+                  value={details.postalCode}
+                  onChange={setField("postalCode")}
+                  placeholder="54000"
+                />
+              </div>
               <AppInput
                 label="Delivery notes"
                 variant="textarea"
@@ -351,6 +497,57 @@ export function Checkout() {
                 onChange={setField("notes")}
                 placeholder="Landmark or preferred time"
               />
+
+              {/* Billing, ruled off from everything above it: it is the one part of
+                  this form that isn't about where the parcel goes. Nothing consumes it
+                  yet — cash on delivery has no card issuer to check an address
+                  against — so the box ships ticked and an ordinary order costs no
+                  extra typing. Unticking is what makes the fields appear, and only
+                  then are they `required`, so the browser asks for them as a set.
+                  Full width rather than paired, unlike the row above: "Billing postal
+                  code" and its Optional tag both want the space.
+                  No animation on the reveal, matching this flow's rule that the step
+                  change is its one piece of motion. */}
+              <div className="border-hairline-on-light border-t pt-6">
+                <span className={LABEL}>Billing</span>
+                <CheckField
+                  checked={details.billingSame}
+                  onChange={setBillingSame}
+                >
+                  Same as shipping address
+                </CheckField>
+                {!details.billingSame && (
+                  <div className="mt-4 flex flex-col gap-6">
+                    <AppInput
+                      label="Billing address"
+                      variant="textarea"
+                      required
+                      rows={3}
+                      autoComplete="billing street-address"
+                      value={details.billingAddress}
+                      onChange={setField("billingAddress")}
+                      placeholder="House, street, area"
+                    />
+                    <AppInput
+                      label="Billing city"
+                      required
+                      autoComplete="billing address-level2"
+                      value={details.billingCity}
+                      onChange={setField("billingCity")}
+                      placeholder="Lahore"
+                    />
+                    <AppInput
+                      label="Billing postal code"
+                      optional
+                      autoComplete="billing postal-code"
+                      value={details.billingPostalCode}
+                      onChange={setField("billingPostalCode")}
+                      placeholder="54000"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="mt-2 flex flex-wrap items-center gap-6">
                 <RippleButton type="submit" aria-label="Continue to review">
                   Continue to review
@@ -370,7 +567,13 @@ export function Checkout() {
                   <span className="text-muted-on-light">
                     {details.address}
                   </span>
-                  <span className="text-muted-on-light">{details.city}</span>
+                  {/* One line whether or not a postal code was given, so a blank one
+                      doesn't leave an empty row in the recap. */}
+                  <span className="text-muted-on-light">
+                    {[details.city, details.postalCode]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </span>
                   {details.notes && (
                     <span className="text-muted-on-light mt-2">
                       {details.notes}
@@ -378,6 +581,23 @@ export function Checkout() {
                   )}
                 </div>
               </div>
+
+              {/* Only when it differs. A "same as shipping" line here would say
+                  nothing the block above hasn't already said — and the ticked box is
+                  the ordinary case, so it would say it on nearly every order. */}
+              {!details.billingSame && (
+                <div>
+                  <span className={LABEL}>Bill to</span>
+                  <div className="text-body text-muted-on-light mt-2 flex flex-col">
+                    <span>{details.billingAddress}</span>
+                    <span>
+                      {[details.billingCity, details.billingPostalCode]
+                        .filter(Boolean)
+                        .join(" ")}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <OrderLines items={items} />
 

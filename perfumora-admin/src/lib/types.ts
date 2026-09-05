@@ -83,8 +83,20 @@ export interface Order {
   /** Kept apart from `shippingAddress` rather than appended to it, so the list
    *  can group by city later without parsing a free-text blob. */
   city: string;
+  /** Beside the city for the same reason the city sits beside the address. Not
+   *  required at checkout — few shoppers here know theirs — so often empty. */
+  postalCode: string;
+  /** Whether the customer said their billing address was the shipping one. The three
+   *  `billing*` fields are filled either way — checkout copies the shipping address
+   *  over them when this is true — so this is what says whether they are worth
+   *  showing, not whether they are populated. True for every order placed before
+   *  checkout asked. */
+  billingSame: boolean;
+  billingAddress: string;
+  billingCity: string;
+  billingPostalCode: string;
   /** Whatever the customer told the courier — a landmark, a preferred time. May
-   *  well be empty; it is the one field checkout does not require. */
+   *  well be empty; checkout does not require it. */
   notes: string;
   status: OrderStatus;
   /** ISO 8601 timestamp. */

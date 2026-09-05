@@ -45,6 +45,11 @@ interface OrderRow {
   customer_phone: string;
   shipping_address: string;
   city: string;
+  postal_code: string;
+  billing_same: boolean;
+  billing_address: string;
+  billing_city: string;
+  billing_postal_code: string;
   notes: string;
   status: OrderStatus;
   total: number;
@@ -92,6 +97,13 @@ function toOrder(row: OrderRow): Order {
     // those columns existed comes back without the keys at all.
     city: row.city ?? "",
     notes: row.notes ?? "",
+    postalCode: row.postal_code ?? "",
+    // `?? true` rather than false: a missing key means the order predates the billing
+    // fields, and an order placed then had one address, which was both.
+    billingSame: row.billing_same ?? true,
+    billingAddress: row.billing_address ?? "",
+    billingCity: row.billing_city ?? "",
+    billingPostalCode: row.billing_postal_code ?? "",
     status: row.status,
     createdAt: row.created_at,
     total: row.total,
@@ -229,8 +241,10 @@ export async function uploadFragranceImage(file: File): Promise<string> {
 /* -------------------------------- orders -------------------------------- */
 
 const ORDER_SELECT =
-  "id, customer_name, customer_email, customer_phone, shipping_address, city, notes, " +
-  "status, total, created_at, order_items ( fragrance_id, fragrance_name, size, qty, price )";
+  "id, customer_name, customer_email, customer_phone, shipping_address, city, " +
+  "postal_code, notes, billing_same, billing_address, billing_city, " +
+  "billing_postal_code, status, total, created_at, " +
+  "order_items ( fragrance_id, fragrance_name, size, qty, price )";
 
 /** Newest first — the dashboard and the list both want recent orders on top. */
 export async function fetchOrders(): Promise<Order[]> {

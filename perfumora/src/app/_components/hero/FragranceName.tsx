@@ -60,7 +60,7 @@ export function FragranceName() {
       ref={scopeRef}
       aria-hidden="true"
       style={{ fontSize: `${sizeVw.toFixed(1)}vw` }}
-      className="font-display text-ink pointer-events-none absolute inset-0 flex select-none items-center justify-center leading-none uppercase opacity-[0.055]"
+      className="font-display text-ink pointer-events-none absolute inset-0 flex select-none items-center justify-center leading-none uppercase opacity-[0.055] tracking-tight"
     >
       {/* One wrapper so the glyphs share a baseline — as individual flex items
           they would each be centred on their own box instead. */}

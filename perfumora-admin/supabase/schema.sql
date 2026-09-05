@@ -164,6 +164,24 @@ alter table orders add column if not exists notes text not null default '';
 alter table orders add column if not exists user_id uuid
   references auth.users(id) on delete set null;
 
+-- Re-runnable upgrade: the postal code beside the city, and a billing address held
+-- apart from the shipping one. Two things worth stating outright:
+--
+--   - `billing_same` records what the customer declared rather than being inferred
+--     later by comparing two free-text blobs, which whitespace alone would break;
+--   - the billing columns are filled either way — copied from shipping when they
+--     said "same" (orders.ts) — for the reason `total` is stored rather than
+--     derived: the row is the order as it was placed, and a reader (this panel
+--     today, an invoice later) shouldn't have to know a fallback rule.
+--
+-- Neither is required at checkout, so both default to the empty string like
+-- `city` and `notes` above.
+alter table orders add column if not exists postal_code text not null default '';
+alter table orders add column if not exists billing_same boolean not null default true;
+alter table orders add column if not exists billing_address text not null default '';
+alter table orders add column if not exists billing_city text not null default '';
+alter table orders add column if not exists billing_postal_code text not null default '';
+
 -- ---------------------------------------------------------------------------
 -- order_items — one row per fragrance+size line on an order.
 --
@@ -320,10 +338,12 @@ create policy "admin delete fragrance images" on storage.objects
 -- Returns the total it computed — the figure the confirmation screen shows.
 -- ---------------------------------------------------------------------------
 
--- The 7-argument version has to go rather than be replaced: `create or replace`
--- cannot change an argument list, and leaving it behind would keep a second path
--- open that writes orders with no owner.
+-- Superseded signatures have to go rather than be replaced: `create or replace`
+-- cannot change an argument list, so a shorter one left behind would not be
+-- overwritten but kept as a second overload — a live path that writes orders with
+-- no owner and no billing address, and an ambiguity for PostgREST to resolve.
 drop function if exists place_order(text,text,text,text,text,text,jsonb);
+drop function if exists place_order(text,text,text,text,text,text,jsonb,uuid);
 
 create or replace function place_order(
   p_id text, p_name text, p_phone text, p_address text,
@@ -332,7 +352,16 @@ create or replace function place_order(
   -- file and the storefront need not deploy in step: PostgREST resolves an RPC by
   -- argument name, and a parameter with no default would make a call that omits
   -- it fail to match the function at all.
-  p_user_id uuid default null
+  p_user_id uuid default null,
+  -- The postal code and the billing address, both optional at checkout and both
+  -- defaulted for the same deploy-order reason as `p_user_id`. Pass-through, like
+  -- every other customer field here: the copy-when-"same" rule and the bounding of
+  -- these strings live in orders.ts beside the rest of the cleaning.
+  p_postal_code text default '',
+  p_billing_same boolean default true,
+  p_billing_address text default '',
+  p_billing_city text default '',
+  p_billing_postal_code text default ''
 ) returns integer
 language plpgsql
 -- Pinned, so an unqualified name below can't be resolved through a caller's
@@ -350,8 +379,12 @@ begin
   -- Inserted at 0 and corrected at the end: the total is the sum of the prices
   -- read below, and there is nothing to sum until the loop has run.
   insert into orders (id, customer_name, customer_phone,
-                      shipping_address, city, notes, total, user_id)
-  values (p_id, p_name, p_phone, p_address, p_city, p_notes, 0, p_user_id);
+                      shipping_address, city, postal_code, notes, total, user_id,
+                      billing_same, billing_address, billing_city,
+                      billing_postal_code)
+  values (p_id, p_name, p_phone, p_address, p_city, p_postal_code, p_notes, 0,
+          p_user_id, p_billing_same, p_billing_address, p_billing_city,
+          p_billing_postal_code);
 
   for v_line in select * from jsonb_array_elements(p_lines) loop
     v_id   := v_line->>'fragrance_id';
@@ -397,10 +430,12 @@ end $$;
 -- anyway (the function runs as its invoker, so the policies above still apply to
 -- them and the first insert aborts the transaction), but failing closed is not the
 -- same as being unreachable, and this is a public POST endpoint.
-revoke all on function place_order(text,text,text,text,text,text,jsonb,uuid) from public;
-revoke execute on function place_order(text,text,text,text,text,text,jsonb,uuid)
-  from anon, authenticated;
-grant execute on function place_order(text,text,text,text,text,text,jsonb,uuid) to service_role;
+revoke all on function place_order(text,text,text,text,text,text,jsonb,uuid,
+  text,boolean,text,text,text) from public;
+revoke execute on function place_order(text,text,text,text,text,text,jsonb,uuid,
+  text,boolean,text,text,text) from anon, authenticated;
+grant execute on function place_order(text,text,text,text,text,text,jsonb,uuid,
+  text,boolean,text,text,text) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Audit — the one invariant the database can't enforce itself.

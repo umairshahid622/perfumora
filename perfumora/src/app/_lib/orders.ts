@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { SIZE_TO_DB } from "./catalogue";
 import { orderReference, type CustomerDetails } from "./checkout";
 import { supabaseAdmin } from "./supabase-admin";
+import { supabaseAuth } from "./supabase-auth";
 import type { SizeMl } from "./variants";
 
 /* ---------------------------------------------------------------------------
@@ -12,7 +13,8 @@ import type { SizeMl } from "./variants";
    A `"use server"` module, so <Checkout> can `await placeOrder(...)` straight
    from its click handler. What that means for this file: the export below is a
    public HTTP endpoint, reachable by POST from anywhere and not only through our
-   own UI, with no customer login to check. So nothing arriving here is trusted:
+   own UI, and it does not require a login — guest checkout is still the common
+   case. So nothing arriving here is trusted:
 
      - the payload names WHAT was ordered, never what it costs. `place_order`
        (perfumora-admin/supabase/schema.sql) reads every price out of
@@ -20,6 +22,9 @@ import type { SizeMl } from "./variants";
        bottle for one rupee;
      - the form's `required` attributes protect the form, not this, so the fields
        are re-checked and bounded below;
+     - whose order it is comes from the session cookie, never from the payload, so
+       an order can only ever be attributed to whoever is signed in on the request
+       that placed it;
      - the whole write is one `rpc()` into one plpgsql function, hence one
        transaction: the order row, its line items and every stock decrement land
        together or not at all.
@@ -41,8 +46,10 @@ type PlaceOrderResult =
   | { ok: false; message: string };
 
 /** Ceilings, not preferences: the text columns are unbounded, so without these a
- *  forged body could write a megabyte of "city" into the admin panel. */
-const LIMITS = { name: 120, phone: 40, address: 400, city: 80, notes: 500 };
+ *  forged body could write a megabyte of "city" into the admin panel. The billing
+ *  fields reuse `address`, `city` and `postal` — the same kind of text, so the same
+ *  ceilings apply to it. */
+const LIMITS = { name: 120, phone: 40, address: 400, city: 80, postal: 20, notes: 500 };
 const MAX_LINES = 24;
 const MAX_QTY = 20;
 
@@ -93,6 +100,7 @@ export async function placeOrder(
     phone: clean(details?.phone, LIMITS.phone),
     address: clean(details?.address, LIMITS.address),
     city: clean(details?.city, LIMITS.city),
+    postalCode: clean(details?.postalCode, LIMITS.postal),
     notes: clean(details?.notes, LIMITS.notes),
   };
 
@@ -100,6 +108,39 @@ export async function placeOrder(
     return {
       ok: false,
       message: "Please fill in your name, phone, address and city.",
+    };
+  }
+
+  // The billing address as it will be stored. `!== false` rather than a truthiness
+  // test: anything but an explicit `false` reads as "same as shipping", which is the
+  // safe way round — it stores the address we already checked instead of whatever
+  // three strings came with the request.
+  //
+  // Copied rather than left blank when the box stayed ticked, so `billing_address` is
+  // always populated and neither the admin panel nor a future invoice has to know a
+  // fallback rule. The order row is a snapshot, the same reason `total` is stored
+  // rather than summed on read.
+  const billingSame = details?.billingSame !== false;
+  const billing = billingSame
+    ? {
+        address: customer.address,
+        city: customer.city,
+        postal: customer.postalCode,
+      }
+    : {
+        address: clean(details?.billingAddress, LIMITS.address),
+        city: clean(details?.billingCity, LIMITS.city),
+        postal: clean(details?.billingPostalCode, LIMITS.postal),
+      };
+
+  // Required as a group, and only once the box is unticked: a billing city with no
+  // street is not something an invoice can be raised from, so a half-typed billing
+  // address is refused rather than stored. Nothing to check when it is ticked — those
+  // three came from the shipping fields above.
+  if (!billingSame && (!billing.address || !billing.city)) {
+    return {
+      ok: false,
+      message: "Please fill in your billing address and city.",
     };
   }
 
@@ -131,6 +172,22 @@ export async function placeOrder(
   const reference = orderReference();
 
   try {
+    // Whose order this is. Read from the session rather than the payload for the
+    // reason at the top of the file, after the validation above so an obviously
+    // forged body never costs a round trip, and inside this `try` alongside
+    // `supabaseAdmin()` so that an unreachable auth server cannot break this
+    // function's promise never to throw.
+    //
+    // `getUser()` rather than `getSession()`, the same choice `currentCustomer()`
+    // makes and for the same reason: it asks the auth server to validate the token
+    // instead of believing what the cookie says about itself — and this stamp is
+    // what decides whose order this counts as from here on.
+    //
+    // Null for a guest, which is still the ordinary case and stays supported end
+    // to end: `orders.user_id` is nullable and `p_user_id` defaults to null.
+    const supabase = await supabaseAuth();
+    const { data: account } = await supabase.auth.getUser();
+
     const { data, error } = await supabaseAdmin().rpc("place_order", {
       p_id: reference,
       p_name: customer.name,
@@ -139,12 +196,22 @@ export async function placeOrder(
       p_city: customer.city,
       p_notes: customer.notes,
       p_lines: payload,
-      // No `p_user_id` key here, deliberately. PostgREST matches an RPC by the
-      // argument names in the body, so sending one the deployed function does not
-      // declare is a 404 (PGRST202) rather than a harmless extra — the schema has to
-      // gain the parameter before this file may send it. Omitting it is the only form
-      // that works against both signatures, since the 8-argument `place_order`
-      // defaults `p_user_id` to null. Pass 2 adds it back, guarded by a real session.
+      // The deployed `place_order` takes this as its eighth argument and writes it
+      // straight into `orders.user_id`; it defaults to null, which is what every
+      // order before this line got. Worth remembering that PostgREST resolves an
+      // RPC by the argument names in the body, so sending a key the function does
+      // not declare is a 404 (PGRST202) rather than a harmless extra — this key and
+      // that signature have to move together.
+      p_user_id: account.user?.id ?? null,
+      // Optional at checkout but never null on the way in: these columns are `not
+      // null default ''`, and `p_billing_*` carries the shipping address whenever the
+      // box stayed ticked. The PostgREST caveat above covers all five of them — the
+      // keys here and the deployed argument list move together or not at all.
+      p_postal_code: customer.postalCode,
+      p_billing_same: billingSame,
+      p_billing_address: billing.address,
+      p_billing_city: billing.city,
+      p_billing_postal_code: billing.postal,
     });
     if (error) throw new Error(error.message);
 

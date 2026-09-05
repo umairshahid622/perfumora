@@ -38,7 +38,7 @@ interface AppInputProps {
   onChange?: (value: string) => void;
   placeholder?: string;
   required?: boolean;
-  /** Marks the one field a customer may leave blank; shows a quiet "Optional" tag. */
+  /** Marks a field a customer may leave blank; shows a quiet "Optional" tag. */
   optional?: boolean;
   autoComplete?: string;
   name?: string;

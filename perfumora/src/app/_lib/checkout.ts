@@ -12,16 +12,36 @@ import type { CartLine } from "./cart-context";
 import type { SizeMl, VariantId } from "./variants";
 
 /**
- * What a COD delivery needs from the customer. Phone rather than email: the
- * courier calls, and nothing here can send mail. Placeholder schema — not a
- * brand-approved checkout.
+ * What a COD delivery needs from the customer, plus what a card payment will.
+ * Phone rather than email: the courier calls, and nothing here can send mail.
+ *
+ * Four fields are required — name, phone, address, city. The postal code is not:
+ * Pakistan's five-digit codes are widely unknown by the people who live at the
+ * address, and a courier routes on the city and the landmark regardless, so making
+ * it mandatory would only buy an abandoned bag. The billing address is optional in
+ * the practical sense — it sits behind a "same as shipping" checkbox that ships
+ * checked, so the ordinary path adds no typing — and nothing consumes it yet, since
+ * cash on delivery has no card issuer performing an address check. It is collected
+ * for the gateway that will.
+ *
+ * Placeholder schema — not a brand-approved checkout.
  */
 export interface CustomerDetails {
   name: string;
   phone: string;
   address: string;
   city: string;
-  /** The one field a customer may leave blank. */
+  postalCode: string;
+  /** Whether the billing address *is* the shipping one. Stored rather than worked
+   *  out later by comparing the two: once either is edited, or a stray space creeps
+   *  into one, a comparison stops being able to answer what the customer said. */
+  billingSame: boolean;
+  /** Only ever typed when `billingSame` is false. `placeOrder` copies the shipping
+   *  address over these when it is true, so the stored order always has a billing
+   *  address and no reader needs a fallback rule. */
+  billingAddress: string;
+  billingCity: string;
+  billingPostalCode: string;
   notes: string;
 }
 
@@ -30,6 +50,13 @@ export const EMPTY_DETAILS: CustomerDetails = {
   phone: "",
   address: "",
   city: "",
+  postalCode: "",
+  // Checked by default, which is the whole reason the billing address costs the
+  // ordinary customer nothing.
+  billingSame: true,
+  billingAddress: "",
+  billingCity: "",
+  billingPostalCode: "",
   notes: "",
 };
 
@@ -112,6 +139,11 @@ export function buildOrder(
       phone: details.phone.trim(),
       address: details.address.trim(),
       city: details.city.trim(),
+      postalCode: details.postalCode.trim(),
+      billingSame: details.billingSame,
+      billingAddress: details.billingAddress.trim(),
+      billingCity: details.billingCity.trim(),
+      billingPostalCode: details.billingPostalCode.trim(),
       notes: details.notes.trim(),
     },
     lines,
