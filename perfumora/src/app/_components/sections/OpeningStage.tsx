@@ -58,7 +58,19 @@ gsap.registerPlugin(ScrollTrigger);
  *
  * The bottle rides inside that same wrapper, which is what makes it leave with the
  * Manifesto and not a line of scroll logic of its own: it is nailed to the viewport
- * for as long as the pair is lifted or stuck, then travels off with the stage.
+ * for as long as the pair is lifted or stuck, then travels off with the stage. Its one
+ * move within the beat is the drift — 19vw to the right, scrubbed on the same curve and
+ * window as the copy's arrival, so the two settle as one centred composition rather than
+ * a left third of prose beside a hole. The copy is indented 13vw, not the same 19vw:
+ * equal distances would have preserved whatever gap the two started with, and the 6vw of
+ * daylight between the two numbers is what opens it. They straddle 16vw symmetrically, so
+ * the pair's midpoint — and therefore its centring — is unaffected by how far apart the
+ * halves are set.
+ *
+ * The Hero's own furniture stays where it was through all of this, the counter and the
+ * product bar included. They belong to the section underneath, which by design does not
+ * move while it is being read over; the consequence is that the counter no longer sits
+ * directly beneath the vessel once the drift has run.
  */
 export function OpeningStage() {
   const stage = useRef<HTMLDivElement>(null);
@@ -108,7 +120,14 @@ export function OpeningStage() {
       // that drops that value while the customer is holding still hands the word back
       // at full weight. Nothing writes to this div but this effect, and the variable
       // inherits down to the span whatever React does inside it.
-      gsap.set(stageEl, { "--name-presence": 1 });
+      //
+      // `--vessel-drift` is the same trick for the vessel's move: 0 → 1, a pure
+      // progress with no distance in it. The distance is a class on the bottle's lane
+      // in the markup, which is what lets it be `md:` only and lets CSS re-resolve it
+      // on resize without a refresh. Below `md` there is no indent to make room for —
+      // the copy is laid over the glass there — so the class is simply absent and this
+      // variable moves nothing.
+      gsap.set(stageEl, { "--name-presence": 1, "--vessel-drift": 0 });
 
       const settle = (lifted: boolean) =>
         gsap.set(liftEl, { position: lifted ? "fixed" : "absolute" });
@@ -145,11 +164,30 @@ export function OpeningStage() {
         panelEl,
         { opacity: 1, x: 0, ease: "power1.inOut", duration: 1 },
         0,
-      ).to(
-        stageEl,
-        { "--name-presence": 0, ease: "power1.inOut", duration: 0.3 },
-        0.2,
-      );
+      )
+        .to(
+          stageEl,
+          { "--name-presence": 0, ease: "power1.inOut", duration: 0.3 },
+          0.2,
+        )
+        // The vessel travels with the copy, on the copy's own curve and window, so the
+        // two read as one move rather than a slide followed by a nudge. The Hero is
+        // composed on the centre of the screen; the Manifesto puts a column of prose in
+        // the left third, and leaving the glass where it was left the beat weighted to
+        // the left with a hole in the right third. Both halves step right — the glass
+        // further than the copy, which is where the air between them comes from — and by
+        // amounts symmetric about the same midpoint, so the pair sits centred whatever
+        // the spread between them is set to.
+        //
+        // Not gated on reduced motion, unlike the copy's entrance slide. This is where
+        // the vessel *belongs* during the beat, not an ornament on the way there: it is
+        // scrubbed to the customer's own scroll like the opacity above, and suppressing
+        // it would park the glass under the copy's right edge.
+        .to(
+          stageEl,
+          { "--vessel-drift": 1, ease: "power1.inOut", duration: 1 },
+          0,
+        );
 
       // Every other ScrollTrigger on the page reads the Manifesto's position in the
       // document — the nav's tone handover, the `#manifesto` anchor, its own reveal.
@@ -202,12 +240,31 @@ export function OpeningStage() {
       <div className="pointer-events-none sticky top-0 h-screen">
         {/* Lifted over the viewport while the dissolve runs; `z-30` carries the
             whole pair above the Hero's own furniture (z-10, z-20) and leaves them
-            under the nav. */}
-        <div ref={lift} className="absolute inset-0 z-30">
+            under the nav.
+
+            `overflow-hidden` is here for the vessel's drift below. The canvas is a
+            full-viewport box, so stepping it to the right pushes its right edge past
+            the viewport — and a transformed box still counts toward the document's
+            scrollable width, which is a horizontal scrollbar on every screen. Clipping
+            at this rectangle removes it and costs nothing visible: what leaves the
+            frame is empty canvas, the vessel itself being a fraction of its width. */}
+        <div ref={lift} className="absolute inset-0 z-30 overflow-hidden">
           <div ref={panel} className="h-full">
             <Manifesto />
           </div>
-          <PersistentBottle />
+
+          {/* The vessel's drift lane. GSAP owns only `--vessel-drift`, 0 → 1; the
+              distance is stated here, once, and `md:` is doing real work — below it the
+              Manifesto's copy has no indent and is laid over the glass, so there is
+              nothing to step aside for. Keeping the distance in CSS also means a resize
+              re-resolves it without a refresh. The number is the far half of a pair with
+              the copy's own `md:ml-[calc(5rem_+_13vw)]`: 19 and 13 straddle 16vw, their
+              midpoint is what holds the composition centred, and their 6vw difference is
+              the gap between the prose and the glass. Move the two apart to widen it —
+              and apart *evenly*, or the pair stops being centred. */}
+          <div className="absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*19vw)]">
+            <PersistentBottle />
+          </div>
         </div>
       </div>
     </div>

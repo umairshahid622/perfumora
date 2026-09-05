@@ -36,12 +36,27 @@ import { SECTION_IDS } from "../../_lib/sections";
  * as detail inside the arrival instead of a second version of it.
  *
  * The measure is a fraction of the viewport rather than a fixed `max-w`, and that is
- * load-bearing: the vessel it must stay clear of is centred in the viewport, so the
- * gap between the copy and the glass only holds if the copy scales with the same unit
- * the gap is measured in. `ml-20` clears the Hero's left arrow, which sits at the
- * container's edge on the same midline as this copy. Both are `md:` only — on a phone
- * neither the arrow nor the centred vessel can be cleared at 327px of container, and
- * the copy is laid over the glass.
+ * load-bearing: the vessel it must stay clear of is positioned in viewport units, so
+ * the gap between the copy and the glass only holds if the copy scales with the same
+ * unit the gap is measured in.
+ *
+ * The indent is two numbers doing two jobs. `5rem` clears the Hero's left arrow, which
+ * sits at the container's edge on the same midline as this copy. `13vw` is this copy's
+ * share of the beat's composition: the Hero is built on the centre of the screen, and a
+ * column of prose in the left third with the glass still dead centre leaves the right
+ * third empty, so both halves step right and the pair reads as centred.
+ *
+ * They do not step by the same distance, though, and the difference between them is the
+ * gap. This copy goes 13vw right; `<OpeningStage>` scrubs the vessel 19vw. Both sit 3vw
+ * either side of the 16vw that would have moved them in lockstep, so the midpoint of the
+ * pair is unchanged and it still reads centred — while the 6vw between the two numbers is
+ * air between the prose and the glass, on top of whatever the measure already leaves. That
+ * is the number to turn: widen the split to open the gap, keep it symmetric to stay
+ * centred.
+ *
+ * All of it is `md:` only — on a phone neither the arrow nor the vessel can be cleared
+ * at 327px of container, so there the copy is laid over the glass and the vessel does
+ * not move at all.
  *
  * Nothing here is selectable: the beat's holder in `<OpeningStage>` is
  * `pointer-events-none` for its whole life so that the Hero's controls behind it stay
@@ -56,7 +71,7 @@ export function Manifesto() {
       className="bg-transparent"
     >
       <Container>
-        <div className="flex max-w-md flex-col md:ml-20 md:max-w-[min(28rem,30vw)]">
+        <div className="flex max-w-md flex-col md:ml-[calc(5rem_+_13vw)] md:max-w-[min(28rem,30vw)]">
           <Eyebrow>Manifesto</Eyebrow>
 
           {/* Working copy — final wording pending brand sign-off. */}
