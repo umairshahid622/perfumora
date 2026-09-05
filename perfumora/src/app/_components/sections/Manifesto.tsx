@@ -43,8 +43,9 @@ import { SECTION_IDS } from "../../_lib/sections";
  * neither the arrow nor the centred vessel can be cleared at 327px of container, and
  * the copy is laid over the glass.
  *
- * Nothing here is selectable: the stage's lifted wrapper is `pointer-events-none` for
- * its whole life so that the Hero's controls behind it stay clickable through the beat.
+ * Nothing here is selectable: the beat's holder in `<OpeningStage>` is
+ * `pointer-events-none` for its whole life so that the Hero's controls behind it stay
+ * clickable through the beat.
  */
 export function Manifesto() {
   return (

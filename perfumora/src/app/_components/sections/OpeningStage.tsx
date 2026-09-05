@@ -37,13 +37,17 @@ gsap.registerPlugin(ScrollTrigger);
  *          they leave on the same pixel — and the stage scrolls away as one block
  *          with the Ritual coming up beneath it. Ordinary scrolling from here down.
  *
- * Nothing in the lifted wrapper takes pointer events, at any point in that sequence.
- * It is a full-viewport box and the controls it covers belong to the Hero, so it is
- * `pointer-events-none` and its children inherit that: you can step the scent, change
- * the size and add to the bag while reading the philosophy. A transparent box is still
- * a hit target, so leaving that off is not a subtle bug — it is every button in the
- * Hero going dead. The price is that the Manifesto's own copy is not selectable, which
- * is the right way round for a layer of prose over a live product.
+ * Nothing in this beat takes pointer events, at any point in that sequence, and the
+ * rule is stated on the Manifesto's *holder* rather than on the lifted wrapper inside
+ * it — the holder is the box that does the covering. It is a screen tall and it paints
+ * above the Hero's holder (later positioned sibling, both `sticky`), so it answers the
+ * hit test for everything behind it: the product bar it covers from the bottom while
+ * the dissolve runs, then the whole Hero once it sticks. Transparency does not exempt
+ * it. With `pointer-events-none` there and inherited by both children, you can step the
+ * scent, change the size and add to the bag while reading the philosophy; without it,
+ * every button in the Hero is dead from the first pixel of scroll. The price is that
+ * the Manifesto's own copy is not selectable, which is the right way round for a layer
+ * of prose over a live product.
  *
  * The lift is the one piece of machinery. For the dissolve to be visible the
  * Manifesto has to be on screen during the *first* screen of scroll, but its place
@@ -183,20 +187,23 @@ export function OpeningStage() {
 
       {/* The Manifesto's own screen of the document — the second one, which is what
           keeps the nav's tone handover and the `#manifesto` anchor honest. Same
-          height as the Hero's holder, so the two release on the same pixel. */}
-      <div className="sticky top-0 h-screen">
+          height as the Hero's holder, so the two release on the same pixel.
+
+          `pointer-events-none` is stated here, on the outermost box of the beat,
+          because that is the box that does the covering. It is a full screen tall
+          and it paints above the Hero's holder — later positioned sibling, both
+          `sticky` — so from the moment it starts rising into the viewport it answers
+          the hit test for everything behind it: first the product bar it covers from
+          the bottom during the dissolve, then the whole Hero once it sticks. Being
+          transparent does not exempt it. Nothing inside this beat is ever meant to be
+          clicked (the Manifesto is prose over a live product, the bottle is
+          decoration), so the rule is stated once and inherited by the lift and the
+          vessel rather than repeated on each. */}
+      <div className="pointer-events-none sticky top-0 h-screen">
         {/* Lifted over the viewport while the dissolve runs; `z-30` carries the
             whole pair above the Hero's own furniture (z-10, z-20) and leaves them
-            under the nav.
-
-            `pointer-events-none` is not decoration. This is a full-viewport box at
-            z-30 with nothing but transparency in it, and a transparent box still
-            answers the hit test — without this it swallows every click meant for the
-            Hero underneath: the arrows, the size selector, Add to Bag. Both children
-            want to be inert anyway (the Manifesto is prose over a live product, the
-            bottle is decoration), so the rule is stated once here and inherited
-            rather than repeated on each of them. */}
-        <div ref={lift} className="pointer-events-none absolute inset-0 z-30">
+            under the nav. */}
+        <div ref={lift} className="absolute inset-0 z-30">
           <div ref={panel} className="h-full">
             <Manifesto />
           </div>
