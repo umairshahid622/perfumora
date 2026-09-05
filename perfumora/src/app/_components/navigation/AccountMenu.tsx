@@ -1,29 +1,45 @@
 "use client";
 
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { signOut } from "../../_lib/auth";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
+import { useRouteTransition } from "../providers/RouteTransition";
 
 interface AccountMenuProps {
   open: boolean;
   onClose: () => void;
-  /** Called once the session is actually gone, so <Navigation> can drop the
-   *  customer and put the person icon back where the initial was. */
-  onSignedOut: () => void;
+  /** Ask for the log-out confirmation, which is all this row does. The session is
+   *  ended by <LogoutConfirm>, so nothing in this panel calls `signOut()` and nothing
+   *  in it has a pending state to show — <Navigation> swaps this dropdown for that
+   *  card, and the card is where the wait happens. */
+  onLogOut: () => void;
 }
 
 /**
- * One row. Deliberately not run through `cn()` and not merged with the callers'
- * classes: tailwind-merge reads `text-micro` (a size) and `text-accent-on-light`
- * (a colour) as one `text-*` conflict and keeps only the last, which drops the
- * size — the same trap `CENTRE_LINK` in <Navigation> documents. `min-h-11` is the
- * 44px touch floor, since micro caps are far shorter than that on their own.
+ * One row, minus its colour. Deliberately not run through `cn()` and not merged
+ * with the callers' classes: tailwind-merge reads `text-micro` (a size) and
+ * `text-accent-on-light` (a colour) as one `text-*` conflict and keeps only the
+ * last, which drops the size — the same trap `CENTRE_LINK` in <Navigation>
+ * documents, and the reason the colour is appended as a template literal below
+ * rather than living in here. `min-h-11` is the 44px touch floor, since micro caps
+ * are far shorter than that on their own.
  */
 const ITEM =
-  "text-micro hover:text-accent-on-light flex min-h-11 w-full items-center px-5 text-left font-medium uppercase transition-colors";
+  "text-micro flex min-h-11 w-full items-center px-5 text-left font-medium uppercase transition-colors";
+
+/**
+ * The row for the page you are on wears the accent outright; the rest reveal it on
+ * hover — `linkTone` in <Navigation>, for the header's centre links. No tone
+ * argument here: that panel spans the parchment and the near-black sections, while
+ * this one is `bg-bg-light` whatever is behind it, so the on-light form is the only
+ * one it can need. Both classes are written out in full for the same reason as
+ * there: Tailwind only generates what it can see as a literal.
+ */
+const itemTone = (current: boolean) =>
+  current ? "text-accent-on-light" : "hover:text-accent-on-light";
 
 /**
  * The account dropdown: what the avatar opens once someone is signed in, in place
@@ -39,17 +55,20 @@ const ITEM =
  * these are three plain buttons that Tab already reaches in order. Announcing a
  * menu we haven't implemented would be worse for a screen reader than not
  * announcing one.
- *
- * Only "Log out" does anything yet. The other two are the rows the account work
- * will land on, so they dismiss the panel and go nowhere for now.
  */
-export function AccountMenu({ open, onClose, onSignedOut }: AccountMenuProps) {
+export function AccountMenu({ open, onClose, onLogOut }: AccountMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const timeline = useRef<gsap.core.Timeline | null>(null);
-  const [pending, startTransition] = useTransition();
+  const { navigate } = useRouteTransition();
+  const pathname = usePathname();
+
+  // Which row is the page you are already on. Read here rather than passed down
+  // from <Navigation>, which knows its own three route flags but not this panel's.
+  const atOrders = pathname === "/orders";
+  const atSettings = pathname === "/settings";
 
   useGSAP(
     () => {
@@ -89,12 +108,14 @@ export function AccountMenu({ open, onClose, onSignedOut }: AccountMenuProps) {
     else tl.reverse();
   }, [open]);
 
-  const logOut = () => {
-    if (pending) return;
-    startTransition(async () => {
-      await signOut();
-      onSignedOut();
-    });
+  // Panel first, then the curtain — the order <Navigation>'s own Checkout CTA
+  // uses. Dismissing after `navigate` would reverse the open timeline underneath
+  // the transition, so the rows would still be lifting away as the new page
+  // arrives. Clicking the row you are already on just dismisses: `navigate`
+  // returns early on the current pathname rather than wiping to the same page.
+  const go = (href: string) => {
+    onClose();
+    navigate(href);
   };
 
   return (
@@ -130,8 +151,9 @@ export function AccountMenu({ open, onClose, onSignedOut }: AccountMenuProps) {
             <button
               type="button"
               tabIndex={open ? 0 : -1}
-              onClick={onClose}
-              className={ITEM}
+              onClick={() => go("/orders")}
+              aria-current={atOrders ? "page" : undefined}
+              className={`${ITEM} ${itemTone(atOrders)}`}
             >
               Your orders
             </button>
@@ -140,22 +162,26 @@ export function AccountMenu({ open, onClose, onSignedOut }: AccountMenuProps) {
             <button
               type="button"
               tabIndex={open ? 0 : -1}
-              onClick={onClose}
-              className={ITEM}
+              onClick={() => go("/settings")}
+              aria-current={atSettings ? "page" : undefined}
+              className={`${ITEM} ${itemTone(atSettings)}`}
             >
               Settings
             </button>
           </li>
-          {/* Ruled off: the two above go somewhere, this one ends the session. */}
+          {/* Ruled off: the two above stay inside the account, this one ends the
+              session. Never current, whatever page you are on — it is an action,
+              not somewhere to be. And a request rather than the action itself: it
+              hands over to <LogoutConfirm>, so the row that reads like a navigation
+              item cannot end a session on one press. */}
           <li className="border-hairline-on-light mt-2 border-t pt-2">
             <button
               type="button"
               tabIndex={open ? 0 : -1}
-              onClick={logOut}
-              disabled={pending}
-              className={ITEM}
+              onClick={onLogOut}
+              className={`${ITEM} ${itemTone(false)}`}
             >
-              {pending ? "Logging out…" : "Log out"}
+              Log out
             </button>
           </li>
         </ul>

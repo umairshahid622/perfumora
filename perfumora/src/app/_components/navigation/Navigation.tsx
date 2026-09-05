@@ -15,14 +15,17 @@ import { AccountMenu } from "./AccountMenu";
 import { AuthModal } from "./AuthModal";
 import { CartDrawer } from "./CartDrawer";
 import { ChevronIcon, BagIcon, PersonIcon } from "./icons";
+import { LogoutConfirm } from "./LogoutConfirm";
 import { MegaMenu } from "./MegaMenu";
 import { SoundToggle } from "./SoundToggle";
 
 gsap.registerPlugin(ScrollTrigger);
 
-/** What the header has open. The account button owns two of these: the login card
- *  when nobody is signed in, the dropdown when someone is. */
-type Panel = "menu" | "cart" | "auth" | "account" | null;
+/** What the header has open. The account button owns three of these: the login card
+ *  when nobody is signed in, the dropdown when someone is, and the confirmation that
+ *  dropdown's Log out row hands over to. One value, so opening any of them puts the
+ *  last away. */
+type Panel = "menu" | "cart" | "auth" | "account" | "logout" | null;
 
 /**
  * The centre links' shared shape. A plain string, deliberately not run through
@@ -101,11 +104,22 @@ export function Navigation() {
 
   const authOpen = panel === "auth";
 
-  // Asked on mount, and again whenever the account card opens or closes, because the
+  /** The panels that can change who is signed in, or what they are called: the card
+   *  signs in, the confirmation signs out, and the dropdown is the only way to
+   *  `/settings`. One flag for all three, because the effect below wants "an account
+   *  panel opened or closed" rather than which of them it was — and because the
+   *  dropdown handing over to the confirmation is not a close, so it should not re-ask
+   *  in the middle of a sign-out it is about to be told about. */
+  const accountPanel = authOpen || panel === "account" || panel === "logout";
+
+  // Asked on mount, and again whenever an account panel opens or closes, because the
   // session is a cookie: it can expire, or a tab elsewhere can sign out, and nothing
   // here would hear about it. <AuthModal> reports a sign-in or sign-out straight back
   // through `onCustomer`, so the re-ask on close is only a backstop — it costs one
-  // Server Action call on a click the customer made deliberately.
+  // Server Action call on a click the customer made deliberately. The dropdown counts
+  // for a second reason: a display name saved on `/settings` is not reported back
+  // through anything, so re-asking as that panel opens is what puts the new initial
+  // in the avatar, on the click that would show it anyway.
   useEffect(() => {
     let live = true;
     currentCustomer().then((who) => {
@@ -114,16 +128,27 @@ export function Navigation() {
     return () => {
       live = false;
     };
-  }, [authOpen]);
+  }, [accountPanel]);
 
-  /** The dropdown's Log out row, once the session is actually gone. Clearing the
-   *  customer puts the person glyph back in place of the initial, and the panel goes
-   *  with it — it is a menu for an account that no longer has a session. Unmounting
-   *  it instead would cut its close animation off mid-play, which is why <AccountMenu>
-   *  stays mounted whether or not anyone is signed in. */
+  /** <LogoutConfirm>, once the session is actually gone. Clearing the customer puts
+   *  the person glyph back in place of the initial, and the panel goes with it — a
+   *  confirmation for a session that no longer exists. Unmounting it instead would cut
+   *  its close animation off mid-play, which is why <AccountMenu> and that card both
+   *  stay mounted whether or not anyone is signed in.
+   *
+   *  Closing here also drops `accountPanel`, which cancels any `currentCustomer()` the
+   *  effect above still has in flight: without that, an answer sent before the sign-out
+   *  could land after it and put the initial back on an account that has none.
+   *
+   *  Off the private routes as well, since the guard in each of them only runs on a
+   *  request: logging out while reading your own order history would otherwise leave it
+   *  on screen until something else navigated. `navigate` rather than `router.replace`,
+   *  so leaving looks like every other departure in this app, and only from those two —
+   *  anywhere else there is nothing on screen that was theirs. */
   const signedOut = () => {
     setCustomer(null);
     close();
+    if (pathname === "/orders" || pathname === "/settings") navigate("/");
   };
 
   // The Fragrances button. The panel counts as on screen from this click either way:
@@ -399,7 +424,7 @@ export function Navigation() {
               <AccountMenu
                 open={panel === "account"}
                 onClose={close}
-                onSignedOut={signedOut}
+                onLogOut={() => setPanel("logout")}
               />
             </div>
 
@@ -441,6 +466,15 @@ export function Navigation() {
         onClose={close}
         customer={customer}
         onCustomer={setCustomer}
+      />
+      {/* Out here beside the card rather than inside <AccountMenu>, for the reason the
+          card is: it is `fixed`, and rendered from within the header it would sit in a
+          stacking context GSAP is animating. Routing it through `panel` gets Escape and
+          the body scroll lock from this file's own handlers as well. */}
+      <LogoutConfirm
+        open={panel === "logout"}
+        onClose={close}
+        onSignedOut={signedOut}
       />
     </>
   );
