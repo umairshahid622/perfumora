@@ -11,6 +11,7 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
   resendConfirmation,
+  sendPasswordReset,
   signIn,
   signUp,
   type Customer,
@@ -34,16 +35,31 @@ interface AuthModalProps {
   onCustomer: (customer: Customer | null) => void;
 }
 
-type Mode = "login" | "signup";
+/** The two credentials modes, and the third state the same form takes when the
+ *  password is the thing that has been forgotten — one field of the three, and an email
+ *  rather than a session at the end of it. */
+type Mode = "login" | "signup" | "reset";
 
 /** Two lines of copy per state — a signed-in session speaks first, then a new
- *  account waiting on its confirmation email, otherwise the mode does. A lookup
- *  rather than nested ternaries, since there are four. */
+ *  account waiting on its confirmation email or a reset link that has gone out,
+ *  otherwise the mode does. A lookup rather than nested ternaries, since there are
+ *  six. */
 const COPY = {
   "signed-in": { heading: "Your account", eyebrow: "Signed in" },
   confirm: { heading: "Almost there", eyebrow: "One more step" },
+  sent: { heading: "Check your inbox", eyebrow: "Link on its way" },
   login: { heading: "Welcome back", eyebrow: "Log in to continue" },
   signup: { heading: "Create account", eyebrow: "Join Perfumora" },
+  reset: { heading: "Forgotten password", eyebrow: "We'll email you a link" },
+} as const;
+
+/** What the submit button says, waiting and working. A lookup for the reason `COPY` is
+ *  one: three modes and two states each read as six strings in a table and as an
+ *  unreadable pair of nested ternaries in the button. */
+const ACTION = {
+  login: { idle: "Log in", busy: "Logging in…" },
+  signup: { idle: "Sign up", busy: "Signing up…" },
+  reset: { idle: "Email me a link", busy: "Sending…" },
 } as const;
 
 /** The treatment <Checkout> gives a refused order: a rule in the accent and a
@@ -86,6 +102,11 @@ function spoken({ message, retryAt }: Refusal) {
  * here — it is a cookie, so <Navigation> asks the server each time the card opens
  * and hands the answer down, which is also what lets the account button wear the
  * customer's initial.
+ *
+ * The third mode is the one that leaves: `reset` asks for the address only and sends a
+ * link, and everything after it happens in `/auth/confirm` and `/reset-password`. This
+ * card never sees a new password — the point of the link is that the person typing one
+ * has proved they can read the mailbox.
  */
 export function AuthModal({
   open,
@@ -117,6 +138,11 @@ export function AuthModal({
    *  clears both before it starts, so the confirmation screen reports the last
    *  press and not a history of them. */
   const [resent, setResent] = useState(false);
+  /** That a reset link has gone out, which swaps the form for "check your inbox" the
+   *  way `confirmed` does. Its own flag rather than a shared one: they are reached from
+   *  different presses, say different things, and only one of them offers to send
+   *  again. */
+  const [sent, setSent] = useState(false);
   const [pending, startTransition] = useTransition();
 
   useGSAP(
@@ -157,6 +183,7 @@ export function AuthModal({
       setConfirmed(false);
       setFailure(null);
       setResent(false);
+      setSent(false);
       // The address and the name are left alone — a mistyped password shouldn't
       // cost you either — but the password never outlives the open card.
       setPassword("");
@@ -171,6 +198,16 @@ export function AuthModal({
     setFailure(null);
 
     startTransition(async () => {
+      // Reset returns before the two credential branches rather than joining their
+      // ternary: it sends an email instead of opening a session, so there is no
+      // `signedIn` to read and nothing to hand up to the header.
+      if (mode === "reset") {
+        const asked = await sendPasswordReset(email);
+        if (asked.ok) setSent(true);
+        else setFailure(asked);
+        return;
+      }
+
       // Written out per mode rather than picking the action with a ternary: the two
       // no longer take the same arguments, since only sign-up has a name to send.
       const result =
@@ -205,17 +242,20 @@ export function AuthModal({
     });
   };
 
-  // Also the way off the confirmation screen, which is why it clears `confirmed`:
-  // that screen now says "log in instead" for the address that already had an
-  // account, and this is the only thing on the card that can honour it.
-  const switchMode = () => {
-    setMode(mode === "login" ? "signup" : "login");
+  // Every way of changing what the card is for, and the way off both of the screens
+  // that replace the form — which is why it clears them: the confirmation screen says
+  // "log in instead" for an address that already had an account, and this is the only
+  // thing on the card that can honour it.
+  const toMode = (next: Mode) => {
+    setMode(next);
     setConfirmed(false);
     setResent(false);
+    setSent(false);
     setFailure(null);
   };
 
-  const copy = COPY[customer ? "signed-in" : confirmed ? "confirm" : mode];
+  const copy =
+    COPY[customer ? "signed-in" : confirmed ? "confirm" : sent ? "sent" : mode];
 
   return (
     <div ref={rootRef} aria-hidden={!open}>
@@ -311,6 +351,25 @@ export function AuthModal({
                 {pending ? "Sending…" : "Resend email"}
               </RippleButton>
             </div>
+          ) : sent ? (
+            <div className="mt-10 flex flex-col items-start gap-6">
+              {/* Worded for both outcomes and for the same reason the screen above is:
+                  GoTrue answers an address it has never seen with the same silent
+                  success it gives a real one, so this is the other place the card
+                  could otherwise be used to ask who shops here. No duration named —
+                  how long the link lasts is a dashboard setting, and a wrong number
+                  here would turn a working link into one nobody trusts.
+
+                  No Resend button, unlike the confirmation screen: that link is the
+                  only way to finish signing up, while this one is a hop from the log-in
+                  form below. Sending two reset emails also spends the project's hourly
+                  quota on the same request. */}
+              <p className="text-body text-muted-on-light">
+                If that address has an account, the link in your inbox will set a
+                new password. If it doesn&apos;t, nothing was sent — create an
+                account instead.
+              </p>
+            </div>
           ) : (
             <form onSubmit={submit} className="mt-8 flex flex-col gap-6">
               {/* Sign-up only, and first: it is the one field that isn't a
@@ -335,17 +394,36 @@ export function AuthModal({
                 value={email}
                 onChange={setEmail}
               />
-              <AppInput
-                label="Password"
-                variant="password"
-                required
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                value={password}
-                onChange={setPassword}
-              />
+              {/* Not asked for in reset mode, where the address is the whole request:
+                  a `required` field nobody can fill would block the submit, and one
+                  more box to type a password into is the last thing to show somebody
+                  who has just said they cannot remember it. */}
+              {mode !== "reset" && (
+                <AppInput
+                  label="Password"
+                  variant="password"
+                  required
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  value={password}
+                  onChange={setPassword}
+                />
+              )}
 
+              {/* Under the field it is about, pulled up out of the form's `gap-6` so it
+                  reads as a note on the password rather than a third field. Login only:
+                  from sign-up there is no account yet to have forgotten anything about,
+                  and in reset mode it is where you already are. */}
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => toMode("reset")}
+                  className="text-micro text-muted-on-light hover:text-ink -mt-3 self-start font-medium uppercase transition-colors"
+                >
+                  Forgot password?
+                </button>
+              )}
               {/* The same treatment <Checkout> gives a refused order — see
                   `NOTICE`. `role="alert"` so it is announced; the submit button
                   keeps focus. */}
@@ -361,30 +439,27 @@ export function AuthModal({
                 silent
                 disabled={pending}
               >
-                {pending
-                  ? mode === "login"
-                    ? "Logging in…"
-                    : "Signing up…"
-                  : mode === "login"
-                    ? "Log in"
-                    : "Sign up"}
+                {pending ? ACTION[mode].busy : ACTION[mode].idle}
               </RippleButton>
             </form>
           )}
 
-          {/* Shown on the confirmation screen too, where it reads "Have an account?
-              Log in" — without it that screen is a dead end for the one person who
-              needs a way out of it, whose address was already registered. Only a
-              live session hides it, since there is nothing to switch to. */}
+          {/* Shown on both of the screens that replace the form, where it reads "Have
+              an account? Log in" — without it the confirmation screen is a dead end for
+              the one person who needs a way out of it, whose address was already
+              registered. Only a live session hides it, since there is nothing to switch
+              to. */}
           {!customer && (
             <button
               type="button"
-              onClick={switchMode}
+              onClick={() => toMode(mode === "login" ? "signup" : "login")}
               className="text-micro text-muted-on-light hover:text-ink mt-6 font-medium uppercase transition-colors"
             >
               {mode === "login"
                 ? "Need an account? Sign up"
-                : "Have an account? Log in"}
+                : mode === "reset"
+                  ? "Back to log in"
+                  : "Have an account? Log in"}
             </button>
           )}
         </div>

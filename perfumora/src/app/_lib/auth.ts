@@ -1,6 +1,6 @@
 "use server";
 
-import type { AuthError, User } from "@supabase/supabase-js";
+import type { AMREntry, AuthError, User } from "@supabase/supabase-js";
 import { supabaseAuth, type AuthMeta } from "./supabase-auth";
 
 /* ---------------------------------------------------------------------------
@@ -25,6 +25,14 @@ import { supabaseAuth, type AuthMeta } from "./supabase-auth";
    The session is a cookie, set by GoTrue through `supabaseAuth()`. Reading it
    back is `currentCustomer()`, which asks the auth server to validate the token
    rather than trusting what the cookie claims.
+
+   One pair of exports is unlike the rest: `sendPasswordReset` and `resetPassword`,
+   the two halves of a forgotten password. Every other write here is authorised by
+   something the customer knows — the password they are typing. That one cannot be,
+   because not knowing it is the whole reason they are there, so it is authorised by
+   *how the session was made* instead: `provedMailbox` below asks the token whether
+   it was minted by following an emailed link. See `resetPassword` for why that check
+   is the load-bearing part and not a formality.
 --------------------------------------------------------------------------- */
 
 /** Ceilings, not preferences — same reasoning as `orders.ts`. 254 is the longest
@@ -93,6 +101,15 @@ const LONG_NAME = "Please pick a shorter display name.";
 const NO_PASSWORDS = "Please enter your current password and a new one.";
 const LONG_PASSWORD = "Please pick a shorter password — 72 characters at most.";
 const WRONG_PASSWORD = "That isn't your current password.";
+const NO_PASSWORD = "Please enter a new password.";
+
+/* Every way of reaching `resetPassword` without having followed a link, said as one
+   sentence: no session at all, a session that came from a password, and a recovery
+   session whose link had already been spent. Deliberately not three — the three are
+   the same thing from the customer's side, and the only useful next step is the same
+   for all of them. */
+const NO_RECOVERY =
+  "That reset link has expired. Please ask for a new one and try again.";
 
 /**
  * The refusals a customer can actually act on, keyed by GoTrue's stable error
@@ -173,7 +190,60 @@ function refused(error: AuthError, where: string, meta: AuthMeta): Refusal {
   };
 }
 
-/** Exchange a password for a session cookie. Never throws. */
+/**
+ * The methods that count as "this person opened our email", which is the only proof
+ * `resetPassword` has to work with.
+ *
+ * Not a list of our own devising: it is exactly the set GoTrue's own
+ * `Session.IsRecovery()` returns true for, which is the test it applies when deciding
+ * whether a password may be set without the old one. `otp` is the one to expect —
+ * `verifyOtp`, the call `/auth/confirm` makes on the emailed token, stamps the session
+ * `otp` whatever `type` it was given — and the other two are what GoTrue writes when a
+ * link is redeemed through its own endpoints. All three are here rather than the one we
+ * expect, so a link redeemed by a route we did not write still works.
+ */
+const MAILBOX_PROOF = ["otp", "magiclink", "recovery"];
+
+/**
+ * Whether this session was created by following a link we emailed, rather than by
+ * typing a password.
+ *
+ * `getClaims()` rather than `getUser()`: both validate the token — asymmetric keys
+ * against the project's JWKS, a legacy shared secret by asking the auth server, so
+ * neither path trusts the cookie — but only this one hands back the `amr` claim, and
+ * `amr` is where the answer is. It is the same record the `auth.mfa_amr_claims` table
+ * holds, carried inside the token.
+ *
+ * Absent `amr` means no, not "unknown": GoTrue omits the claim entirely for a session
+ * with no methods recorded against it, and a session we cannot account for is not one
+ * to hand a password change to.
+ */
+async function provedMailbox(
+  supabase: Awaited<ReturnType<typeof supabaseAuth>>,
+): Promise<boolean> {
+  const { data } = await supabase.auth.getClaims();
+  // Typed `AMREntry[] | string[]` — GoTrue sends the objects, and the plain strings
+  // are there for the other shape the claim has taken, so both are read rather than
+  // one being asserted.
+  const used: (AMREntry | string)[] = data?.claims.amr ?? [];
+  const methods = used.map((entry) =>
+    typeof entry === "string" ? entry : entry.method,
+  );
+  const proved = methods.some((method) => MAILBOX_PROOF.includes(method));
+
+  // Logged, unlike a missing session in `currentCustomer()`, because this is the one
+  // refusal in the file with no other way to see it: the customer is told the link
+  // expired, and if that were ever wrong — the claim renamed, a session issued with a
+  // method we do not know — the method names are what says so. No address or id: the
+  // question is which door was used, not who came through it.
+  if (!proved) {
+    console.error("provedMailbox refused:", methods.join(", ") || "no amr claim");
+  }
+
+  return proved;
+}
+
+
 export async function signIn(
   email: string,
   password: string,
@@ -271,6 +341,40 @@ export async function resendConfirmation(email: string): Promise<ResendResult> {
 }
 
 /**
+ * Email the link that lets someone who has forgotten their password set a new one.
+ * Never throws.
+ *
+ * Says nothing about whether that address has an account, for the same reason
+ * `resendConfirmation` above says nothing: GoTrue answers an address it has never
+ * seen with the same silent success it gives a real one, and we pass that through
+ * rather than turning the one form anybody can submit into a way to ask who shops
+ * here. The card's copy has to hold that line too — "if that address has an account"
+ * rather than "we've sent you an email".
+ *
+ * No `redirectTo`, matching `signUp` and `resendConfirmation`: where the link lands is
+ * written into the dashboard's Reset Password template, which has to point at
+ * `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery` — see that
+ * route for why the link carries a `token_hash` and not a `code`. Until that edit is
+ * made the email still arrives and still works, but it goes through GoTrue's own
+ * `/verify`, which hands the tokens back in the URL fragment; nothing on the server
+ * can read a fragment, so the customer would land on the shop no closer to a new
+ * password.
+ */
+export async function sendPasswordReset(email: string): Promise<ResendResult> {
+  const address = typeof email === "string" ? email.trim() : "";
+  if (!address || address.length > LIMITS.email) {
+    return { ok: false, message: NO_EMAIL };
+  }
+
+  const meta: AuthMeta = {};
+  const supabase = await supabaseAuth(meta);
+  const { error } = await supabase.auth.resetPasswordForEmail(address);
+  if (error) return refused(error, "sendPasswordReset", meta);
+
+  return { ok: true };
+}
+
+/**
  * Change the name the storefront greets them by. Never throws.
  *
  * Writes `user_metadata.full_name` — the key `signUp` writes and the first one
@@ -357,6 +461,50 @@ export async function changePassword(
   return { ok: true };
 }
 
+/**
+ * Set a new password from the session an emailed reset link created. Never throws.
+ *
+ * The other half of `sendPasswordReset`, and deliberately not a branch of
+ * `changePassword`: that one proves the person by signing in with their current
+ * password, which is the one thing somebody who followed a "forgot password" link does
+ * not have. What stands in for it is `provedMailbox` — the session had to come from
+ * opening our email — so the proof is control of the mailbox instead of knowledge of
+ * the password.
+ *
+ * That check is the whole of the security here, not a formality. Without it this would
+ * be a way around `changePassword`: an ordinary signed-in session would be enough to
+ * set a new password without knowing the old one, and the unlocked laptop that jsdoc
+ * warns about would be an account takeover. It is GoTrue's own rule, kept on our side
+ * for the same reason the current-password rule is — GoTrue applies it only when
+ * "Secure password change" is ticked in the dashboard, and a checkbox in a UI is not
+ * where this should be decided.
+ *
+ * No length floor and no strength opinion, as in <Settings>: the minimum is GoTrue's,
+ * it moves with a dashboard setting, and a second opinion here could only disagree
+ * with the authority. The ceiling is ours, because 72 bytes is where bcrypt stops.
+ */
+export async function resetPassword(next: string): Promise<UpdateResult> {
+  const wanted = typeof next === "string" ? next : "";
+  if (!wanted) return { ok: false, message: NO_PASSWORD };
+  if (wanted.length > LIMITS.password) {
+    return { ok: false, message: LONG_PASSWORD };
+  }
+
+  const meta: AuthMeta = {};
+  const supabase = await supabaseAuth(meta);
+  if (!(await provedMailbox(supabase))) {
+    return { ok: false, message: NO_RECOVERY };
+  }
+
+  // No `getUser()` first, unlike the two writes above: `provedMailbox` has already
+  // validated this token, and `updateUser` acts on whoever the session says it is
+  // rather than on an address we pass in.
+  const { error } = await supabase.auth.updateUser({ password: wanted });
+  if (error) return refused(error, "resetPassword", meta);
+
+  return { ok: true };
+}
+
 /** Drop the session cookies. Safe to call with no session. */
 export async function signOut(): Promise<void> {
   const supabase = await supabaseAuth();
@@ -374,5 +522,27 @@ export async function currentCustomer(): Promise<Customer | null> {
   const { data, error } = await supabase.auth.getUser();
   // A missing session is the common case, not a fault: nothing to log.
   if (error || !data.user?.email) return null;
+  return customerFrom(data.user, data.user.email);
+}
+
+/**
+ * The same, narrowed to a session that came from a reset link — the guard
+ * `/reset-password` renders behind, and the reason that page needs no token in its URL.
+ *
+ * `null` covers a visitor, an ordinary signed-in customer who arrived here some other
+ * way, and a link that has already been spent. The page sends all three home, because
+ * the only honest thing it could offer any of them is the link they do not have.
+ *
+ * Two questions of the auth server rather than one, since `getUser()` returns the
+ * account and `getClaims()` returns how it got here. Worth the extra call on a page
+ * that renders once per forgotten password, and the alternative — reading the name and
+ * address out of the token's own claims — would mean trusting a payload for identity
+ * that `customerFrom` is written to take from a validated user.
+ */
+export async function recoveringCustomer(): Promise<Customer | null> {
+  const supabase = await supabaseAuth();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user?.email) return null;
+  if (!(await provedMailbox(supabase))) return null;
   return customerFrom(data.user, data.user.email);
 }
