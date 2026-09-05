@@ -33,8 +33,41 @@ import type { SupabaseClient } from "@supabase/supabase-js";
    `next/headers`.
 --------------------------------------------------------------------------- */
 
+/**
+ * Somewhere for the fetch wrapper below to leave what the HTTP response said but
+ * the client library discards. Pass one in when the answer matters; omit it and
+ * nothing is wrapped.
+ */
+export interface AuthMeta {
+  /** Seconds from `Retry-After` on a 429, when the server sent one. */
+  retryAfter?: number;
+}
+
+/**
+ * GoTrue answers a throttled request with `429` **and** a `Retry-After` header,
+ * but `@supabase/auth-js` throws the header away: its `AuthError` carries
+ * `message`, `status` and `code` and nothing else, so by the time a Server Action
+ * sees a refusal there is no way to say when the customer may try again. Wrapping
+ * `fetch` is the supported way back to it — `global.fetch` is a client option for
+ * exactly this — and this wrapper is read-only: the response is handed back
+ * untouched, and a missing or unparseable header simply leaves `meta` empty.
+ */
+function capturing(meta: AuthMeta): typeof fetch {
+  return async (input, init) => {
+    const response = await fetch(input, init);
+    if (response.status === 429) {
+      // `Retry-After` is either delta-seconds or an HTTP date. Only the first
+      // form is useful here, and `Number` rejects the second as `NaN`, so the
+      // finite check is the whole of the parsing.
+      const seconds = Number(response.headers.get("retry-after"));
+      if (Number.isFinite(seconds) && seconds > 0) meta.retryAfter = seconds;
+    }
+    return response;
+  };
+}
+
 /** The cookie-backed anon client for this request. Throws by name if unset. */
-export async function supabaseAuth(): Promise<SupabaseClient> {
+export async function supabaseAuth(meta?: AuthMeta): Promise<SupabaseClient> {
   const url = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
 
@@ -49,6 +82,7 @@ export async function supabaseAuth(): Promise<SupabaseClient> {
   const store = await cookies();
 
   return createServerClient(url, anonKey, {
+    global: meta ? { fetch: capturing(meta) } : undefined,
     cookies: {
       getAll: () => store.getAll(),
       setAll: (written) => {

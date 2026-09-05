@@ -66,7 +66,7 @@ $$;
 -- an empty Orders page is a miserable thing to debug.
 do $$
 declare
-  v_email text := 'you@example.com';
+  v_email text := 'shahidumair622@gmail.com';
   v_id    uuid;
 begin
   select id into v_id from auth.users where email = v_email;
@@ -390,11 +390,16 @@ begin
   return v_total;
 end $$;
 
--- Only the service-role key may call this. Postgres grants execute to `public`
--- by default; an anon or signed-in caller would get nowhere anyway (the function
--- runs as its invoker, so the policies above still apply to them), but saying so
--- outright is cheaper than reasoning about it.
+-- Only the service-role key may call this. Two revokes, not one: Postgres grants
+-- execute to `public` by default, and Supabase's default privileges on this schema
+-- then grant it to `anon` and `authenticated` by name — an explicit grant that a
+-- revoke aimed at PUBLIC leaves standing. Either caller would have got nowhere
+-- anyway (the function runs as its invoker, so the policies above still apply to
+-- them and the first insert aborts the transaction), but failing closed is not the
+-- same as being unreachable, and this is a public POST endpoint.
 revoke all on function place_order(text,text,text,text,text,text,jsonb,uuid) from public;
+revoke execute on function place_order(text,text,text,text,text,text,jsonb,uuid)
+  from anon, authenticated;
 grant execute on function place_order(text,text,text,text,text,text,jsonb,uuid) to service_role;
 
 -- ---------------------------------------------------------------------------

@@ -9,7 +9,13 @@ import {
 } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
-import { signIn, signOut, signUp, type Customer } from "../../_lib/auth";
+import {
+  resendConfirmation,
+  signIn,
+  signUp,
+  type Customer,
+  type Refusal,
+} from "../../_lib/auth";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { AppInput } from "../ui/AppInput";
@@ -22,8 +28,9 @@ interface AuthModalProps {
   /** Who the header has signed in, or `null`. The card reads its signed-in state
    *  from this rather than keeping a second copy that could disagree. */
   customer: Customer | null;
-  /** Report a sign-in or sign-out upward: the header owns the answer, so it is
-   *  what re-paints the account button. */
+  /** Report a sign-in upward: the header owns the answer, so it is what re-paints
+   *  the account button. Signing back out is <AccountMenu>'s, which is what the
+   *  avatar opens once there is a session to end. */
   onCustomer: (customer: Customer | null) => void;
 }
 
@@ -38,6 +45,35 @@ const COPY = {
   login: { heading: "Welcome back", eyebrow: "Log in to continue" },
   signup: { heading: "Create account", eyebrow: "Join Perfumora" },
 } as const;
+
+/** The treatment <Checkout> gives a refused order: a rule in the accent and a
+ *  sentence, never colour alone, because the reason is the actionable part. Used
+ *  by the form and by the confirmation screen, so it lives here rather than being
+ *  typed twice — and as a plain literal, never through `cn()`, since `text-body`
+ *  and `text-accent-on-light` share a tailwind-merge group and only the last of
+ *  them would survive. */
+const NOTICE =
+  "border-accent-on-light text-body text-accent-on-light border-l-2 pl-4";
+
+/**
+ * A refusal as one sentence, with the moment it expires when the server told us
+ * one. Formatted here rather than in the Server Action because `toLocaleTimeString`
+ * reads the *browser's* clock and locale: the same instant is 11:37 PM in Karachi
+ * and 6:37 PM on a UTC server, and the customer is only ever looking at the first.
+ *
+ * A time, not a countdown. The email quota these come from is hourly, so "at 11:37
+ * PM" is something you can act on and "in 54 minutes" is something you would have
+ * to keep watching — and unlike a countdown, a printed time cannot go stale while
+ * the card sits open.
+ */
+function spoken({ message, retryAt }: Refusal) {
+  if (!retryAt) return message;
+  const at = new Date(retryAt).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${message} You can try again at ${at}.`;
+}
 
 /**
  * Auth modal (§4.0): a centered overlay that scales/fades in via GSAP (scrim
@@ -68,9 +104,19 @@ export function AuthModal({
   const [confirmed, setConfirmed] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  /** The server's refusal, in the customer's words. Cleared on every attempt and
-   *  on the mode toggle, so a failed login can't sit above the Sign up button. */
-  const [failure, setFailure] = useState<string | null>(null);
+  /** What the account will be greeted by, and where the avatar letter comes from.
+   *  Sign-up only — logging in doesn't need it, and the server floors a missing one
+   *  at the email address rather than refusing. */
+  const [name, setName] = useState("");
+  /** The server's refusal, in the customer's words. Held whole rather than as its
+   *  sentence, because a throttled attempt also carries the moment it expires and
+   *  only the browser can put that on the right clock. Cleared on every attempt
+   *  and on the mode toggle, so a failed login can't sit above the Sign up button. */
+  const [failure, setFailure] = useState<Refusal | null>(null);
+  /** That the link went out again. Never shown beside a `failure`: each attempt
+   *  clears both before it starts, so the confirmation screen reports the last
+   *  press and not a history of them. */
+  const [resent, setResent] = useState(false);
   const [pending, startTransition] = useTransition();
 
   useGSAP(
@@ -110,8 +156,9 @@ export function AuthModal({
     if (open) {
       setConfirmed(false);
       setFailure(null);
-      // The address is left alone — a mistyped password shouldn't cost you the
-      // email as well — but the password never outlives the open card.
+      setResent(false);
+      // The address and the name are left alone — a mistyped password shouldn't
+      // cost you either — but the password never outlives the open card.
       setPassword("");
     }
   }
@@ -124,12 +171,17 @@ export function AuthModal({
     setFailure(null);
 
     startTransition(async () => {
-      const result = await (mode === "login" ? signIn : signUp)(email, password);
+      // Written out per mode rather than picking the action with a ternary: the two
+      // no longer take the same arguments, since only sign-up has a name to send.
+      const result =
+        mode === "login"
+          ? await signIn(email, password)
+          : await signUp(email, password, name);
 
       if (!result.ok) {
         // The card stays exactly as it was, address included: the fix for a wrong
         // password is to retype it here.
-        setFailure(result.message);
+        setFailure(result);
         return;
       }
 
@@ -139,16 +191,27 @@ export function AuthModal({
     });
   };
 
-  const logOut = () => {
+  // The address the sign-up went out with: `email` is one of the two fields the
+  // open-reset above deliberately leaves alone, and this screen is only ever
+  // reached from a submit, so there is nothing to ask for again.
+  const resend = () => {
     if (pending) return;
+    setFailure(null);
+    setResent(false);
     startTransition(async () => {
-      await signOut();
-      onCustomer(null);
+      const result = await resendConfirmation(email);
+      if (result.ok) setResent(true);
+      else setFailure(result);
     });
   };
 
+  // Also the way off the confirmation screen, which is why it clears `confirmed`:
+  // that screen now says "log in instead" for the address that already had an
+  // account, and this is the only thing on the card that can honour it.
   const switchMode = () => {
     setMode(mode === "login" ? "signup" : "login");
+    setConfirmed(false);
+    setResent(false);
     setFailure(null);
   };
 
@@ -203,17 +266,66 @@ export function AuthModal({
               <p className="text-body text-muted-on-light">
                 Signed in as <span className="text-ink">{customer.name}</span>.
               </p>
-              <RippleButton onClick={logOut} disabled={pending} silent>
-                {pending ? "Logging out…" : "Log out"}
+              {/* Dismissal, not an action — the only thing left to do here is get
+                  back to shopping. Logging out lives in <AccountMenu>, which is
+                  what the avatar opens from now on; offering it here would make
+                  ending the session the one button someone sees a second after
+                  starting it. */}
+              <RippleButton onClick={onClose} silent>
+                Continue
               </RippleButton>
             </div>
           ) : confirmed ? (
-            <p className="text-body text-muted-on-light mt-10">
-              Check your inbox — the link in that email finishes creating your
-              account.
-            </p>
+            <div className="mt-10 flex flex-col items-start gap-6">
+              {/* Worded for both outcomes, because this screen cannot tell them
+                  apart and must not try: GoTrue answers a sign-up for an address
+                  that already has an account with the same silent success it gives
+                  a new one, and sends nothing, precisely so that this card cannot
+                  be used to ask whether someone is registered. Promising an email
+                  unconditionally made that case look like mail that never arrived. */}
+              <p className="text-body text-muted-on-light">
+                If that address is new here, the link in your inbox finishes
+                creating the account. If it already has one, nothing was sent —
+                log in instead.
+              </p>
+
+              {/* Above the button, like the form's refusal: the press keeps
+                  focus, so an announced region has to come before it to be
+                  read in order. */}
+              {failure && (
+                <p role="alert" className={NOTICE}>
+                  {spoken(failure)}
+                </p>
+              )}
+              {resent && (
+                <p role="status" className="text-body text-ink">
+                  Sent again. Give it a minute to arrive, and check your spam
+                  folder.
+                </p>
+              )}
+
+              {/* Not the primary action on this screen — the link in the email
+                  is — so it stays the width of its own label rather than the
+                  card, the same weight the Log out button carries. */}
+              <RippleButton onClick={resend} disabled={pending} silent>
+                {pending ? "Sending…" : "Resend email"}
+              </RippleButton>
+            </div>
           ) : (
             <form onSubmit={submit} className="mt-8 flex flex-col gap-6">
+              {/* Sign-up only, and first: it is the one field that isn't a
+                  credential, and asking for it after the password would read as an
+                  afterthought. Logging in has an account to read the name off
+                  already. */}
+              {mode === "signup" && (
+                <AppInput
+                  label="Display name"
+                  required
+                  autoComplete="name"
+                  value={name}
+                  onChange={setName}
+                />
+              )}
               <AppInput
                 label="Email"
                 variant="email"
@@ -234,16 +346,12 @@ export function AuthModal({
                 onChange={setPassword}
               />
 
-              {/* The same treatment <Checkout> gives a refused order: a rule in
-                  the accent and a sentence, never colour alone, because the
-                  reason is the actionable part. `role="alert"` so it is
-                  announced — the submit button keeps focus. */}
+              {/* The same treatment <Checkout> gives a refused order — see
+                  `NOTICE`. `role="alert"` so it is announced; the submit button
+                  keeps focus. */}
               {failure && (
-                <p
-                  role="alert"
-                  className="border-accent-on-light text-body text-accent-on-light border-l-2 pl-4"
-                >
-                  {failure}
+                <p role="alert" className={NOTICE}>
+                  {spoken(failure)}
                 </p>
               )}
 
@@ -264,7 +372,11 @@ export function AuthModal({
             </form>
           )}
 
-          {!customer && !confirmed && (
+          {/* Shown on the confirmation screen too, where it reads "Have an account?
+              Log in" — without it that screen is a dead end for the one person who
+              needs a way out of it, whose address was already registered. Only a
+              live session hides it, since there is nothing to switch to. */}
+          {!customer && (
             <button
               type="button"
               onClick={switchMode}

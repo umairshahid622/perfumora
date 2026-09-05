@@ -1,7 +1,7 @@
 "use server";
 
 import type { AuthError, User } from "@supabase/supabase-js";
-import { supabaseAuth } from "./supabase-auth";
+import { supabaseAuth, type AuthMeta } from "./supabase-auth";
 
 /* ---------------------------------------------------------------------------
    Signing a customer in, out, and up — the storefront's second write.
@@ -9,8 +9,8 @@ import { supabaseAuth } from "./supabase-auth";
    A `"use server"` module, so <AuthModal> can `await signIn(...)` from its
    submit handler exactly as <Checkout> awaits `placeOrder`. Same consequence as
    there: every export below is a public HTTP endpoint, reachable by POST from
-   anywhere rather than only through our own modal, so the two fields are
-   re-checked and bounded here and not trusted from the form's `required`.
+   anywhere rather than only through our own modal, so the fields are re-checked
+   and bounded here and not trusted from the form's `required`.
 
    What is deliberately *not* here is any notion of who may do what. The role
    lives in `user_roles` and is read by `is_admin()` inside the policies
@@ -28,8 +28,10 @@ import { supabaseAuth } from "./supabase-auth";
 
 /** Ceilings, not preferences — same reasoning as `orders.ts`. 254 is the longest
  *  legal email address; 72 bytes is where bcrypt stops reading, and GoTrue
- *  refuses anything longer outright rather than silently truncating. */
-const LIMITS = { email: 254, password: 72 };
+ *  refuses anything longer outright rather than silently truncating. 64 for the
+ *  display name has no standard behind it: it is simply past any real name and
+ *  short of what would make `user_metadata` a place to store things. */
+const LIMITS = { email: 254, password: 72, name: 64 };
 
 /**
  * Who is signed in, as the storefront needs them: an address to show and a name
@@ -41,17 +43,38 @@ export interface Customer {
   name: string;
 }
 
+/**
+ * A refusal, and when it stops being one. `retryAt` is unix milliseconds rather
+ * than a formatted string on purpose: the wait belongs on the customer's clock,
+ * and this module runs in whatever timezone the server happens to be in — Vercel
+ * is UTC, Umair is UTC+5 — so formatting here would have shown a time five hours
+ * off. The card formats it.
+ */
+export interface Refusal {
+  ok: false;
+  message: string;
+  /** Only set when the server sent a `Retry-After`, so absence means unknown
+   *  rather than "now". */
+  retryAt?: number;
+}
+
 export type AuthResult =
   /** Signed in — the session cookies are set and `customer` is the live account. */
   | { ok: true; signedIn: true; customer: Customer }
   /** Account taken, but it needs the emailed link before it can sign in. */
   | { ok: true; signedIn: false }
-  | { ok: false; message: string };
+  | Refusal;
+
+/** Resending the confirmation link has no session either way, so it answers with
+ *  the refusal half of `AuthResult` and a bare acknowledgement rather than
+ *  borrowing a `signedIn` flag that could never be true. */
+export type ResendResult = { ok: true } | Refusal;
 
 /** Shown when we cannot explain the refusal — a raw GoTrue message can name
  *  internals, so it goes to the server log instead. */
 const GENERIC = "Something went wrong on our end. Please try again.";
 const MISSING = "Please enter your email address and password.";
+const NO_EMAIL = "Please enter your email address.";
 
 /**
  * The refusals a customer can actually act on, keyed by GoTrue's stable error
@@ -62,15 +85,19 @@ const SPOKEN: Record<string, string> = {
   invalid_credentials: "That email and password don't match an account.",
   email_not_confirmed:
     "Confirm your email address first — the link is in your inbox.",
-  // The live state today: public sign-ups stay off until the role work in
-  // schema.sql has been applied, because every new policy depends on it.
+  // Not reachable while public sign-ups are on, which they now are — kept because
+  // the setting is a checkbox in the dashboard and can go back.
   signup_disabled: "New accounts aren't open yet. Please check back shortly.",
   email_exists: "That email already has an account — log in instead.",
   user_already_exists: "That email already has an account — log in instead.",
   weak_password: "Pick a longer password — at least six characters.",
-  over_request_rate_limit: "Too many attempts. Wait a minute, then try again.",
-  over_email_send_rate_limit:
-    "Too many attempts. Wait a minute, then try again.",
+  // Both rate limits, worded so they read as complete sentences on their own and
+  // still read correctly with "You can try again at …" appended. Neither names a
+  // duration any more: the two windows are nothing alike — this one is per-IP and
+  // measured in minutes, the email one is the project's whole hourly quota — and
+  // guessing wrong is what made a throttle look like a broken form.
+  over_request_rate_limit: "Too many attempts from this connection.",
+  over_email_send_rate_limit: "We can't send another email just yet.",
   validation_failed: MISSING,
 };
 
@@ -86,10 +113,11 @@ function credentials(email: unknown, password: unknown) {
 /**
  * The account as the header and the card show it. The name is whatever GoTrue was
  * handed, and the key it sits under depends on who wrote the row: `full_name` is
- * what the admin API and most OAuth providers use, `display_name` is what the
- * Supabase dashboard writes, `name` is what some providers send instead. None is
- * guaranteed — signing up here asks for an address and a password only — so the
- * address itself is the last resort rather than a blank.
+ * what `signUp` writes below, along with the admin API and most OAuth providers;
+ * `display_name` is what the Supabase dashboard writes; `name` is what some
+ * providers send instead. None is guaranteed — an account made before the sign-up
+ * form asked for a name carries no key at all — so the address itself is the last
+ * resort rather than a blank.
  */
 function customerFrom(user: User | null, fallback: string): Customer {
   const email = user?.email ?? fallback;
@@ -103,12 +131,24 @@ function customerFrom(user: User | null, fallback: string): Customer {
   return { email, name: email };
 }
 
-function refused(error: AuthError, where: string): AuthResult {
+/** The shared refusal, narrowed to the one branch every caller can return: both
+ *  `AuthResult` and `ResendResult` carry it. `meta` is whatever the 429 said, so
+ *  a throttled attempt comes back with the moment it can be repeated instead of a
+ *  guess at how long to sit there. */
+function refused(error: AuthError, where: string, meta: AuthMeta): Refusal {
   const spoken = error.code ? SPOKEN[error.code] : undefined;
   if (!spoken) {
     console.error(`${where} failed:`, error.code ?? "no code", error.message);
   }
-  return { ok: false, message: spoken ?? GENERIC };
+  return {
+    ok: false,
+    message: spoken ?? GENERIC,
+    // Rounded up to the next second so the stated time is never a hair early,
+    // which would send the customer straight back into the same refusal.
+    ...(meta.retryAfter
+      ? { retryAt: Date.now() + Math.ceil(meta.retryAfter) * 1000 }
+      : {}),
+  };
 }
 
 /** Exchange a password for a session cookie. Never throws. */
@@ -119,9 +159,10 @@ export async function signIn(
   const creds = credentials(email, password);
   if (!creds) return { ok: false, message: MISSING };
 
-  const supabase = await supabaseAuth();
+  const meta: AuthMeta = {};
+  const supabase = await supabaseAuth(meta);
   const { data, error } = await supabase.auth.signInWithPassword(creds);
-  if (error) return refused(error, "signIn");
+  if (error) return refused(error, "signIn", meta);
 
   return {
     ok: true,
@@ -134,13 +175,29 @@ export async function signIn(
 export async function signUp(
   email: string,
   password: string,
+  name: string,
 ): Promise<AuthResult> {
   const creds = credentials(email, password);
   if (!creds) return { ok: false, message: MISSING };
 
-  const supabase = await supabaseAuth();
-  const { data, error } = await supabase.auth.signUp(creds);
-  if (error) return refused(error, "signUp");
+  // Trimmed and bounded like the pair above, but a name that fails either test is
+  // dropped rather than refused: `customerFrom` already floors the name at the email
+  // address, so a blank one costs nothing, and no real display name runs to 64
+  // characters — only a POST straight at this endpoint would.
+  const given = typeof name === "string" ? name.trim() : "";
+  const stored = given && given.length <= LIMITS.name ? given : null;
+
+  const meta: AuthMeta = {};
+  const supabase = await supabaseAuth(meta);
+  const { data, error } = await supabase.auth.signUp({
+    ...creds,
+    // `full_name` rather than `display_name`: it is the key `customerFrom` reads
+    // first, what GoTrue's email templates and most providers use, and what the
+    // accounts already in this project carry. Left off entirely when there is no
+    // name, so the metadata never holds an empty one.
+    options: stored ? { data: { full_name: stored } } : undefined,
+  });
+  if (error) return refused(error, "signUp", meta);
 
   // Two honest outcomes, decided by the project's "Confirm email" setting: with
   // it on, GoTrue creates the user and withholds the session until the link is
@@ -157,6 +214,38 @@ export async function signUp(
     signedIn: true,
     customer: customerFrom(data.user, creds.email),
   };
+}
+
+/**
+ * Send the confirmation link again, for the account that signed up and never got
+ * the email. Never throws.
+ *
+ * What it will not say is whether that address has an account, or whether the
+ * account is already confirmed. Neither code is in `SPOKEN`, so either comes back
+ * as `GENERIC` — this is the one screen that could otherwise be used to ask "is
+ * this person registered?", which is precisely what `signUp` above is careful not
+ * to answer.
+ */
+export async function resendConfirmation(email: string): Promise<ResendResult> {
+  // Bounded like `credentials` bounds the pair, and for the same reason: reachable
+  // by POST from anywhere. Nothing checks the shape of the address — GoTrue is the
+  // authority on that, and a second opinion here could only disagree with it.
+  const address = typeof email === "string" ? email.trim() : "";
+  if (!address || address.length > LIMITS.email) {
+    return { ok: false, message: NO_EMAIL };
+  }
+
+  const meta: AuthMeta = {};
+  const supabase = await supabaseAuth(meta);
+  // No `emailRedirectTo`, matching `signUp`: both then fall back to the project's
+  // Site URL, so the second link lands exactly where the first one would have.
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: address,
+  });
+  if (error) return refused(error, "resendConfirmation", meta);
+
+  return { ok: true };
 }
 
 /** Drop the session cookies. Safe to call with no session. */
