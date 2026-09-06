@@ -233,15 +233,18 @@ export default function BottleScene({
           the canvas itself, which would tear the WebGL context and the environment
           map down with it and rebuild both. */}
       <group position={[0, rest.y, 0]} scale={rest.scale}>
-        <Suspense fallback={null}>
-          <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
-        </Suspense>
+        {/* Tilt group for scroll-driven showcase pose and bottle tilt */}
+        <group ref={refs.tiltGroup}>
+          <Suspense fallback={null}>
+            <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
+          </Suspense>
 
-        {/* The spray, a sibling of the model so it shares its framed space
-            without being turned by the variant spin — and outside the suspense
-            boundary, so its handles are wired from the first commit rather than
-            when the download lands. */}
-        <BottleMist refs={refs} color={juice} />
+          {/* The spray, a sibling of the model so it shares its framed space
+              without being turned by the variant spin — and outside the suspense
+              boundary, so its handles are wired from the first commit rather than
+              when the download lands. */}
+          <BottleMist refs={refs} color={juice} />
+        </group>
       </group>
     </Canvas>
   );

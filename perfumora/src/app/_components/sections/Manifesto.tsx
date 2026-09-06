@@ -65,7 +65,6 @@ import { SECTION_IDS } from "../../_lib/sections";
 export function Manifesto() {
   return (
     <Section
-      id={SECTION_IDS.manifesto}
       tone="light"
       overlay
       className="bg-transparent"

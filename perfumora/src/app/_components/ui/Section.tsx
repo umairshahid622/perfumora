@@ -5,7 +5,8 @@ import type { SectionId } from "../../_lib/sections";
 export type Tone = "light" | "dark";
 
 interface SectionProps {
-  id: SectionId;
+  id?: SectionId;
+  ref?: React.Ref<HTMLElement>;
   /** Light = parchment bg / ink text; dark = near-black bg / paper text (§3.3). */
   tone?: Tone;
   /**
@@ -37,6 +38,7 @@ interface SectionProps {
  */
 export function Section({
   id,
+  ref,
   tone = "light",
   full = false,
   overlay = false,
@@ -45,6 +47,7 @@ export function Section({
 }: SectionProps) {
   return (
     <section
+      ref={ref}
       id={id}
       data-tone={overlay ? undefined : tone}
       className={cn(

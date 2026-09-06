@@ -38,6 +38,11 @@ export interface BottleRefs {
    */
   mist: RefObject<Object3D | null>;
   mistMaterial: RefObject<PointsMaterial | null>;
+  /**
+   * Group wrapping the model and mist for scroll-driven tilt and showcase pose.
+   * Keeps tilt independent of the variant spin on root.
+   */
+  tiltGroup: RefObject<Group | null>;
 }
 
 export function useBottleRefs(): BottleRefs {
@@ -50,6 +55,7 @@ export function useBottleRefs(): BottleRefs {
   const pumpButton = useRef<Object3D | null>(null);
   const mist = useRef<Object3D | null>(null);
   const mistMaterial = useRef<PointsMaterial | null>(null);
+  const tiltGroup = useRef<Group | null>(null);
 
   // Stable identity, so the assembly can wire these up in an effect without
   // re-running it on every render.
@@ -64,6 +70,7 @@ export function useBottleRefs(): BottleRefs {
       pumpButton,
       mist,
       mistMaterial,
+      tiltGroup,
     }),
     [
       root,
@@ -75,6 +82,7 @@ export function useBottleRefs(): BottleRefs {
       pumpButton,
       mist,
       mistMaterial,
+      tiltGroup,
     ],
   );
 }

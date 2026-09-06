@@ -9,6 +9,7 @@ import { PersistentBottle } from "../three/PersistentBottle";
 import { Manifesto } from "./Manifesto";
 import { Ritual } from "./Ritual";
 import { prefersReducedMotion } from "../../_lib/motion";
+import { SECTION_IDS } from "../../_lib/sections";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -27,7 +28,7 @@ gsap.registerPlugin(ScrollTrigger);
  * layer of text takes over from another in the same space; the only thing that moves is
  * the copy, and it moves 80px, so there is no parallax and no drift to reconcile.
  *
- * Four screens, each one doing a job:
+ * Five screens, each one doing a job:
  *
  *   0 → 1  The Manifesto arrives. Every panel is stuck at the top; the watermark goes,
  *          the Manifesto slides in and fades up, and the vessel steps right — all
@@ -35,9 +36,11 @@ gsap.registerPlugin(ScrollTrigger);
  *   1 → 2  The changeover. The Manifesto fades out to the left, exactly reversing its
  *          own entrance, while the Ritual fades in from the left in its place and the
  *          vessel comes back to the middle.
- *   2 → 3  The Ritual, held. It is stuck on its own now and dead still, which is the
- *          same stillness every other beat gets while it is being read.
- *   3 → 4  The release. All three panels un-stick together — they are the same height,
+ *   2 → 3  The Ritual steps, held. The cap lifts, pump fires, mist sprays, and the
+ *          three application steps stagger in around the upright vessel.
+ *   3 → 4  The Ritual showcase. The steps fade out, the cap glides shut, the bottle
+ *          tilts to the dramatic showcase angle, and the lasting impression subtitle arrives.
+ *   4 → 5  The release. All panels un-stick together — they are the same height,
  *          so they leave on the same pixel — and the stage scrolls away as one block
  *          with the Craft coming up beneath it. Ordinary scrolling from here down.
  *
@@ -251,9 +254,9 @@ export function OpeningStage() {
   );
 
   return (
-    <div ref={stage} className="relative h-[400vh]">
-      {/* Stuck for the first three screens of the stage, so the Hero is still on screen
-          underneath while it is being covered — twice over. */}
+    <div ref={stage} className="relative h-[500vh]">
+      {/* Stuck for the first four screens of the stage, so the Hero is still on screen
+          underneath while it is being covered — across all opening beats. */}
       <div ref={heroHolder} className="sticky top-0 h-screen">
         <Hero />
       </div>
@@ -270,7 +273,10 @@ export function OpeningStage() {
           whole Hero once it sticks. Being transparent does not exempt it. Nothing in this
           beat is ever meant to be clicked, so the rule is stated once here and inherited
           by the lift rather than repeated on it. */}
-      <div className="pointer-events-none sticky top-0 h-screen">
+      <div
+        id={SECTION_IDS.manifesto}
+        className="pointer-events-none sticky top-0 h-screen"
+      >
         {/* Lifted over the viewport for the first screen of scroll, while the dissolve
             runs. `z-30` carries the panel above the Hero's own furniture (z-10, z-20) and
             leaves it under the nav — and under the Ritual's wrapper below, which carries
@@ -289,7 +295,10 @@ export function OpeningStage() {
       {/* The Ritual's screen — the third — and the same beat over again: a transparent
           overlay on the same live Hero, arriving on the same slide and fade the Manifesto
           did, inert for the same reason. */}
-      <div className="pointer-events-none sticky top-0 h-screen">
+      <div
+        id={SECTION_IDS.ritual}
+        className="pointer-events-none sticky top-0 h-screen"
+      >
         {/* Lifted for the first two screens of scroll. The vessel rides in here rather
             than in the Manifesto's wrapper because this is the last of the three, so its
             z-30 paints over both layers of copy — the glass in front of the words, which

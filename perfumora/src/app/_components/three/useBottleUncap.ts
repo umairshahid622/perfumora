@@ -1,11 +1,12 @@
 "use client";
 
+import { useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Box3, Vector3, type Object3D } from "three";
 import { prefersReducedMotion } from "../../_lib/motion";
-import { MIST_OPACITY } from "./BottleMist";
+import { MIST_OPACITY, MIST_COLLAPSED } from "./BottleMist";
 import type { BottleRefs } from "./useBottleRefs";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -41,7 +42,7 @@ const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
  * would stall the beat for the better part of two seconds before a word of it
  * could be read.
  */
-export const RITUAL_STEPS_DELAY = SPRAY_AT + MIST_IN + 0.07;
+export const RITUAL_STEPS_DELAY = SPRAY_AT + MIST_IN + 0.1;
 
 /**
  * An object's height in the space its own `position` is written in — its
@@ -102,11 +103,19 @@ export function useBottleUncap(
   refs: BottleRefs,
   { enabled, ready, trigger }: BottleUncapOptions,
 ): void {
+  const initialCapY = useRef<number | null>(null);
+  const initialButtonY = useRef<number | null>(null);
+
   useGSAP(
     () => {
       if (!enabled) return;
       const cap = refs.cap.current;
       if (!cap) return;
+
+      if (initialCapY.current === null) {
+        initialCapY.current = cap.position.y;
+      }
+      const baseCapY = initialCapY.current;
 
       const still = prefersReducedMotion();
       const height = localHeight(cap);
@@ -126,7 +135,7 @@ export function useBottleUncap(
       tl.to(
         cap.position,
         {
-          y: cap.position.y + height * LIFT,
+          y: baseCapY + height * LIFT,
           duration: still ? 0 : UNCAP_DURATION,
           ease: "power2.out",
         },
@@ -138,21 +147,38 @@ export function useBottleUncap(
       const material = refs.mistMaterial.current;
 
       if (!still && button && mist && material) {
+        if (initialButtonY.current === null) {
+          initialButtonY.current = button.position.y;
+        }
+        const baseButtonY = initialButtonY.current;
+
         // The press, and the spray it causes. Down sharply and back up slower,
         // so it reads as a finger releasing rather than a spring.
         tl.to(
           button.position,
           {
-            y: button.position.y - height * PRESS,
+            y: baseButtonY - height * PRESS,
             duration: PRESS_DOWN,
             ease: "power2.in",
           },
           UNCAP_DURATION,
         ).to(
           button.position,
-          { y: button.position.y, duration: PRESS_UP, ease: "power2.out" },
+          { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
           SPRAY_AT,
         );
+
+        // Guarantee initial state is reset on reverse
+        tl.set(
+          mist.scale,
+          {
+            x: MIST_COLLAPSED,
+            y: MIST_COLLAPSED,
+            z: MIST_COLLAPSED,
+          },
+          0,
+        );
+        tl.set(material, { opacity: 0 }, 0);
 
         // The cloud expands away from the nozzle it is parked on, and fades in
         // fast and out slow across the same span — so the mist is thickest as it
@@ -176,6 +202,44 @@ export function useBottleUncap(
             },
             SPRAY_AT + MIST_IN,
           );
+      }
+
+      // Showcase scrubbed timeline: as scroll advances past the steps, close the cap
+      // and tilt/rotate the bottle to the dramatic showcase angle seen in the reference.
+      const tiltGroup = refs.tiltGroup.current;
+      if (tiltGroup) {
+        gsap.set(tiltGroup.rotation, { x: 0, y: 0, z: 0 });
+      }
+
+      const showcaseTl = gsap.timeline({
+        scrollTrigger: {
+          trigger,
+          start: () => "top+=" + Math.round(window.innerHeight * 0.7) + " top",
+          end: () => "top+=" + Math.round(window.innerHeight * 1.5) + " top",
+          scrub: 1,
+        },
+      });
+
+      showcaseTl.fromTo(
+        cap.position,
+        { y: baseCapY + height * LIFT },
+        { y: baseCapY, ease: "power2.inOut", immediateRender: false },
+        0,
+      );
+
+      if (!still && tiltGroup) {
+        showcaseTl.fromTo(
+          tiltGroup.rotation,
+          { x: 0, y: 0, z: 0 },
+          {
+            x: 0.1,
+            y: -0.35,
+            z: -0.28,
+            ease: "power2.inOut",
+            immediateRender: false,
+          },
+          0,
+        );
       }
 
       // The trigger above is built long after the page is — the model downloads
