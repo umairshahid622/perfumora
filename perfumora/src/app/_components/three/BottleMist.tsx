@@ -31,8 +31,8 @@ export const MIST_COLLAPSED = 0.04;
 const RENDER_ORDER = 3;
 
 /**
- * Creates an atomized droplet map with deep warm charcoal/ink tint for strong,
- * crisp contrast against the light parchment page — exactly matching the reference.
+ * Creates an alpha-only atomized droplet map. The particle material supplies the
+ * live fragrance tint, so the same plume can follow every variant color.
  */
 function createDroplet(): CanvasTexture {
   const size = 64;
@@ -43,11 +43,12 @@ function createDroplet(): CanvasTexture {
   const ctx = canvas.getContext("2d")!;
   const half = size / 2;
   const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
-  // High-contrast warm charcoal ink gradient: dense core, feathered mist rim
-  gradient.addColorStop(0, "rgba(42, 34, 30, 0.95)");
-  gradient.addColorStop(0.35, "rgba(54, 44, 38, 0.8)");
-  gradient.addColorStop(0.65, "rgba(75, 62, 54, 0.35)");
-  gradient.addColorStop(1, "rgba(75, 62, 54, 0)");
+  // White RGB keeps the texture neutral; its alpha still defines the dense core
+  // and feathered rim while pointsMaterial applies the fragrance color.
+  gradient.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+  gradient.addColorStop(0.35, "rgba(255, 255, 255, 0.8)");
+  gradient.addColorStop(0.65, "rgba(255, 255, 255, 0.35)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
 

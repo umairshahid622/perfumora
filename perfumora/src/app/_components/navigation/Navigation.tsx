@@ -244,8 +244,16 @@ export function Navigation() {
 
     // Queried off `document`, not scoped to `navRef`: the sections being watched
     // are the nav's siblings, not its children.
-    document.querySelectorAll<HTMLElement>("[data-tone]").forEach((section) => {
-      const tone = section.dataset.tone;
+    document
+      .querySelectorAll<HTMLElement>("[data-tone], [data-nav-tone]")
+      .forEach((section) => {
+      const tone = section.dataset.navTone ?? section.dataset.tone;
+      const openingStage = document.querySelector<HTMLElement>("[data-opening-stage]");
+      const openingIsVisible = () => {
+        if (!openingStage) return false;
+        const bounds = openingStage.getBoundingClientRect();
+        return bounds.top <= midline && bounds.bottom > midline;
+      };
       // Three jobs off one trigger: repaint the nav, record which section the
       // header is over so the link pointing at it can read as current, and record
       // that section's tone so the accent uses the form that reads on it. Sharing
@@ -253,9 +261,10 @@ export function Navigation() {
       // over at the same scroll position by construction, rather than by three sets
       // of matching numbers.
       const arrive = (seconds: number) => {
-        paint(tone, seconds);
+        const effectiveTone = openingIsVisible() ? "light" : tone;
+        paint(effectiveTone, seconds);
         setActiveSection(section.id);
-        setToneBehind(tone === "dark" ? "dark" : "light");
+        setToneBehind(effectiveTone === "dark" ? "dark" : "light");
       };
       ScrollTrigger.create({
         trigger: section,
@@ -271,6 +280,29 @@ export function Navigation() {
         },
       });
     });
+
+    // The opening stage is a light composition even while later dark sections
+    // occupy the document flow behind its sticky overlays. It owns the nav tone
+    // for its entire screen range, so Craft cannot repaint the nav while Ritual
+    // is still the visible scene.
+    const openingStage = document.querySelector<HTMLElement>("[data-opening-stage]");
+    if (openingStage) {
+      const setOpeningTone = (seconds: number) => {
+        paint("light", seconds);
+        setToneBehind("light");
+      };
+
+      ScrollTrigger.create({
+        trigger: openingStage,
+        start: "top top",
+        end: "bottom top",
+        onEnter: () => setOpeningTone(duration),
+        onEnterBack: () => setOpeningTone(duration),
+        onRefresh: (self) => {
+          if (self.isActive) setOpeningTone(0);
+        },
+      });
+    }
   }, { dependencies: [pathname], revertOnUpdate: true });
 
   // Which centre link reads as current. The two anchors point at home's sections,

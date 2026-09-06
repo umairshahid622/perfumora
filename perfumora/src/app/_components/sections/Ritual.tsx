@@ -86,7 +86,7 @@ export function Ritual() {
             trigger: triggerEl,
             start: "top top",
             end: "bottom top",
-            toggleActions: "play none play reverse",
+            scrub: 1,
           },
         });
 

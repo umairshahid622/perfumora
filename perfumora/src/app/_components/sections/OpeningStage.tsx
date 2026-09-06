@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { Hero } from "../hero/Hero";
 import { PersistentBottle } from "../three/PersistentBottle";
 import { Manifesto } from "./Manifesto";
@@ -12,6 +13,7 @@ import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
 
 gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollToPlugin);
 
 /**
  * The opening stage: the Hero, the Manifesto and the Ritual, dissolved between rather
@@ -86,11 +88,95 @@ gsap.registerPlugin(ScrollTrigger);
  */
 export function OpeningStage() {
   const stage = useRef<HTMLDivElement>(null);
+  const scrollTarget = useRef<number | null>(null);
+  const scrollTween = useRef<gsap.core.Tween | null>(null);
   const heroHolder = useRef<HTMLDivElement>(null);
   const manifestoLift = useRef<HTMLDivElement>(null);
   const manifestoPanel = useRef<HTMLDivElement>(null);
   const ritualLift = useRef<HTMLDivElement>(null);
   const ritualPanel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stageEl = stage.current;
+    if (!stageEl || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
+      }
+
+      const bounds = stageEl.getBoundingClientRect();
+      const stageStart = stageEl.offsetTop;
+      const stageEnd = stageStart + stageEl.offsetHeight;
+      if (
+        bounds.bottom <= 0 ||
+        bounds.top >= window.innerHeight ||
+        window.scrollY < stageStart ||
+        window.scrollY >= stageEnd - 1
+      ) {
+        scrollTween.current?.kill();
+        scrollTween.current = null;
+        scrollTarget.current = null;
+        return;
+      }
+
+      event.preventDefault();
+
+      const unit =
+        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+      const current = window.scrollY;
+      const base =
+        scrollTarget.current !== null &&
+        Math.abs(current - scrollTarget.current) < 500
+          ? scrollTarget.current
+          : current;
+      const ritualStart = stageStart + window.innerHeight * 2;
+      const ritualEnd = stageStart + window.innerHeight * 4;
+      const inRitual = base >= ritualStart && base < ritualEnd;
+      const resistance = inRitual ? 0.22 : 0.55;
+      const maxDelta = inRitual ? 90 : 180;
+      const next = Math.max(
+        0,
+        Math.min(
+          document.documentElement.scrollHeight - window.innerHeight,
+          base + Math.max(
+            -maxDelta,
+            Math.min(maxDelta, event.deltaY * unit * resistance),
+          ),
+        ),
+      );
+      scrollTarget.current = next;
+
+      scrollTween.current?.kill();
+      scrollTween.current = gsap.to(window, {
+        duration: 0.55,
+        ease: "power2.out",
+        scrollTo: { y: next, autoKill: false },
+        overwrite: true,
+        onComplete: () => {
+          if (Math.abs(window.scrollY - next) < 2) {
+            scrollTarget.current = null;
+            scrollTween.current = null;
+          }
+        },
+      });
+
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      scrollTween.current?.kill();
+    };
+  }, []);
 
   useGSAP(
     () => {
@@ -251,7 +337,7 @@ export function OpeningStage() {
   );
 
   return (
-    <div ref={stage} className="relative h-[500vh]">
+    <div ref={stage} data-opening-stage className="relative h-[500vh]">
       {/* Stuck for the first four screens of the stage, so the Hero is still on screen
           underneath while it is being covered — across all opening beats. */}
       <div ref={heroHolder} className="sticky top-0 h-screen">
@@ -272,6 +358,7 @@ export function OpeningStage() {
           by the lift rather than repeated on it. */}
       <div
         id={SECTION_IDS.manifesto}
+        data-nav-tone="light"
         className="pointer-events-none sticky top-0 h-screen"
       >
         {/* Lifted over the viewport for the first screen of scroll, while the dissolve
@@ -294,6 +381,7 @@ export function OpeningStage() {
           did, inert for the same reason. */}
       <div
         id={SECTION_IDS.ritual}
+        data-nav-tone="light"
         className="pointer-events-none sticky top-0 h-screen"
       >
         {/* Lifted for the first two screens of scroll. The vessel rides in here rather
