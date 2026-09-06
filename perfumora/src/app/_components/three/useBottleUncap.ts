@@ -164,9 +164,29 @@ export function useBottleUncap(
         }
         const baseButtonY = initialButtonY.current;
 
+        // The spray is a one-way event. Keeping it out of the reversible cap
+        // timeline prevents the mist from playing backward on upward scroll.
+        const sprayTl = gsap.timeline({
+          scrollTrigger: {
+            trigger,
+            start: "top top",
+            end: "bottom top",
+            toggleActions: "restart none none none",
+            onLeaveBack: () => {
+              gsap.set(button.position, { y: baseButtonY });
+              gsap.set(mist.scale, {
+                x: MIST_COLLAPSED,
+                y: MIST_COLLAPSED,
+                z: MIST_COLLAPSED,
+              });
+              gsap.set(material, { opacity: 0 });
+            },
+          },
+        });
+
         // The press, and the spray it causes. Down sharply and back up slower,
         // so it reads as a finger releasing rather than a spring.
-        tl.to(
+        sprayTl.to(
           button.position,
           {
             y: baseButtonY - height * PRESS,
@@ -180,8 +200,8 @@ export function useBottleUncap(
           UNCAP_START + SPRAY_AT,
         );
 
-        // Guarantee initial state is reset on reverse
-        tl.set(
+        // Guarantee the one-way event starts from a clean state.
+        sprayTl.set(
           mist.scale,
           {
             x: MIST_COLLAPSED,
@@ -190,12 +210,12 @@ export function useBottleUncap(
           },
           0,
         );
-        tl.set(material, { opacity: 0 }, 0);
+        sprayTl.set(material, { opacity: 0 }, 0);
 
         // The cloud expands away from the nozzle it is parked on, and fades in
         // fast and out slow across the same span — so the mist is thickest as it
         // leaves the spout and gone by the time it has travelled its length.
-        tl.to(
+        sprayTl.to(
           mist.scale,
           { x: 1, y: 1, z: 1, duration: SPRAY_DURATION, ease: "power2.out" },
           UNCAP_START + SPRAY_AT,
@@ -246,6 +266,7 @@ export function useBottleUncap(
           0,
         );
       }
+
 
       // The trigger above is built long after the page is — the model downloads
       // and parses first — so by now the beat's wrapper is back to being lifted

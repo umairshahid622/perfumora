@@ -54,6 +54,7 @@ const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
  * faces the camera dead centre and only the variant-change spin below turns it.
  */
 const REST = { y: 0.15, scale: 0.62 };
+const REST_TABLET = { y: -0.08, scale: 0.52 };
 const REST_COMPACT = { y: 0.4, scale: 0.38 };
 
 export interface BottleSceneProps {
@@ -99,6 +100,9 @@ export default function BottleScene({
   const [ready, setReady] = useState(false);
   const handleReady = useCallback(() => setReady(true), []);
   const isCompact = useMediaQuery("(max-width: 767px)");
+  const isTablet = useMediaQuery(
+    "(min-width: 768px) and (max-width: 1200px)",
+  );
   const accent = liquidColor ?? readCssToken("--accent", "#b87333");
   // The 3D liquid renders a treated variant colour: a pale juice's faint hue is
   // amplified so it reads as tinted clear liquid, not dead white; saturated juices
@@ -107,7 +111,7 @@ export default function BottleScene({
   const juice = juiceColor(accent);
   const firstRun = useRef(true);
   // Portrait viewports rest higher and smaller — see `REST_COMPACT`.
-  const rest = isCompact ? REST_COMPACT : REST;
+  const rest = isCompact ? REST_COMPACT : isTablet ? REST_TABLET : REST;
 
   /**
    * The change timeline (§6.3 #10): the bottle turns the way the arrow pointed
