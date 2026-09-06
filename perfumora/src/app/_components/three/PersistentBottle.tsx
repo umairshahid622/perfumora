@@ -35,7 +35,10 @@ export function PersistentBottle() {
   const { variant, index, direction } = useScent();
 
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-40">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-[4.75rem] bottom-0 z-40"
+    >
       {/* Fragrance colour comes from the variant itself rather than the `--accent`
           token: <ScentProvider> writes that token in an effect, so reading it
           during this render trails one variant behind. */}

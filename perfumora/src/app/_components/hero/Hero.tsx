@@ -69,7 +69,7 @@ export function Hero() {
       <Container className="relative z-10 flex flex-1 flex-col">
 
         {/* Stage */}
-        <div className="relative flex flex-1 items-center justify-center py-1">
+        <div className="relative flex flex-1 items-center justify-center py-0 md:py-1">
           {/* Oversized variant name, behind the bottle */}
           <FragranceName />
 
@@ -94,17 +94,17 @@ export function Hero() {
         <PositionCounter />
 
         {/* Product bar */}
-        <div className="grid grid-cols-1 items-end gap-6 py-8 md:grid-cols-3 md:py-4">
+        <div className="grid grid-cols-2 items-end gap-3 py-4 md:grid-cols-3 md:gap-6 md:py-4">
           <div className="order-2 md:order-1">
             <Eyebrow>{variant.name} · Parfum</Eyebrow>
             <Price value={price} />
           </div>
 
-          <div className="order-1 flex justify-start md:order-2 md:justify-center">
+          <div className="order-1 col-span-2 flex justify-center md:order-2 md:col-span-1 md:justify-center">
             <SizeSelector value={size} onChange={setPicked} sizes={variant.sizes} />
           </div>
 
-          <div className="order-3 flex sm:justify-end">
+          <div className="order-3 flex justify-end md:order-3">
             <RippleButton
               onClick={addToBag}
               disabled={soldOut}

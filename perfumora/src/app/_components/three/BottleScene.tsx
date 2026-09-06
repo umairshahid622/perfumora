@@ -51,7 +51,7 @@ const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
  * faces the camera dead centre and only the variant-change spin below turns it.
  */
 const REST = { y: 0.15, scale: 0.62 };
-const REST_COMPACT = { y: 0.4, scale: 0.46 };
+const REST_COMPACT = { y: 0.4, scale: 0.38 };
 
 export interface BottleSceneProps {
   /** Variant colour for the fragrance; defaults to the live `--accent` token. */

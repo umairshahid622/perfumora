@@ -149,8 +149,8 @@ export function Ritual() {
         if (listRef.current) {
           ScrollTrigger.create({
             trigger: triggerEl,
-            start: () => "top+=" + Math.round(window.innerHeight * 0.7) + " top",
-            end: () => "top+=" + Math.round(window.innerHeight * 1.5) + " top",
+            start: () => "top+=" + Math.round(window.innerHeight * 1) + " top",
+            end: () => "top+=" + Math.round(window.innerHeight * 1.9) + " top",
             scrub: 1,
             animation: gsap.timeline().to(listRef.current, {
               opacity: 0,
@@ -188,30 +188,30 @@ export function Ritual() {
           </div>
 
           {/* Phone-only: the band the bottle occupies above the stacked steps */}
-          <div aria-hidden="true" className="h-[20vh] shrink-0 md:hidden" />
+          <div aria-hidden="true" className="h-[14vh] shrink-0 md:hidden" />
 
           {/* 3-step grid surrounding the bottle with callout pointer lines */}
           <ol
             ref={listRef}
             className={cn(
-              "mt-4 md:mt-2 grid grid-cols-1 gap-6",
+              "relative -top-28 mt-4 grid grid-cols-3 gap-2 md:top-0 md:mt-2",
               "md:grid-cols-[1fr_minmax(240px,340px)_1fr] md:grid-rows-2",
               "md:flex-1 md:items-center md:gap-x-4 md:gap-y-6",
             )}
           >
             {/* 01 Prime — Left side, vertically centered with bottle, line pointing right */}
-            <li className="flex flex-col md:flex-row items-start md:items-center md:col-start-1 md:row-span-2 md:self-center md:justify-self-end">
-              <div className="flex flex-col max-w-xs text-left">
-                <span className="border-hairline-on-light w-full border-t mb-3 md:hidden" />
-                <div className="flex items-baseline gap-2.5">
-                  <span className="font-display text-accent-on-light text-2xl md:text-3xl leading-none font-medium">
+            <li className="flex min-w-0 flex-col md:flex-row items-start md:items-center md:col-start-1 md:row-span-2 md:self-center md:justify-self-end">
+              <div className="flex max-w-none flex-col text-left md:max-w-xs">
+                <span className="border-hairline-on-light w-full border-t mb-2 md:mb-3 md:hidden" />
+                <div className="flex items-baseline gap-1 md:gap-2.5">
+                  <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
                     {STEPS[0].num}
                   </span>
-                  <h3 className="text-lg md:text-xl font-medium tracking-tight text-ink">
+                  <h3 className="text-base md:text-xl font-medium tracking-tight text-ink">
                     {STEPS[0].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-2 leading-relaxed text-sm">
+                <p className="text-body text-muted-on-light mt-1 leading-relaxed text-xs md:mt-2 md:text-sm">
                   {STEPS[0].body}
                 </p>
               </div>
@@ -244,7 +244,7 @@ export function Ritual() {
             </li>
 
             {/* 02 Apply — Upper right, line pointing down-left to bottle collar */}
-            <li className="flex flex-col md:flex-row items-start md:col-start-3 md:row-start-1 md:self-center md:justify-self-start">
+            <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-1 md:self-center md:justify-self-start">
               {/* Callout line from bottle collar to Apply */}
               <div className="hidden md:flex items-center mr-3 shrink-0 pointer-events-none pt-1">
                 <svg
@@ -271,24 +271,24 @@ export function Ritual() {
                 </svg>
               </div>
 
-              <div className="flex flex-col max-w-xs text-left">
-                <span className="border-hairline-on-light w-full border-t mb-3 md:hidden" />
-                <div className="flex items-baseline gap-2.5">
-                  <span className="font-display text-accent-on-light text-2xl md:text-3xl leading-none font-medium">
+              <div className="flex max-w-none flex-col text-left md:max-w-xs">
+                <span className="border-hairline-on-light w-full border-t mb-2 md:mb-3 md:hidden" />
+                <div className="flex items-baseline gap-1 md:gap-2.5">
+                  <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
                     {STEPS[1].num}
                   </span>
-                  <h3 className="text-lg md:text-xl font-medium tracking-tight text-ink">
+                  <h3 className="text-base md:text-xl font-medium tracking-tight text-ink">
                     {STEPS[1].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-2 leading-relaxed text-sm">
+                <p className="text-body text-muted-on-light mt-1 leading-relaxed text-xs md:mt-2 md:text-sm">
                   {STEPS[1].body}
                 </p>
               </div>
             </li>
 
             {/* 03 Layer — Lower right, line pointing left to lower bottle body */}
-            <li className="flex flex-col md:flex-row items-start md:col-start-3 md:row-start-2 md:self-center md:justify-self-start">
+            <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-2 md:self-center md:justify-self-start">
               {/* Callout line from bottle body to Layer */}
               <div className="hidden md:flex items-center mr-3 shrink-0 pointer-events-none pt-1">
                 <svg
@@ -315,17 +315,17 @@ export function Ritual() {
                 </svg>
               </div>
 
-              <div className="flex flex-col max-w-xs text-left">
-                <span className="border-hairline-on-light w-full border-t mb-3 md:hidden" />
-                <div className="flex items-baseline gap-2.5">
-                  <span className="font-display text-accent-on-light text-2xl md:text-3xl leading-none font-medium">
+              <div className="flex max-w-none flex-col text-left md:max-w-xs">
+                <span className="border-hairline-on-light w-full border-t mb-2 md:mb-3 md:hidden" />
+                <div className="flex items-baseline gap-1 md:gap-2.5">
+                  <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
                     {STEPS[2].num}
                   </span>
-                  <h3 className="text-lg md:text-xl font-medium tracking-tight text-ink">
+                  <h3 className="text-base md:text-xl font-medium tracking-tight text-ink">
                     {STEPS[2].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-2 leading-relaxed text-sm">
+                <p className="text-body text-muted-on-light mt-1 leading-relaxed text-xs md:mt-2 md:text-sm">
                   {STEPS[2].body}
                 </p>
               </div>
