@@ -48,9 +48,9 @@ export function Ritual() {
 
       const still = prefersReducedMotion();
 
-      // Initial subtitle state: hidden until showcase scene
+      // Initial subtitle state: hidden until spray reveal with the steps
       if (subtitleRef.current) {
-        gsap.set(subtitleRef.current, { opacity: still ? 1 : 0, y: still ? 0 : 12 });
+        gsap.set(subtitleRef.current, { opacity: still ? 1 : 0, y: still ? 0 : STEP_RISE });
       }
 
       const items = gsap.utils.toArray<HTMLElement>("li", listRef.current);
@@ -102,6 +102,20 @@ export function Ritual() {
           RITUAL_STEPS_DELAY,
         );
 
+        // Subtitle reveals with the steps, after the last step lands
+        if (subtitleRef.current) {
+          tl.to(
+            subtitleRef.current,
+            {
+              opacity: 1,
+              y: 0,
+              duration: STEP_DURATION,
+              ease: "power3.out",
+            },
+            RITUAL_STEPS_DELAY + STEP_STAGGER * (items.length - 1) + 0.1,
+          );
+        }
+
         if (lines.length) {
           tl.to(
             lines,
@@ -131,33 +145,20 @@ export function Ritual() {
         }
 
         // Showcase scrubbed transition: as user scrolls from the steps into the showcase scene,
-        // fade out the 3 step cards and fade in the subtitle cleanly.
-        ScrollTrigger.create({
-          trigger: triggerEl,
-          start: () => "top+=" + Math.round(window.innerHeight * 0.7) + " top",
-          end: () => "top+=" + Math.round(window.innerHeight * 1.5) + " top",
-          scrub: 1,
-          animation: gsap
-            .timeline()
-            .to(
-              listRef.current,
-              {
-                opacity: 0,
-                y: -24,
-                ease: "power2.inOut",
-              },
-              0,
-            )
-            .to(
-              subtitleRef.current,
-              {
-                opacity: 1,
-                y: 0,
-                ease: "power2.inOut",
-              },
-              0.2,
-            ),
-        });
+        // fade out the step cards, keeping the subtitle on screen.
+        if (listRef.current) {
+          ScrollTrigger.create({
+            trigger: triggerEl,
+            start: () => "top+=" + Math.round(window.innerHeight * 0.7) + " top",
+            end: () => "top+=" + Math.round(window.innerHeight * 1.5) + " top",
+            scrub: 1,
+            animation: gsap.timeline().to(listRef.current, {
+              opacity: 0,
+              y: -24,
+              ease: "power2.inOut",
+            }),
+          });
+        }
       }
     },
     { scope: listRef },
