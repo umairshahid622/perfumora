@@ -60,10 +60,12 @@ gsap.registerPlugin(ScrollTrigger);
  * The lift is the one piece of machinery, and there is one per overlay. For a dissolve to
  * be visible the arriving panel has to be on screen during the screen of scroll *before*
  * its own place in the document — so its wrapper is `fixed` over the viewport until its
- * own sticky reaches the top, and handed back to `absolute` at the exact offset where the
- * two describe the same rectangle. The switch is invisible by construction rather than by
- * a matched pair of numbers. The Manifesto's is handed back after one screen, the
- * Ritual's after two.
+ * own sticky reaches the top, and handed back to `absolute` half a screen after that,
+ * inside the stretch where the two describe the same rectangle. The switch is invisible
+ * by construction rather than by a matched pair of numbers, and the half-screen of slack
+ * is what keeps it invisible on the way *up*, where a late switch is the one thing in
+ * this stage that can jump. The Manifesto's is handed back at 1.5 screens, the Ritual's
+ * at 2.5.
  *
  * The bottle rides inside the Ritual's wrapper — the last of the three, so the glass
  * paints over both layers of copy rather than under one of them — and that is what makes
@@ -140,6 +142,19 @@ export function OpeningStage() {
        * holder's height rather than restated as `100vh`, because on a phone those are
        * not the same number, and two statements of one offset is how a handover jumps.
        *
+       * Handed back half a screen *after* that, though, and the half-screen is the point.
+       * The two positions describe the same rectangle for as long as the holder is stuck
+       * — from this beat's own screen all the way to the release — so the switch is
+       * invisible anywhere inside that window, but it is only *safe* late. Scrolling up,
+       * the switch back to `fixed` has to have landed before the holder un-sticks, or the
+       * panel paints low by exactly the scroll the toggle lagged by: measured 1:1, so
+       * 240px of lag is a 240px jump, and in the Ritual's wrapper the vessel jumps with
+       * it. Scrolling down the same lag costs nothing, the holder being stuck already —
+       * which is why the jerk only ever showed on the way up. Half a screen puts the
+       * switch far enough inside the window that no plausible lag reaches the edge of it.
+       * The room to spend is the stage's fourth screen: the Ritual's handover lands at
+       * 2.5 screens and the release is at 3.
+       *
        * Returns its own teardown, because every other ScrollTrigger on the page reads
        * these sections' positions in the document — the nav's tone handover, the
        * `#manifesto` and `#ritual` anchors, each heading's own reveal. While a wrapper is
@@ -160,7 +175,7 @@ export function OpeningStage() {
         const st = ScrollTrigger.create({
           trigger: stageEl,
           start: "top top",
-          end: () => `+=${heroEl.offsetHeight * screens}`,
+          end: () => `+=${heroEl.offsetHeight * (screens + 0.5)}`,
           onToggle: (self) => settle(isLifted(self)),
         });
 
