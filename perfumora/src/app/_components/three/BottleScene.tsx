@@ -7,12 +7,15 @@ import gsap from "gsap";
 import { NeutralToneMapping, Color } from "three";
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
+import { SECTION_IDS } from "../../_lib/sections";
 import { juiceColor } from "../../_lib/variants";
 import { useMediaQuery } from "../../_hooks/useMediaQuery";
 import { BottleGltf } from "./BottleGltf";
+import { BottleMist } from "./BottleMist";
 import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
+import { useBottleUncap } from "./useBottleUncap";
 
 /**
  * One full turn per fragrance change. A whole revolution rather than a part of
@@ -69,14 +72,16 @@ export interface BottleSceneProps {
  * over the whole home route and never unmounted, so the model exists exactly once
  * and one WebGL context, one glTF and one environment map serve the page.
  *
- * Nothing here reads the scroll position. The vessel is parked at `REST` and the
- * only motion left is the variant-change spin below, which a press on the Hero's
- * arrows drives — so the bottle is dead still until somebody changes the fragrance.
- * The idle float is wired but switched off (see its call), which is what the Hero
- * showed anyway; it is one word away if the next idea wants it back. None of this
- * motion is authored inside the 3D components themselves (§5): they expose refs and
- * GSAP does the work. The canvas is transparent so the DOM layers show behind it
- * (§4.1).
+ * The vessel is parked at `REST` and stays there: nothing here moves the
+ * assembly with the scroll. Two motions act on it, and both are events rather
+ * than journeys — the variant-change spin below, which a press on the Hero's
+ * arrows drives, and the Ritual's uncapping (`useBottleUncap`), which the beat's
+ * own screen of scroll cues and which then plays at its own pace. Through the
+ * Hero and the Manifesto the bottle is dead still. The idle float is wired but
+ * switched off (see its call), which is what the Hero showed anyway; it is one
+ * word away if the next idea wants it back. None of this motion is authored
+ * inside the 3D components themselves (§5): they expose refs and GSAP does the
+ * work. The canvas is transparent so the DOM layers show behind it (§4.1).
  */
 export default function BottleScene({
   liquidColor,
@@ -177,6 +182,18 @@ export default function BottleScene({
   // `enabled` flag is the hook's own opt-in, so this is a one-word change to revisit.
   useBottleFloat(refs, { enabled: false, ready });
 
+  // The Ritual's theatre: the closure lifts off, the pump fires, the fragrance
+  // hangs in the air (§4.3). Cued by the beat's own screen of the document — the
+  // one screen `<OpeningStage>` holds still for reading — and played from there,
+  // because a spray is an event and not a state to be scrubbed. The DOM half of
+  // the same sequence, the three steps that arrive once the mist is up, is in
+  // `<Ritual>`.
+  useBottleUncap(refs, {
+    enabled: true,
+    ready,
+    trigger: `#${SECTION_IDS.ritual}`,
+  });
+
   return (
     <Canvas
       className={className}
@@ -219,6 +236,12 @@ export default function BottleScene({
         <Suspense fallback={null}>
           <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
         </Suspense>
+
+        {/* The spray, a sibling of the model so it shares its framed space
+            without being turned by the variant spin — and outside the suspense
+            boundary, so its handles are wired from the first commit rather than
+            when the download lands. */}
+        <BottleMist refs={refs} color={juice} />
       </group>
     </Canvas>
   );

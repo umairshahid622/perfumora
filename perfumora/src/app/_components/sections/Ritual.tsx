@@ -1,11 +1,19 @@
 "use client";
 
+import { useRef } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Container } from "../ui/Container";
 import { Eyebrow } from "../ui/Eyebrow";
 import { RevealHeading } from "../ui/RevealHeading";
 import { Section } from "../ui/Section";
 import { cn } from "../../_lib/cn";
+import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
+import { RITUAL_STEPS_DELAY } from "../three/useBottleUncap";
+
+gsap.registerPlugin(ScrollTrigger);
 
 /** Placeholder ritual steps — not brand-approved final copy. */
 const STEPS = [
@@ -38,6 +46,15 @@ const STEP_PLACEMENT = [
 ] as const;
 
 /**
+ * How the three arrive once the spray has happened: each rises this far and fades
+ * up, one after the next, so they read as consequences of the mist rather than a
+ * row of cards appearing at once.
+ */
+const STEP_RISE = 24;
+const STEP_DURATION = 0.8;
+const STEP_STAGGER = 0.12;
+
+/**
  * The Ritual (§4.3): the third beat of the opening, and the last one the bottle appears
  * in.
  *
@@ -63,11 +80,14 @@ const STEP_PLACEMENT = [
  * and works at the word level, so it reads as detail inside the arrival rather than a
  * second version of it.
  *
- * The three steps are written and placed but not shown: the `<ol>` is held at zero opacity
- * and out of the accessibility tree, so the beat is the heading alone. Their composition —
- * 01 to the left of the vessel, 02 beneath it, 03 to its right, the empty upper-centre
- * cell of the grid being the glass's own slot — is intact underneath it, waiting on how it
- * should be revealed.
+ * The three steps arrive after the spray, not with the heading. The bottle's closure
+ * lifts, the pump fires and the fragrance hangs in the air (`useBottleUncap`, in the
+ * canvas); only then do these three rise into place, 01 to the left of the vessel, 02
+ * beneath it, 03 to its right — the empty upper-centre cell of the grid being the
+ * glass's own slot. The two halves cannot share a timeline, since one animates a DOM
+ * list and the other an object in a WebGL scene, so they share the cue instead:
+ * `RITUAL_STEPS_DELAY` is exported from that hook and used as the position of the
+ * `from` below, on a trigger with the same window and the same toggle actions.
  *
  * `full` so this owns its own padding rather than taking the Section's default rhythm,
  * and because the beat is a screen tall by construction: it is stacked on the Hero, and
@@ -78,6 +98,51 @@ const STEP_PLACEMENT = [
  * clickable through it.
  */
 export function Ritual() {
+  const listRef = useRef<HTMLOListElement>(null);
+
+  useGSAP(
+    () => {
+      // The untouched DOM is the finished composition, so reduced motion is "do
+      // nothing": no `from` state is applied and all three are simply present when
+      // the beat cross-fades in — which is what the closure does there too (it
+      // comes off, without the travel).
+      if (prefersReducedMotion()) return;
+
+      const items = gsap.utils.toArray<HTMLElement>("li", listRef.current);
+      if (!items.length) return;
+
+      // A timeline rather than a bare tween, so `RITUAL_STEPS_DELAY` can be read as
+      // what it is — a position on the same clock the canvas choreography runs on,
+      // counted from the top of the beat. `from` renders its start values in
+      // `useGSAP`'s layout effect, before the first paint, so the steps are hidden
+      // from mount, stay hidden through the wait, and hide again on the reverse.
+      gsap
+        .timeline({
+          scrollTrigger: {
+            trigger: `#${SECTION_IDS.ritual}`,
+            start: "top top",
+            end: "bottom top",
+            // Matching the uncap's actions exactly: played on entry from either
+            // direction, reversed only off the top. Anything else and the steps
+            // would be out of step with the spray that causes them.
+            toggleActions: "play none play reverse",
+          },
+        })
+        .from(
+          items,
+          {
+            opacity: 0,
+            y: STEP_RISE,
+            duration: STEP_DURATION,
+            ease: "power3.out",
+            stagger: STEP_STAGGER,
+          },
+          RITUAL_STEPS_DELAY,
+        );
+    },
+    { scope: listRef },
+  );
+
   return (
     <Section
       id={SECTION_IDS.ritual}
@@ -102,17 +167,14 @@ export function Ritual() {
               On `md` the empty centre cell of the grid below does this job. */}
           <div aria-hidden="true" className="h-[19vh] shrink-0 md:hidden" />
 
-          {/* Parked, not deleted. The composition below is the one the steps will be
-              revealed into, so it stays exactly as it was laid out — placements, hairlines,
-              numerals and the `1fr` row that is the vessel's slot — and only its visibility
-              is withheld. `opacity-0` rather than `hidden` so the grid still occupies the
-              beat and the row it reserves for the glass is still measured; `aria-hidden` so
-              the accessibility tree agrees with the screen instead of reading out three
-              steps nobody can see. */}
+          {/* Real content now, not a parked composition: no `opacity-0` and no
+              `aria-hidden`, so a page whose script never runs still reads out the
+              three steps and the reveal above is the only thing withholding them.
+              The `1fr` row it reserves for the glass is measured either way. */}
           <ol
-            aria-hidden="true"
+            ref={listRef}
             className={cn(
-              "mt-6 grid grid-cols-1 gap-6 opacity-0",
+              "mt-6 grid grid-cols-1 gap-6",
               "md:grid-cols-[1fr_minmax(0,0.85fr)_1fr] md:grid-rows-[1fr_auto]",
               "md:flex-1 md:gap-x-10 md:gap-y-6",
             )}
@@ -120,7 +182,7 @@ export function Ritual() {
             {STEPS.map((step, i) => (
               <li
                 key={step.title}
-                className={cn("reveal flex flex-col", STEP_PLACEMENT[i])}
+                className={cn("flex flex-col", STEP_PLACEMENT[i])}
               >
                 {/* A hairline over each step ties the three together as one
                     caption system even though they no longer sit in a row. */}

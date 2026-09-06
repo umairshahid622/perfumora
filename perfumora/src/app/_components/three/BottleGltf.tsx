@@ -28,6 +28,8 @@ const NODE = {
   liquid: "liquid",
   dipTube: "pipe",
   cap: "cap",
+  /** The pump's press button, which the closure above hides until it lifts. */
+  pumpButton: "automizerButton",
 } as const;
 
 /**
@@ -286,6 +288,7 @@ export function BottleGltf({
     refs.liquidMaterial.current = liquid.material as MeshPhysicalMaterial;
     refs.dipTube.current = dipTube;
     refs.cap.current = gltf.nodes[NODE.cap];
+    refs.pumpButton.current = gltf.nodes[NODE.pumpButton];
 
     invalidate();
     // Last, so the motion hooks that react to this only ever see fully wired refs.
