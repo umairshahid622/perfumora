@@ -228,15 +228,13 @@ export function useBottleUncap(
       );
 
       if (!still && tiltGroup) {
-        showcaseTl.fromTo(
+        showcaseTl.to(
           tiltGroup.rotation,
-          { x: 0, y: 0, z: 0 },
           {
             x: 0.1,
-            y: -0.35,
-            z: -0.28,
+            y: 0.35,
+            z: 0.28,
             ease: "power2.inOut",
-            immediateRender: false,
           },
           0,
         );

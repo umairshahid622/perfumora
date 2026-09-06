@@ -4,6 +4,7 @@ import { Suspense, useCallback, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NeutralToneMapping, Color } from "three";
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
@@ -16,6 +17,8 @@ import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
 import { useBottleUncap } from "./useBottleUncap";
+
+gsap.registerPlugin(ScrollTrigger);
 
 /**
  * One full turn per fragrance change. A whole revolution rather than a part of
@@ -193,6 +196,34 @@ export default function BottleScene({
     ready,
     trigger: `#${SECTION_IDS.ritual}`,
   });
+
+  // The bottle leans into the Manifesto as it leaves the Hero's centre, giving
+  // the existing horizontal drift a physical handoff instead of a plain slide.
+  useGSAP(
+    () => {
+      const tiltGroup = refs.tiltGroup.current;
+      const trigger = document.getElementById(SECTION_IDS.manifesto);
+      if (!ready || !tiltGroup || !trigger || prefersReducedMotion()) return;
+
+      gsap.set(tiltGroup.rotation, { x: 0, y: 0, z: 0 });
+
+      const transition = gsap.timeline({
+        scrollTrigger: {
+          trigger,
+          start: "top bottom",
+          end: "top top",
+          scrub: 1,
+        },
+      });
+
+      transition.to(tiltGroup.rotation, {
+        y: -0.14,
+        z: -0.16,
+        ease: "power1.inOut",
+      });
+    },
+    { dependencies: [ready], revertOnUpdate: true },
+  );
 
   return (
     <Canvas

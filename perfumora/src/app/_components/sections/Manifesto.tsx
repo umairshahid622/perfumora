@@ -70,7 +70,7 @@ export function Manifesto() {
       className="bg-transparent"
     >
       <Container>
-        <div className="flex max-w-md flex-col md:ml-[calc(5rem_+_13vw)] md:max-w-[min(28rem,30vw)]">
+        <div className="flex max-w-md flex-col md:ml-[calc(5rem_+_11vw)] md:max-w-[min(28rem,30vw)]">
           <Eyebrow>Manifesto</Eyebrow>
 
           {/* Working copy — final wording pending brand sign-off. */}

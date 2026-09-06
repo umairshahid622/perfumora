@@ -234,10 +234,7 @@ export function OpeningStage() {
         // is one crossfade in one place, not two blocks moving past each other.
         .to(manifestoPanelEl, { opacity: 0, x: slide, ...beat }, 1)
         .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 1)
-        // And the glass comes back to the middle, the Ritual being composed on the centre
-        // of the screen again. Returning the progress to 0 rather than restating a
-        // distance is what makes the return exact at every width: the 19vw only ever has
-        // to cancel against itself.
+        // Return the bottle to center for the Ritual's step choreography.
         .to(stageEl, { "--vessel-drift": 0, ...beat }, 1);
 
       const teardowns = [lift(manifestoLiftEl, 1), lift(ritualLiftEl, 2)];
@@ -325,7 +322,7 @@ export function OpeningStage() {
               transformed box still counts toward the document's scrollable width, which
               is a horizontal scrollbar on every screen. What gets clipped is empty
               canvas, the vessel being a fraction of its width. */}
-          <div className="absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*19vw)]">
+          <div className="absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*21vw)]">
             <PersistentBottle />
           </div>
         </div>
