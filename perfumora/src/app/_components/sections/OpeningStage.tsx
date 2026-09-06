@@ -7,261 +7,300 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Hero } from "../hero/Hero";
 import { PersistentBottle } from "../three/PersistentBottle";
 import { Manifesto } from "./Manifesto";
+import { Ritual } from "./Ritual";
 import { prefersReducedMotion } from "../../_lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
 
 /**
- * The opening stage: the Hero and the Manifesto, dissolved between rather than
- * scrolled between (§4.1 → §4.2).
+ * The opening stage: the Hero, the Manifesto and the Ritual, dissolved between rather
+ * than scrolled between (§4.1 → §4.3).
  *
- * The page holds still for the first two beats, and so does the Hero. Both panels are
- * `sticky` at the top of a stage three screens tall, stacked one over the other, and
+ * The page holds still for the first three beats, and so does the Hero. All three panels
+ * are `sticky` at the top of a stage four screens tall, stacked one over the other, and
  * the wheel drives a *changeover of the words* rather than a journey: the Hero's
  * oversized fragrance name fades out as the Manifesto's copy slides in from the left
- * over it. The Manifesto brings no surface of its own — it is transparent, so the
- * parchment, the accent glow, the vessel, the arrows, the counter, the price and Add to
- * Bag are all still there underneath and still live. One layer of text takes over from
- * another in the same space; the only thing that moves is the arriving copy, and it
- * moves 80px, so there is no parallax and no drift to reconcile.
+ * over it, then the Manifesto leaves the way it came and the Ritual arrives in its place
+ * on the same curve. Neither overlay brings a surface of its own — both are transparent
+ * — so the parchment, the accent glow, the vessel, the arrows, the counter, the price
+ * and Add to Bag are all still there underneath and still live, for all three beats. One
+ * layer of text takes over from another in the same space; the only thing that moves is
+ * the copy, and it moves 80px, so there is no parallax and no drift to reconcile.
  *
- * Three screens, each one doing a job:
+ * Four screens, each one doing a job:
  *
- *   0 → 1  The dissolve. Both panels are stuck at the top; the watermark goes and the
- *          Manifesto slides in and fades up, scrubbed, so the customer's own wheel is
- *          the transport — and scrolling back up plays that same tween in reverse, so
- *          the copy leaves to the left the way it came, with no second animation.
- *   1 → 2  The Manifesto, held. It is stuck on its own now and dead still, which is
- *          the same stillness every other beat gets while it is being read.
- *   2 → 3  The release. Both panels un-stick together — they are the same height, so
- *          they leave on the same pixel — and the stage scrolls away as one block
- *          with the Ritual coming up beneath it. Ordinary scrolling from here down.
+ *   0 → 1  The Manifesto arrives. Every panel is stuck at the top; the watermark goes,
+ *          the Manifesto slides in and fades up, and the vessel steps right — all
+ *          scrubbed, so the customer's own wheel is the transport.
+ *   1 → 2  The changeover. The Manifesto fades out to the left, exactly reversing its
+ *          own entrance, while the Ritual fades in from the left in its place and the
+ *          vessel comes back to the middle.
+ *   2 → 3  The Ritual, held. It is stuck on its own now and dead still, which is the
+ *          same stillness every other beat gets while it is being read.
+ *   3 → 4  The release. All three panels un-stick together — they are the same height,
+ *          so they leave on the same pixel — and the stage scrolls away as one block
+ *          with the Craft coming up beneath it. Ordinary scrolling from here down.
  *
- * Nothing in this beat takes pointer events, at any point in that sequence, and the
- * rule is stated on the Manifesto's *holder* rather than on the lifted wrapper inside
- * it — the holder is the box that does the covering. It is a screen tall and it paints
- * above the Hero's holder (later positioned sibling, both `sticky`), so it answers the
- * hit test for everything behind it: the product bar it covers from the bottom while
- * the dissolve runs, then the whole Hero once it sticks. Transparency does not exempt
- * it. With `pointer-events-none` there and inherited by both children, you can step the
- * scent, change the size and add to the bag while reading the philosophy; without it,
- * every button in the Hero is dead from the first pixel of scroll. The price is that
- * the Manifesto's own copy is not selectable, which is the right way round for a layer
- * of prose over a live product.
+ * Scrolling back up runs every one of those tweens in reverse, so each layer of copy
+ * leaves to the left the way it came, with no second animation and no direction to
+ * detect.
  *
- * The lift is the one piece of machinery. For the dissolve to be visible the
- * Manifesto has to be on screen during the *first* screen of scroll, but its place
- * in the document is the second — so its wrapper is `fixed` over the viewport until
- * the sticky takes over, and handed back to `absolute` at the exact offset where the
- * two describe the same rectangle. The switch is invisible by construction rather
- * than by a matched pair of numbers.
+ * Nothing in either overlay takes pointer events, at any point in that sequence, and the
+ * rule is stated on each beat's *holder* rather than on the lifted wrapper inside it —
+ * the holder is the box that does the covering. It is a screen tall and it paints above
+ * the Hero's holder (later positioned sibling, all `sticky`), so it answers the hit test
+ * for everything behind it: first the product bar it covers from the bottom while a
+ * dissolve runs, then the whole Hero once it sticks. Transparency does not exempt it.
+ * With `pointer-events-none` there and inherited downward you can step the scent, change
+ * the size and add to the bag while reading either layer of prose; without it every
+ * button in the Hero is dead from the first pixel of scroll. The price is that neither
+ * overlay's own copy is selectable, which is the right way round for words laid over a
+ * live product.
  *
- * The bottle rides inside that same wrapper, which is what makes it leave with the
- * Manifesto and not a line of scroll logic of its own: it is nailed to the viewport
- * for as long as the pair is lifted or stuck, then travels off with the stage. Its one
- * move within the beat is the drift — 19vw to the right, scrubbed on the same curve and
- * window as the copy's arrival, so the two settle as one centred composition rather than
- * a left third of prose beside a hole. The copy is indented 13vw, not the same 19vw:
- * equal distances would have preserved whatever gap the two started with, and the 6vw of
- * daylight between the two numbers is what opens it. They straddle 16vw symmetrically, so
- * the pair's midpoint — and therefore its centring — is unaffected by how far apart the
- * halves are set.
+ * The lift is the one piece of machinery, and there is one per overlay. For a dissolve to
+ * be visible the arriving panel has to be on screen during the screen of scroll *before*
+ * its own place in the document — so its wrapper is `fixed` over the viewport until its
+ * own sticky reaches the top, and handed back to `absolute` at the exact offset where the
+ * two describe the same rectangle. The switch is invisible by construction rather than by
+ * a matched pair of numbers. The Manifesto's is handed back after one screen, the
+ * Ritual's after two.
+ *
+ * The bottle rides inside the Ritual's wrapper — the last of the three, so the glass
+ * paints over both layers of copy rather than under one of them — and that is what makes
+ * it leave with the stage rather than with scroll logic of its own: it is nailed to the
+ * viewport for as long as that wrapper is lifted or stuck, then travels off with the
+ * block. Its one move across the three beats is the drift, 19vw right on the Manifesto's
+ * own curve and window and back to 0 on the Ritual's, so the glass is centred for the two
+ * beats composed on the middle of the screen and stepped aside for the one that puts a
+ * column of prose in the left third.
  *
  * The Hero's own furniture stays where it was through all of this, the counter and the
  * product bar included. They belong to the section underneath, which by design does not
- * move while it is being read over; the consequence is that the counter no longer sits
- * directly beneath the vessel once the drift has run.
+ * move while it is being read over; the consequence is that the counter does not sit
+ * beneath the vessel while the Manifesto's drift is standing.
  */
 export function OpeningStage() {
   const stage = useRef<HTMLDivElement>(null);
   const heroHolder = useRef<HTMLDivElement>(null);
-  const lift = useRef<HTMLDivElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
+  const manifestoLift = useRef<HTMLDivElement>(null);
+  const manifestoPanel = useRef<HTMLDivElement>(null);
+  const ritualLift = useRef<HTMLDivElement>(null);
+  const ritualPanel = useRef<HTMLDivElement>(null);
 
   useGSAP(
     () => {
-      const liftEl = lift.current;
-      const panelEl = panel.current;
-      const heroEl = heroHolder.current;
       const stageEl = stage.current;
-      if (!liftEl || !panelEl || !heroEl || !stageEl) return;
+      const heroEl = heroHolder.current;
+      const manifestoLiftEl = manifestoLift.current;
+      const manifestoPanelEl = manifestoPanel.current;
+      const ritualLiftEl = ritualLift.current;
+      const ritualPanelEl = ritualPanel.current;
+      if (
+        !stageEl ||
+        !heroEl ||
+        !manifestoLiftEl ||
+        !manifestoPanelEl ||
+        !ritualLiftEl ||
+        !ritualPanelEl
+      ) {
+        return;
+      }
 
-      // How far the Manifesto travels to arrive: 80px, which is the copy's own `ml-20`
-      // indent, so the block slides in by exactly the distance it is inset by. The
-      // fade alone read as an apparition; with this it enters *from* somewhere.
-      // Scrolling up runs the same tween backwards, so it leaves the way it came —
-      // out to the left — with no second animation and no direction to detect.
+      // How far a panel travels to arrive: 80px, which is the Manifesto copy's own
+      // indent, so a block slides in by exactly the distance it is inset by. The fade
+      // alone read as an apparition; with this it enters *from* somewhere. Scrolling up
+      // runs the same tween backwards, so it leaves the way it came — out to the left —
+      // with no second animation and no direction to detect. Both overlays use the one
+      // value, so the two arrivals are the same gesture rather than two similar ones.
       //
       // Opacity is not conditional but the travel is: a fade is legible to someone who
       // has asked for less motion, a slide is the thing they asked to be spared. Zero
       // makes the tween a no-op on the x axis rather than a special case below.
       const slide = prefersReducedMotion() ? 0 : -80;
 
-      // The dissolve's start state belongs to GSAP rather than to a class: with the
-      // script gone the Manifesto should still be a readable section in its resting
-      // place instead of an invisible one shifted off its measure. `useGSAP` runs
-      // before paint, so nothing flashes. Inertness is the wrapper's
+      // Both dissolves' start state belongs to GSAP rather than to a class: with the
+      // script gone the overlays should still be readable sections in their resting
+      // places instead of invisible ones shifted off their measures. `useGSAP` runs
+      // before paint, so nothing flashes. Their inertness is the holders'
       // `pointer-events`, stated in the markup where it can be seen.
-      gsap.set(panelEl, { opacity: 0, x: slide });
+      gsap.set([manifestoPanelEl, ritualPanelEl], { opacity: 0, x: slide });
 
-      // How much of the Hero's oversized fragrance name is left, 1 → 0. It is seeded
-      // here rather than in the stylesheet because a tween needs a resolved number to
-      // start from: an unset custom property computes to `""`, which GSAP would read
-      // as 0 and the word would be erased before the dissolve began. `<FragranceName>`
-      // reads it as `calc(0.055 * var(--name-presence, 1))` — the resting weight is
-      // its number, the presence is this stage's, and neither restates the other.
-      //
-      // The word is erased through a variable on *this* element rather than by a tween
-      // on the word itself, and that is what stopped it being stranded visible. The
-      // span is React's: it renders a `style` attribute (`fontSize` is re-derived from
-      // the variant on every step of the scent) and its glyphs remount on each step, so
-      // an inline `opacity` written there by GSAP is one author among several — and a
-      // scrubbed timeline does not write again until the next scroll tick, so anything
-      // that drops that value while the customer is holding still hands the word back
-      // at full weight. Nothing writes to this div but this effect, and the variable
-      // inherits down to the span whatever React does inside it.
-      //
-      // `--vessel-drift` is the same trick for the vessel's move: 0 → 1, a pure
-      // progress with no distance in it. The distance is a class on the bottle's lane
-      // in the markup, which is what lets it be `md:` only and lets CSS re-resolve it
-      // on resize without a refresh. Below `md` there is no indent to make room for —
-      // the copy is laid over the glass there — so the class is simply absent and this
-      // variable moves nothing.
+      // The watermark's presence and the vessel's drift, as unitless progress on the
+      // stage element. GSAP writes the number below; CSS owns what the number means —
+      // `--name-presence` multiplies the fragrance name's own opacity, `--vessel-drift`
+      // multiplies a 19vw step inside an `md:` utility. That split is what lets the drift
+      // be desktop-only without a media query in here, and lets a resize re-resolve the
+      // distance with no refresh.
       gsap.set(stageEl, { "--name-presence": 1, "--vessel-drift": 0 });
 
-      const settle = (lifted: boolean) =>
-        gsap.set(liftEl, { position: lifted ? "fixed" : "absolute" });
+      /**
+       * Hold one overlay's wrapper over the viewport until its own sticky reaches the
+       * top, then hand it back to the flow. `screens` is how many screens of scroll that
+       * takes — one for the Manifesto, two for the Ritual — measured off the Hero
+       * holder's height rather than restated as `100vh`, because on a phone those are
+       * not the same number, and two statements of one offset is how a handover jumps.
+       *
+       * Returns its own teardown, because every other ScrollTrigger on the page reads
+       * these sections' positions in the document — the nav's tone handover, the
+       * `#manifesto` and `#ritual` anchors, each heading's own reveal. While a wrapper is
+       * lifted, `getBoundingClientRect` answers with the viewport, which would key all of
+       * them to the Hero's screen. So the lift is dropped for the length of a refresh and
+       * restored once every trigger has been measured; both events fire inside one frame,
+       * so nothing paints in between.
+       */
+      const lift = (el: HTMLDivElement, screens: number) => {
+        const settle = (lifted: boolean) =>
+          gsap.set(el, { position: lifted ? "fixed" : "absolute" });
 
-      // Progress, not `isActive`. ScrollTrigger reports a trigger inactive at
-      // progress 0 exactly as it does at 1 (`!!clipped && clipped < 1`), and progress
-      // 0 is scroll 0 — the one place the lift matters most, since dropping it there
-      // parks the pair a screen below the fold. `< 1` is the honest question anyway:
-      // lifted for the whole dissolve, including its first pixel, and handed back
-      // only once the sticky has reached the top.
-      const isLifted = (self: ScrollTrigger) => self.progress < 1;
+        // Progress, not `isActive`. ScrollTrigger reports a trigger inactive at progress
+        // 0 exactly as it does at 1, and progress 0 is scroll 0 — the one place the lift
+        // matters most, since dropping it there parks the panel a screen below the fold.
+        const isLifted = (self: ScrollTrigger) => self.progress < 1;
 
+        const st = ScrollTrigger.create({
+          trigger: stageEl,
+          start: "top top",
+          end: () => `+=${heroEl.offsetHeight * screens}`,
+          onToggle: (self) => settle(isLifted(self)),
+        });
+
+        const drop = () => settle(false);
+        const restore = () => settle(isLifted(st));
+        ScrollTrigger.addEventListener("refreshInit", drop);
+        ScrollTrigger.addEventListener("refresh", restore);
+
+        return () => {
+          ScrollTrigger.removeEventListener("refreshInit", drop);
+          ScrollTrigger.removeEventListener("refresh", restore);
+        };
+      };
+
+      // Both changeovers on one timeline and one trigger, two screens long, so a single
+      // playhead owns every property across both beats. Two timelines over adjacent
+      // windows would each claim the Manifesto's opacity and the vessel's drift, and on a
+      // refresh ScrollTrigger renders them in start order — the later one stamping its own
+      // start values over the earlier one's mid-dissolve state.
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: stageEl,
           start: "top top",
-          // The Hero holder's own height, measured rather than restated as `100vh`:
-          // it is exactly the scroll at which the Manifesto's sticky engages, and on
-          // a phone `100vh` and the visible viewport are not the same number — two
-          // statements of the same offset is how a handover comes to jump.
-          end: () => `+=${heroEl.offsetHeight}`,
+          end: () => `+=${heroEl.offsetHeight * 2}`,
           scrub: true,
-          onToggle: (self) => settle(isLifted(self)),
         },
       });
 
-      // The two layers of text trade places, but not from the first pixel. For the
-      // first fifth of the scroll the Hero is untouched, then the name goes, and it is
-      // gone by the halfway point — where the copy crosses half opacity and becomes
-      // properly readable. So the word leaves exactly as the Manifesto becomes legible:
-      // one event, rather than a slow erase followed by an unrelated fade. Scrubbing
-      // back up reverses it and the name returns to its own resting weight.
-      tl.to(
-        panelEl,
-        { opacity: 1, x: 0, ease: "power1.inOut", duration: 1 },
-        0,
-      )
+      // One duration and one ease for every arrival and departure, so the beats are
+      // literally the same curve rather than curves that happen to match.
+      const beat = { ease: "power1.inOut", duration: 1 };
+
+      tl
+        // Beat one: the Manifesto arrives and the watermark goes. Not from the first
+        // pixel — for the first fifth the Hero is untouched, then the name leaves, and it
+        // is gone by the halfway point, where the copy crosses half opacity and becomes
+        // properly readable. One event rather than a slow erase and an unrelated fade.
+        .to(manifestoPanelEl, { opacity: 1, x: 0, ...beat }, 0)
         .to(
           stageEl,
           { "--name-presence": 0, ease: "power1.inOut", duration: 0.3 },
           0.2,
         )
         // The vessel travels with the copy, on the copy's own curve and window, so the
-        // two read as one move rather than a slide followed by a nudge. The Hero is
-        // composed on the centre of the screen; the Manifesto puts a column of prose in
-        // the left third, and leaving the glass where it was left the beat weighted to
-        // the left with a hole in the right third. Both halves step right — the glass
-        // further than the copy, which is where the air between them comes from — and by
-        // amounts symmetric about the same midpoint, so the pair sits centred whatever
-        // the spread between them is set to.
-        //
-        // Not gated on reduced motion, unlike the copy's entrance slide. This is where
-        // the vessel *belongs* during the beat, not an ornament on the way there: it is
-        // scrubbed to the customer's own scroll like the opacity above, and suppressing
-        // it would park the glass under the copy's right edge.
-        .to(
-          stageEl,
-          { "--vessel-drift": 1, ease: "power1.inOut", duration: 1 },
-          0,
-        );
+        // two read as one move. Both halves of the composition step right — the glass
+        // further than the prose, which is where the air between them comes from — by
+        // amounts symmetric about one midpoint, so the pair still reads centred. Not
+        // gated on reduced motion, unlike the entry slide: this is where the vessel
+        // *belongs* during the beat, not an ornament on the way there.
+        .to(stageEl, { "--vessel-drift": 1, ...beat }, 0)
+        // Beat two: the Manifesto's entrance played backwards — out to the left, the way
+        // it came — under the Ritual arriving on the identical tween, so the changeover
+        // is one crossfade in one place, not two blocks moving past each other.
+        .to(manifestoPanelEl, { opacity: 0, x: slide, ...beat }, 1)
+        .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 1)
+        // And the glass comes back to the middle, the Ritual being composed on the centre
+        // of the screen again. Returning the progress to 0 rather than restating a
+        // distance is what makes the return exact at every width: the 19vw only ever has
+        // to cancel against itself.
+        .to(stageEl, { "--vessel-drift": 0, ...beat }, 1);
 
-      // Every other ScrollTrigger on the page reads the Manifesto's position in the
-      // document — the nav's tone handover, the `#manifesto` anchor, its own reveal.
-      // While it is lifted, `getBoundingClientRect` answers with the viewport, which
-      // would key all three to the Hero's screen. So the lift is dropped for the
-      // length of a refresh and restored once every trigger has been measured: both
-      // events fire inside one frame, so nothing paints in between.
-      const st = tl.scrollTrigger!;
-      const drop = () => settle(false);
-      const restore = () => settle(isLifted(st));
-      ScrollTrigger.addEventListener("refreshInit", drop);
-      ScrollTrigger.addEventListener("refresh", restore);
+      const teardowns = [lift(manifestoLiftEl, 1), lift(ritualLiftEl, 2)];
 
-      // The nav's triggers are built in the layout, before this stage exists, so
-      // they were measured against a Manifesto that was already lifted. One refresh
-      // with the pair above in place is what puts them on the honest position — and
-      // it is also what gives `lift` its first `position` for the current scroll.
+      // The nav's triggers are built in the layout, before this stage exists, so they
+      // were measured against panels that were already lifted. One refresh with the
+      // three above in place is what puts them on the honest position — and it is also
+      // what gives each lift its first `position` for the current scroll.
       ScrollTrigger.refresh();
 
-      return () => {
-        ScrollTrigger.removeEventListener("refreshInit", drop);
-        ScrollTrigger.removeEventListener("refresh", restore);
-      };
+      return () => teardowns.forEach((off) => off());
     },
     { scope: stage },
   );
 
   return (
-    <div ref={stage} className="relative h-[300vh]">
-      {/* Stuck for the first two screens of the stage, so the Hero is still on
-          screen underneath while it is being covered. */}
+    <div ref={stage} className="relative h-[400vh]">
+      {/* Stuck for the first three screens of the stage, so the Hero is still on screen
+          underneath while it is being covered — twice over. */}
       <div ref={heroHolder} className="sticky top-0 h-screen">
         <Hero />
       </div>
 
       {/* The Manifesto's own screen of the document — the second one, which is what
-          keeps the nav's tone handover and the `#manifesto` anchor honest. Same
-          height as the Hero's holder, so the two release on the same pixel.
+          keeps the nav's tone handover and the `#manifesto` anchor honest. The same
+          height as the Hero's holder, so every panel releases on the same pixel.
 
-          `pointer-events-none` is stated here, on the outermost box of the beat,
-          because that is the box that does the covering. It is a full screen tall
-          and it paints above the Hero's holder — later positioned sibling, both
-          `sticky` — so from the moment it starts rising into the viewport it answers
-          the hit test for everything behind it: first the product bar it covers from
-          the bottom during the dissolve, then the whole Hero once it sticks. Being
-          transparent does not exempt it. Nothing inside this beat is ever meant to be
-          clicked (the Manifesto is prose over a live product, the bottle is
-          decoration), so the rule is stated once and inherited by the lift and the
-          vessel rather than repeated on each. */}
+          `pointer-events-none` is stated here, on the outermost box of the beat, because
+          this is the box that does the covering: a full screen tall, painting above the
+          Hero's holder (later positioned sibling, both `sticky`), so from the moment it
+          rises into the viewport it answers the hit test for everything behind it —
+          first the product bar it covers from the bottom during the dissolve, then the
+          whole Hero once it sticks. Being transparent does not exempt it. Nothing in this
+          beat is ever meant to be clicked, so the rule is stated once here and inherited
+          by the lift rather than repeated on it. */}
       <div className="pointer-events-none sticky top-0 h-screen">
-        {/* Lifted over the viewport while the dissolve runs; `z-30` carries the
-            whole pair above the Hero's own furniture (z-10, z-20) and leaves them
-            under the nav.
+        {/* Lifted over the viewport for the first screen of scroll, while the dissolve
+            runs. `z-30` carries the panel above the Hero's own furniture (z-10, z-20) and
+            leaves it under the nav — and under the Ritual's wrapper below, which carries
+            the same z-30 and is the later sibling.
 
-            `overflow-hidden` is here for the vessel's drift below. The canvas is a
-            full-viewport box, so stepping it to the right pushes its right edge past
-            the viewport — and a transformed box still counts toward the document's
-            scrollable width, which is a horizontal scrollbar on every screen. Clipping
-            at this rectangle removes it and costs nothing visible: what leaves the
-            frame is empty canvas, the vessel itself being a fraction of its width. */}
-        <div ref={lift} className="absolute inset-0 z-30 overflow-hidden">
-          <div ref={panel} className="h-full">
+            `overflow-hidden` keeps the panel to the screen it occupies: it holds a
+            full-height section inside a box that is `fixed` for that screen, and it is
+            the box the 80px entry slide happens in. */}
+        <div ref={manifestoLift} className="absolute inset-0 z-30 overflow-hidden">
+          <div ref={manifestoPanel} className="h-full">
             <Manifesto />
           </div>
+        </div>
+      </div>
 
-          {/* The vessel's drift lane. GSAP owns only `--vessel-drift`, 0 → 1; the
-              distance is stated here, once, and `md:` is doing real work — below it the
-              Manifesto's copy has no indent and is laid over the glass, so there is
-              nothing to step aside for. Keeping the distance in CSS also means a resize
-              re-resolves it without a refresh. The number is the far half of a pair with
-              the copy's own `md:ml-[calc(5rem_+_13vw)]`: 19 and 13 straddle 16vw, their
-              midpoint is what holds the composition centred, and their 6vw difference is
-              the gap between the prose and the glass. Move the two apart to widen it —
-              and apart *evenly*, or the pair stops being centred. */}
+      {/* The Ritual's screen — the third — and the same beat over again: a transparent
+          overlay on the same live Hero, arriving on the same slide and fade the Manifesto
+          did, inert for the same reason. */}
+      <div className="pointer-events-none sticky top-0 h-screen">
+        {/* Lifted for the first two screens of scroll. The vessel rides in here rather
+            than in the Manifesto's wrapper because this is the last of the three, so its
+            z-30 paints over both layers of copy — the glass in front of the words, which
+            is the order the phone layout needs, where neither block has an indent and
+            both are laid over it. Sharing a wrapper with a panel is also what gives the
+            bottle its whole lifecycle for free: nailed to the viewport for as long as
+            this box is lifted or stuck, then away with the stage. */}
+        <div ref={ritualLift} className="absolute inset-0 z-30 overflow-hidden">
+          <div ref={ritualPanel} className="h-full">
+            <Ritual />
+          </div>
+
+          {/* The vessel's drift lane. GSAP owns only `--vessel-drift`, 0 → 1 → 0; the
+              distance is stated here, once. `md:` is doing real work — below it neither
+              overlay's copy has an indent and both are laid over the glass, so there is
+              nothing to step aside for. The number is the far half of a pair with the
+              Manifesto copy's own `md:ml-[calc(5rem_+_13vw)]`: 19 and 13 straddle 16vw,
+              their midpoint is what holds the composition centred, and their 6vw
+              difference is the gap between the prose and the glass. Move the two apart to
+              widen it — and apart *evenly*, or the pair stops reading centred.
+
+              `overflow-hidden` on the wrapper above is what this needs: stepping a
+              full-viewport box sideways pushes its right edge past the viewport, and a
+              transformed box still counts toward the document's scrollable width, which
+              is a horizontal scrollbar on every screen. What gets clipped is empty
+              canvas, the vessel being a fraction of its width. */}
           <div className="absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*19vw)]">
             <PersistentBottle />
           </div>

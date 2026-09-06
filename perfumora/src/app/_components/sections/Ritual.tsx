@@ -6,7 +6,6 @@ import { RevealHeading } from "../ui/RevealHeading";
 import { Section } from "../ui/Section";
 import { cn } from "../../_lib/cn";
 import { SECTION_IDS } from "../../_lib/sections";
-import { useReveal } from "../../_hooks/useReveal";
 
 /** Placeholder ritual steps — not brand-approved final copy. */
 const STEPS = [
@@ -39,48 +38,61 @@ const STEP_PLACEMENT = [
 ] as const;
 
 /**
- * The Ritual (§4.3): a three-step sequence for wearing the fragrance — and the
- * last beat the bottle appears in.
+ * The Ritual (§4.3): the third beat of the opening, and the last one the bottle appears
+ * in.
  *
- * Built as a stage rather than a column. The persistent bottle travels back to the
- * centre here and swells, so the three steps are arranged *around* it: 01 to its
- * left, 02 beneath it, 03 to its right, with the vessel itself filling the empty
- * middle. That is the story's turn from contemplation to use — the product comes
- * forward and the copy arranges itself about it.
+ * Built as a layer rather than a section, exactly as the Manifesto is — `bg-transparent`,
+ * light tone, `overlay` — and `<OpeningStage>` cross-fades it in where the Manifesto
+ * fades out, on the same 80px slide from the left and the same curve. So nothing arrives
+ * and nothing leaves: the Hero is still underneath, its parchment and glow and watermark
+ * intact, and the vessel, the arrows, the counter, the price and Add to Bag are all still
+ * there and still live. The vessel's one move is back to the middle — the drift that made
+ * room for the Manifesto's column, simply undone — so this beat is composed on the centre
+ * of the screen again.
  *
- * Held to one screen (`full`, so this owns its own padding rather than taking the
- * Section's default rhythm). Every piece of furniture here is therefore sized
- * against the viewport: the heading takes the top-left, 02's caption takes the
- * bottom-centre, and the `1fr` row between them is the bottle's slot.
+ * `tone="light"` is for the parchment underneath, which belongs to the Hero: painting
+ * `bg-bg-light` here would hide it, glow and watermark and product bar together. And
+ * `overlay` because nothing behind the nav has changed — the Hero is still the section on
+ * screen — so this beat stamps no tone of its own and the header goes on reading the
+ * Hero's.
  *
- * The vessel is deliberately allowed to stand *taller* than that row. It is a fixed
- * canvas layer that nothing clips, and the heading is held to `max-w-xl` on the
- * left, so it can rise past the heading's row in the free space to the right of it —
- * which is what lets this beat be the largest the bottle gets (§4.3's lean-in)
- * inside a single screen. Its only hard floor is 02's caption below it, so the pose
- * in `BOTTLE_WAYPOINTS` sits a touch *above* centre rather than in the middle of the
- * row, and 01 and 03 flank it slightly below its midpoint.
+ * No `useReveal`, for the Manifesto's reason: a 32px vertical rise underneath a
+ * horizontal slide is two entrances arguing, and the one-shot would fire at whatever
+ * point this section's *document* position crossed the trigger — two screens from where
+ * it visually is. The heading keeps `RevealHeading`, which is scrubbed to the same scroll
+ * and works at the word level, so it reads as detail inside the arrival rather than a
+ * second version of it.
  *
- * Below `md` there is no room to flank anything: the steps stack, and since three
- * of them plus a heading is very nearly a screen on their own, the bottle gets the
- * shallow band above them and little more.
+ * The three steps are written and placed but not shown: the `<ol>` is held at zero opacity
+ * and out of the accessibility tree, so the beat is the heading alone. Their composition —
+ * 01 to the left of the vessel, 02 beneath it, 03 to its right, the empty upper-centre
+ * cell of the grid being the glass's own slot — is intact underneath it, waiting on how it
+ * should be revealed.
+ *
+ * `full` so this owns its own padding rather than taking the Section's default rhythm,
+ * and because the beat is a screen tall by construction: it is stacked on the Hero, and
+ * the grid's `1fr` row is measured against that screen.
+ *
+ * Nothing here is selectable: the beat's holder in `<OpeningStage>` is
+ * `pointer-events-none` for its whole life, so that the Hero's controls behind it stay
+ * clickable through it.
  */
 export function Ritual() {
-  const scope = useReveal<HTMLDivElement>();
   return (
     <Section
       id={SECTION_IDS.ritual}
       tone="light"
+      overlay
       full
-      className="pt-20 pb-10 md:pb-12"
+      className="bg-transparent pt-20 pb-10 md:pb-12"
     >
       <Container className="flex flex-1 flex-col">
-        <div ref={scope} className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col">
           {/* Top-left, and held to a measure that keeps both balanced lines clear
-              of the bottle's column — the vessel rises through the middle of the
+              of the bottle's column — the vessel stands in the middle of the
               screen from just below this block. */}
           <div className="flex max-w-xl flex-col gap-2">
-            <Eyebrow className="reveal">The Ritual</Eyebrow>
+            <Eyebrow>The Ritual</Eyebrow>
             <RevealHeading className="text-section text-balance">
               Three moments, one lasting impression
             </RevealHeading>
@@ -90,9 +102,17 @@ export function Ritual() {
               On `md` the empty centre cell of the grid below does this job. */}
           <div aria-hidden="true" className="h-[19vh] shrink-0 md:hidden" />
 
+          {/* Parked, not deleted. The composition below is the one the steps will be
+              revealed into, so it stays exactly as it was laid out — placements, hairlines,
+              numerals and the `1fr` row that is the vessel's slot — and only its visibility
+              is withheld. `opacity-0` rather than `hidden` so the grid still occupies the
+              beat and the row it reserves for the glass is still measured; `aria-hidden` so
+              the accessibility tree agrees with the screen instead of reading out three
+              steps nobody can see. */}
           <ol
+            aria-hidden="true"
             className={cn(
-              "mt-6 grid grid-cols-1 gap-6",
+              "mt-6 grid grid-cols-1 gap-6 opacity-0",
               "md:grid-cols-[1fr_minmax(0,0.85fr)_1fr] md:grid-rows-[1fr_auto]",
               "md:flex-1 md:gap-x-10 md:gap-y-6",
             )}
