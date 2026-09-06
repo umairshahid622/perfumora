@@ -22,6 +22,8 @@ const LIFT = 1.15;
 const PRESS = 0.08;
 
 const UNCAP_DURATION = 0.7;
+const STRAIGHTEN_DURATION = 0.55;
+const UNCAP_START = STRAIGHTEN_DURATION;
 const PRESS_DOWN = 0.12;
 const PRESS_UP = 0.22;
 const SPRAY_DURATION = 0.9;
@@ -42,7 +44,7 @@ const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
  * would stall the beat for the better part of two seconds before a word of it
  * could be read.
  */
-export const RITUAL_STEPS_DELAY = SPRAY_AT + MIST_IN + 0.1;
+export const RITUAL_STEPS_DELAY = UNCAP_START + SPRAY_AT + MIST_IN + 0.1;
 
 /**
  * An object's height in the space its own `position` is written in — its
@@ -119,6 +121,7 @@ export function useBottleUncap(
 
       const still = prefersReducedMotion();
       const height = localHeight(cap);
+      const tiltGroup = refs.tiltGroup.current;
 
       const tl = gsap.timeline({
         scrollTrigger: {
@@ -132,6 +135,15 @@ export function useBottleUncap(
         },
       });
 
+      if (!still && tiltGroup) {
+        // Straighten the bottle before the closure begins to lift.
+        tl.to(
+          tiltGroup.rotation,
+          { x: 0, y: 0, z: 0, duration: STRAIGHTEN_DURATION, ease: "power2.inOut" },
+          0,
+        );
+      }
+
       tl.to(
         cap.position,
         {
@@ -139,7 +151,7 @@ export function useBottleUncap(
           duration: still ? 0 : UNCAP_DURATION,
           ease: "power2.out",
         },
-        0,
+        UNCAP_START,
       );
 
       const button = refs.pumpButton.current;
@@ -161,11 +173,11 @@ export function useBottleUncap(
             duration: PRESS_DOWN,
             ease: "power2.in",
           },
-          UNCAP_DURATION,
+          UNCAP_START + UNCAP_DURATION,
         ).to(
           button.position,
           { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
-          SPRAY_AT,
+          UNCAP_START + SPRAY_AT,
         );
 
         // Guarantee initial state is reset on reverse
@@ -186,12 +198,12 @@ export function useBottleUncap(
         tl.to(
           mist.scale,
           { x: 1, y: 1, z: 1, duration: SPRAY_DURATION, ease: "power2.out" },
-          SPRAY_AT,
+          UNCAP_START + SPRAY_AT,
         )
           .to(
             material,
             { opacity: MIST_OPACITY, duration: MIST_IN, ease: "power1.out" },
-            SPRAY_AT,
+            UNCAP_START + SPRAY_AT,
           )
           .to(
             material,
@@ -200,22 +212,17 @@ export function useBottleUncap(
               duration: SPRAY_DURATION - MIST_IN,
               ease: "power1.in",
             },
-            SPRAY_AT + MIST_IN,
+            UNCAP_START + SPRAY_AT + MIST_IN,
           );
       }
 
       // Showcase scrubbed timeline: as scroll advances past the steps, close the cap
       // and tilt/rotate the bottle to the dramatic showcase angle seen in the reference.
-      const tiltGroup = refs.tiltGroup.current;
-      if (tiltGroup) {
-        gsap.set(tiltGroup.rotation, { x: 0, y: 0, z: 0 });
-      }
-
       const showcaseTl = gsap.timeline({
         scrollTrigger: {
           trigger,
-          start: () => "top+=" + Math.round(window.innerHeight * 0.7) + " top",
-          end: () => "top+=" + Math.round(window.innerHeight * 1.5) + " top",
+          start: () => "top+=" + Math.round(window.innerHeight * 1.2) + " top",
+          end: () => "top+=" + Math.round(window.innerHeight * 1.9) + " top",
           scrub: 1,
         },
       });
