@@ -30,6 +30,8 @@ const PRESS_UP = 0.22;
 const SPRAY_DURATION = 0.9;
 /** How quickly the mist arrives once the button bottoms out. */
 const MIST_IN = 0.18;
+/** How long the showcase takes to glide the cap shut once its window is entered. */
+const SHOWCASE_CLOSE_DURATION = 0.6;
 
 /** The instant the pump fires: the button has just bottomed out. */
 const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
@@ -89,10 +91,13 @@ interface BottleUncapOptions {
  * backwards and forwards by a scroll wheel stops being one. So the beat's own
  * screen of scroll is the cue and the timeline plays at its own pace from there.
  *
- * It plays on entry from either direction, so arriving at the beat from the
- * Craft below shows the same thing as arriving from the Manifesto above, and
- * reverses only off the top — where the beat is genuinely being left behind and
- * the bottle has to be whole again for the two beats that come before it.
+ * It plays on the downward entry only. A detach without the spray that
+ * justifies it is the one thing the beat must not show, so nothing here lifts
+ * the cap going up — not an upward re-entry from the showcase, and not the
+ * showcase itself, whose glide-shut is its own one-way event below. Leaving
+ * through the top seats the cap outright and reverses only the straighten, so
+ * the bottle is whole again for the two beats that come before it and the next
+ * downward entry replays the whole sequence from the top.
  *
  * The window is `#ritual`'s own screen of the document, the third of the stage's
  * four, which is exactly the screen `<OpeningStage>` leaves still for reading.
@@ -143,10 +148,19 @@ export function useBottleUncap(
           trigger,
           start: "top top",
           end: "bottom top",
-          // `play` on the way back in as well: `none` there would leave the
-          // bottle capped and the steps unread for anyone scrolling up from the
-          // Craft, since the timeline is only ever reversed off the top.
-          toggleActions: "play none play reverse",
+          // Downward entry only. Every upward direction stays capped: `play` on
+          // an upward re-entry would re-run the uncapping with no spray behind
+          // it, and a plain `reverse` from the end would pull the cap down from
+          // a pose it may no longer be in (the showcase closes it below),
+          // rendering its lifted end first. onLeaveBack handles the exit.
+          toggleActions: "play none none none",
+          // Rewind to the top of the lift and reverse only what came before it:
+          // the cap lands seated in one tick — the same instant reset the
+          // spray's own onLeaveBack gives the button and the mist — and the
+          // straighten then eases back out, so the bottle is whole and tilted
+          // for the beats above. Reversing from there also leaves the timeline
+          // ready to replay on the next downward entry.
+          onLeaveBack: () => tl.reverse(UNCAP_START),
         },
       });
 
