@@ -11,7 +11,10 @@ import { Section } from "../ui/Section";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
-import { RITUAL_STEPS_DELAY } from "../three/useBottleUncap";
+import {
+  SPRAY_COMPLETE_EVENT,
+  SPRAY_RESET_EVENT,
+} from "../three/useBottleUncap";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -81,68 +84,53 @@ export function Ritual() {
             transformOrigin: "center center",
           });
 
-        const tl = gsap.timeline({
-          scrollTrigger: {
-            trigger: triggerEl,
-            start: "top top",
-            end: "bottom top",
-            scrub: 1,
-          },
-        });
-
-        tl.to(
-          items,
-          {
+        const reveal = () => {
+          const tl = gsap.timeline();
+          tl.to(items, {
             opacity: 1,
             y: 0,
             duration: STEP_DURATION,
             ease: "power3.out",
             stagger: STEP_STAGGER,
-          },
-          RITUAL_STEPS_DELAY,
-        );
-
-        // Subtitle reveals with the steps, after the last step lands
-        if (subtitleRef.current) {
-          tl.to(
-            subtitleRef.current,
-            {
+          });
+          if (subtitleRef.current) {
+            tl.to(subtitleRef.current, {
               opacity: 1,
               y: 0,
               duration: STEP_DURATION,
               ease: "power3.out",
-            },
-            RITUAL_STEPS_DELAY + STEP_STAGGER * (items.length - 1) + 0.1,
-          );
-        }
-
-        if (lines.length) {
-          tl.to(
-            lines,
-            {
+            }, "-=0.5");
+          }
+          if (lines.length) {
+            tl.to(lines, {
               opacity: 1,
               scaleX: 1,
               duration: 0.6,
               ease: "power2.out",
               stagger: STEP_STAGGER,
-            },
-            RITUAL_STEPS_DELAY + 0.08,
-          );
-        }
-
-        if (dots.length) {
-          tl.to(
-            dots,
-            {
+            }, 0.08);
+          }
+          if (dots.length) {
+            tl.to(dots, {
               opacity: 1,
               scale: 1,
               duration: 0.35,
               ease: "back.out(2)",
               stagger: STEP_STAGGER,
-            },
-            RITUAL_STEPS_DELAY + 0.16,
-          );
-        }
+            }, 0.16);
+          }
+        };
+
+        const reset = () => {
+          gsap.killTweensOf([...items, ...lines, ...dots]);
+          gsap.set(items, { opacity: 0, y: STEP_RISE });
+          gsap.set(lines, { opacity: 0, scaleX: 0 });
+          gsap.set(dots, { opacity: 0, scale: 0 });
+          if (subtitleRef.current) gsap.set(subtitleRef.current, { opacity: 0, y: STEP_RISE });
+        };
+
+        window.addEventListener(SPRAY_COMPLETE_EVENT, reveal);
+        window.addEventListener(SPRAY_RESET_EVENT, reset);
 
         // Showcase scrubbed transition: as user scrolls from the steps into the showcase scene,
         // fade out the step cards, keeping the subtitle on screen.
@@ -159,6 +147,11 @@ export function Ritual() {
             }),
           });
         }
+
+        return () => {
+          window.removeEventListener(SPRAY_COMPLETE_EVENT, reveal);
+          window.removeEventListener(SPRAY_RESET_EVENT, reset);
+        };
       }
     },
     { scope: listRef },
@@ -171,7 +164,7 @@ export function Ritual() {
       full
       className="bg-transparent pt-16 md:pt-20 pb-8 md:pb-12"
     >
-      <Container className="flex flex-1 flex-col h-full justify-between">
+      <Container className="relative z-20 flex flex-1 flex-col h-full justify-between">
         <div className="flex flex-1 flex-col h-full justify-between">
           {/* Top-left heading */}
           <div className="flex max-w-xl flex-col gap-2 shrink-0">
@@ -194,7 +187,7 @@ export function Ritual() {
           <ol
             ref={listRef}
             className={cn(
-              "relative -top-28 mt-4 grid grid-cols-3 gap-2 md:top-0 md:mt-2",
+              "relative z-20 -top-40 mt-4 grid grid-cols-3 gap-2 md:top-0 md:mt-2",
               "md:grid-cols-[1fr_minmax(240px,340px)_1fr] md:grid-rows-2",
               "md:flex-1 md:items-center md:gap-x-4 md:gap-y-6",
             )}
@@ -211,7 +204,7 @@ export function Ritual() {
                     {STEPS[0].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 leading-relaxed text-xs md:mt-2 md:text-sm">
+                <p className="text-body text-muted-on-light mt-1 leading-[1.35] text-[0.7rem] md:mt-2 md:text-sm md:leading-relaxed">
                   {STEPS[0].body}
                 </p>
               </div>
@@ -281,7 +274,7 @@ export function Ritual() {
                     {STEPS[1].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 leading-relaxed text-xs md:mt-2 md:text-sm">
+                <p className="text-body text-muted-on-light mt-1 leading-[1.35] text-[0.7rem] md:mt-2 md:text-sm md:leading-relaxed">
                   {STEPS[1].body}
                 </p>
               </div>
@@ -325,7 +318,7 @@ export function Ritual() {
                     {STEPS[2].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 leading-relaxed text-xs md:mt-2 md:text-sm">
+                <p className="text-body text-muted-on-light mt-1 leading-[1.35] text-[0.7rem] md:mt-2 md:text-sm md:leading-relaxed">
                   {STEPS[2].body}
                 </p>
               </div>

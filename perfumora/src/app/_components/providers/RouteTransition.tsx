@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -85,6 +86,20 @@ export function RouteTransitionProvider({ children }: { children: ReactNode }) {
   // tween starts, while the panel is still off-screen — so the re-render it
   // triggers never lands mid-wipe.
   const [label, setLabel] = useState("Perfumora");
+
+  // Home opens at the Hero on a hard refresh instead of restoring the browser's
+  // previous scroll position. Client-side navigation remains untouched because
+  // this runs only once for the provider's lifetime.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const previousRestoration = history.scrollRestoration;
+    history.scrollRestoration = "manual";
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
+    return () => {
+      history.scrollRestoration = previousRestoration;
+    };
+  }, []);
 
   // Park the panel below the fold before first paint. <AppLoader> (z-100) covers
   // everything during the only moment this runs — first load — so the panel is

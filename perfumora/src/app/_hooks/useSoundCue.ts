@@ -7,7 +7,7 @@ import { useSoundContext } from "../_lib/sound-context";
  * sound consumer imports. All playback flows through the one `<audio>` owned by
  * `<SoundProvider>`:
  *
- *   const { play, isMuted, toggleMute, isPlaying } = useSoundCue()
+ *   const { play, playSpray, isMuted, toggleMute, isPlaying } = useSoundCue()
  *
  * Rules baked in:
  *   - `play()` fires the shared click cue and is a no-op while muted; nothing

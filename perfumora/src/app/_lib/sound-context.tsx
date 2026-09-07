@@ -32,6 +32,8 @@ interface SoundContextValue {
   setMuted: (muted: boolean) => void;
   /** Fire the shared click cue. A no-op while muted or before the clip exists. */
   play: () => void;
+  /** Fire the available spray cue at the pump-fire moment. */
+  playSpray: () => void;
   /** True while the cue is actually sounding — drives the waveform's dance. */
   isPlaying: boolean;
 }
@@ -45,6 +47,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   const [isMuted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUnlocked = useRef(false);
 
   // One `<audio>` for the whole app (§1: one element per cue), created on the
   // client only. Its own events keep `isPlaying` in lockstep with real playback,
@@ -55,15 +58,36 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     audio.preload = "auto";
     audioRef.current = audio;
 
+    const unlock = () => {
+      if (audioUnlocked.current) return;
+      audioUnlocked.current = true;
+      const volume = audio.volume;
+      audio.volume = 0;
+      void audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = volume;
+      }).catch(() => {
+        audio.volume = volume;
+        audioUnlocked.current = false;
+      });
+    };
+
     const onPlay = () => setIsPlaying(true);
     const onStop = () => setIsPlaying(false);
     audio.addEventListener("playing", onPlay);
     audio.addEventListener("ended", onStop);
     audio.addEventListener("pause", onStop);
     audio.addEventListener("error", onStop);
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("wheel", unlock, { once: true, passive: true });
+    window.addEventListener("keydown", unlock, { once: true });
 
     return () => {
       audio.pause();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("wheel", unlock);
+      window.removeEventListener("keydown", unlock);
       audio.removeEventListener("playing", onPlay);
       audio.removeEventListener("ended", onStop);
       audio.removeEventListener("pause", onStop);
@@ -76,10 +100,21 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     if (isMuted || !audio) return;
     // Restart from 0 so rapid clicks re-fire the one-shot cleanly.
+    audio.volume = 1;
     audio.currentTime = 0;
     void audio.play().catch(() => {
       /* Autoplay/gesture guard or a missing clip — a blocked play is a silent
          no-op, not an error. */
+    });
+  }, [isMuted]);
+
+  const playSpray = useCallback(() => {
+    const audio = audioRef.current;
+    if (isMuted || !audio) return;
+    audio.currentTime = 0;
+    audio.volume = 0.55;
+    void audio.play().catch(() => {
+      /* A missing or blocked cue remains a silent no-op. */
     });
   }, [isMuted]);
 
@@ -92,8 +127,8 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
 
   const value = useMemo<SoundContextValue>(
-    () => ({ isMuted, toggleMute, setMuted, play, isPlaying }),
-    [isMuted, toggleMute, play, isPlaying],
+    () => ({ isMuted, toggleMute, setMuted, play, playSpray, isPlaying }),
+    [isMuted, toggleMute, play, playSpray, isPlaying],
   );
 
   return <SoundContext.Provider value={value}>{children}</SoundContext.Provider>;

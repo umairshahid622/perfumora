@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -99,6 +99,34 @@ export default function BottleScene({
   // first render, and that resolution doesn't re-run the hooks here on its own.
   const [ready, setReady] = useState(false);
   const handleReady = useCallback(() => setReady(true), []);
+  // Whether the canvas's host box is intersecting the viewport at all. The bottle
+  // lives only in the opening stage; once that block has scrolled away this layer
+  // is off-screen for good, yet `always` below would keep rendering it — an empty
+  // full-viewport alpha+MSAA clear every frame for the whole page below. Watching
+  // the *host* (below) rather than the canvas keeps this independent of what
+  // `position` games the stage's wrappers play on their own children.
+  const [visible, setVisible] = useState(true);
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+  // On-demand frames while idle, continuous while anything can be seen to move.
+  // `always` is still required whenever the layer is visible: the variant spin,
+  // the scroll-scrubbed tilt and the Ritual's spray are all authored in GSAP,
+  // which writes transforms on GSAP's own ticker — R3F has no way to know about
+  // them, so without a frame every tick the canvas would sit still while the
+  // objects moved underneath. But off-screen there is nothing to move that anyone
+  // can see, and `demand` frees the GPU to composite the page's own scrolling.
+  // (Switching frameloop dynamically is supported — R3F routes a changed prop
+  // through `setFrameloop`, which parks or resumes the internal loop cleanly.)
+  const frameloop = visible ? "always" : "demand";
   const isCompact = useMediaQuery("(max-width: 767px)");
   const isTablet = useMediaQuery(
     "(min-width: 768px) and (max-width: 1200px)",
@@ -230,57 +258,61 @@ export default function BottleScene({
   );
 
   return (
-    <Canvas
-      className={className}
-      /* R3F forces `pointer-events: auto` on its own wrapper div (to catch canvas
-         pointer events), which overrides the layer's `pointer-events-none` and
-         would let this full-viewport canvas swallow every click meant for the
-         Hero's arrows and buttons beneath it. The bottle is purely scroll-driven —
-         it never needs DOM pointer events — so switch the wrapper back off. */
-      style={{ pointerEvents: "none" }}
-      /* `always`, not `demand`. The variant-change spin and the liquid cross-fade
-         are authored in GSAP, which writes the bottle's transform on GSAP's own
-         ticker — something R3F has no way to know about. Without a frame every tick
-         the canvas would render once and then sit still while the object moved
-         underneath it. */
-      frameloop="always"
-      dpr={[1, isCompact ? 1.6 : 2]}
-      gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-      camera={{ position: [0, 0, 7.2], fov: 24, near: 0.1, far: 40 }}
-      onCreated={({ gl }) => {
-        gl.toneMapping = NeutralToneMapping;
-        gl.toneMappingExposure = 1.05;
-      }}
-    >
-      <StudioEnvironment />
+    <div ref={hostRef} className={className ?? "h-full w-full"}>
+      <Canvas
+        className="h-full w-full"
+        /* R3F forces `pointer-events: auto` on its own wrapper div (to catch canvas
+           pointer events), which overrides the layer's `pointer-events-none` and
+           would let this full-viewport canvas swallow every click meant for the
+           Hero's arrows and buttons beneath it. The bottle is purely scroll-driven —
+           it never needs DOM pointer events — so switch the wrapper back off. */
+        style={{ pointerEvents: "none" }}
+        /* See `frameloop` above: `always` only while the layer is on screen,
+           `demand` once it has scrolled away, so an invisible WebGL surface
+           stops competing with the page's own scroll for GPU time. */
+        frameloop={frameloop}
+        /* 1.5, not 2: the vessel is glass over parchment on a transparent canvas
+           — a soft-edged, low-contrast subject, where the extra pixel doubling of
+           dpr 2 (4× the fill) buys no visible fidelity but a real frame cost on
+           integrated GPUs. Compact keeps the original 1.6 (its canvas is small). */
+        dpr={[1, isCompact ? 1.6 : 1.5]}
+        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+        camera={{ position: [0, 0, 7.2], fov: 24, near: 0.1, far: 40 }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = NeutralToneMapping;
+          gl.toneMappingExposure = 1.05;
+        }}
+      >
+        <StudioEnvironment />
 
-      {/* Key light, front-right, gives the cap its broad highlight */}
-      <directionalLight position={[2.6, 3.4, 4]} intensity={1.5} />
-      {/* Fill, front-left */}
-      <directionalLight position={[-3.2, 1.6, 2.4]} intensity={0.45} />
-      {/* Rim, behind, lights the glass edges and the liquid from within */}
-      <directionalLight position={[0, 1.2, -4]} intensity={1.1} />
+        {/* Key light, front-right, gives the cap its broad highlight */}
+        <directionalLight position={[2.6, 3.4, 4]} intensity={1.5} />
+        {/* Fill, front-left */}
+        <directionalLight position={[-3.2, 1.6, 2.4]} intensity={0.45} />
+        {/* Rim, behind, lights the glass edges and the liquid from within */}
+        <directionalLight position={[0, 1.2, -4]} intensity={1.1} />
 
-      {/* The resting pose, set once as plain props — there is no longer a timeline
-          writing this group, so React owns the transform outright and no ref is
-          needed. Still a group rather than posing the model directly: it wraps the
-          model's own suspense boundary, kept in here so the download cannot suspend
-          the canvas itself, which would tear the WebGL context and the environment
-          map down with it and rebuild both. */}
-      <group position={[0, rest.y, 0]} scale={rest.scale}>
-        {/* Tilt group for scroll-driven showcase pose and bottle tilt */}
-        <group ref={refs.tiltGroup}>
-          <Suspense fallback={null}>
-            <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
-          </Suspense>
+        {/* The resting pose, set once as plain props — there is no longer a timeline
+            writing this group, so React owns the transform outright and no ref is
+            needed. Still a group rather than posing the model directly: it wraps the
+            model's own suspense boundary, kept in here so the download cannot suspend
+            the canvas itself, which would tear the WebGL context and the environment
+            map down with it and rebuild both. */}
+        <group position={[0, rest.y, 0]} scale={rest.scale}>
+          {/* Tilt group for scroll-driven showcase pose and bottle tilt */}
+          <group ref={refs.tiltGroup}>
+            <Suspense fallback={null}>
+              <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
+            </Suspense>
 
-          {/* The spray, a sibling of the model so it shares its framed space
-              without being turned by the variant spin — and outside the suspense
-              boundary, so its handles are wired from the first commit rather than
-              when the download lands. */}
-          <BottleMist refs={refs} color={juice} />
+            {/* The spray, a sibling of the model so it shares its framed space
+                without being turned by the variant spin — and outside the suspense
+                boundary, so its handles are wired from the first commit rather than
+                when the download lands. */}
+            <BottleMist refs={refs} color={juice} />
+          </group>
         </group>
-      </group>
-    </Canvas>
+      </Canvas>
+    </div>
   );
 }

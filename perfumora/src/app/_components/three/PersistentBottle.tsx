@@ -37,7 +37,7 @@ export function PersistentBottle() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 top-[4.75rem] bottom-0 z-40"
+      className="pointer-events-none absolute inset-x-0 top-19 bottom-0 z-10 md:z-40"
     >
       {/* Fragrance colour comes from the variant itself rather than the `--accent`
           token: <ScentProvider> writes that token in an effect, so reading it

@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Box3, Vector3, type Object3D } from "three";
 import { prefersReducedMotion } from "../../_lib/motion";
+import { useSoundCue } from "../../_hooks/useSoundCue";
 import { MIST_OPACITY, MIST_COLLAPSED } from "./BottleMist";
 import type { BottleRefs } from "./useBottleRefs";
 
@@ -45,6 +46,8 @@ const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
  * could be read.
  */
 export const RITUAL_STEPS_DELAY = UNCAP_START + SPRAY_AT + MIST_IN + 0.1;
+export const SPRAY_COMPLETE_EVENT = "perfumora:spray-complete";
+export const SPRAY_RESET_EVENT = "perfumora:spray-reset";
 
 /**
  * An object's height in the space its own `position` is written in — its
@@ -105,8 +108,20 @@ export function useBottleUncap(
   refs: BottleRefs,
   { enabled, ready, trigger }: BottleUncapOptions,
 ): void {
+  const { playSpray } = useSoundCue();
   const initialCapY = useRef<number | null>(null);
   const initialButtonY = useRef<number | null>(null);
+  // The spray cue read at fire time, not captured at build time. `playSpray`
+  // changes identity whenever the sound context's `isMuted` flips, and it was
+  // a dependency of the useGSAP below — so a press of the nav's mute toggle
+  // rebuilt every timeline here (cap, spray, showcase) *and* ran the full
+  // `ScrollTrigger.refresh()` at the bottom, a whole-page re-measure in the
+  // middle of an ordinary interaction. The cue is only ever called from a tween
+  // callback, so a ref keeps it current without owning the hook's schedule.
+  const playSprayRef = useRef(playSpray);
+  useEffect(() => {
+    playSprayRef.current = playSpray;
+  }, [playSpray]);
 
   useGSAP(
     () => {
@@ -180,6 +195,7 @@ export function useBottleUncap(
                 z: MIST_COLLAPSED,
               });
               gsap.set(material, { opacity: 0 });
+              window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
             },
           },
         });
@@ -217,7 +233,14 @@ export function useBottleUncap(
         // leaves the spout and gone by the time it has travelled its length.
         sprayTl.to(
           mist.scale,
-          { x: 1, y: 1, z: 1, duration: SPRAY_DURATION, ease: "power2.out" },
+          {
+            x: 1,
+            y: 1,
+            z: 1,
+            duration: SPRAY_DURATION,
+            ease: "power2.out",
+            onStart: () => playSprayRef.current(),
+          },
           UNCAP_START + SPRAY_AT,
         )
           .to(
@@ -231,6 +254,8 @@ export function useBottleUncap(
               opacity: 0,
               duration: SPRAY_DURATION - MIST_IN,
               ease: "power1.in",
+              onComplete: () =>
+                window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT)),
             },
             UNCAP_START + SPRAY_AT + MIST_IN,
           );

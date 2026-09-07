@@ -102,6 +102,27 @@ export function OpeningStage() {
       return;
     }
 
+    // Stage geometry, cached and recomputed on resize only. Reading
+    // `getBoundingClientRect` / `offsetTop` / `offsetHeight` /
+    // `scrollHeight` per wheel event forced a layout flush at trackpad
+    // frequency — main-thread work the hijacked scroll below then had to pay
+    // for before its tween could advance, which read as the stage stuttering
+    // under the fingers. Nothing above the stage changes height without a
+    // resize (the nav is fixed, the stage itself is 500vh), so a resize
+    // listener is the only invalidation these need.
+    let stageStart = stageEl.offsetTop;
+    let stageEnd = stageStart + stageEl.offsetHeight;
+    let vh = window.innerHeight;
+    let maxScroll = document.documentElement.scrollHeight - vh;
+
+    const measure = () => {
+      stageStart = stageEl.offsetTop;
+      stageEnd = stageStart + stageEl.offsetHeight;
+      vh = window.innerHeight;
+      maxScroll = document.documentElement.scrollHeight - vh;
+    };
+    window.addEventListener("resize", measure);
+
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.metaKey) return;
 
@@ -113,15 +134,13 @@ export function OpeningStage() {
         return;
       }
 
-      const bounds = stageEl.getBoundingClientRect();
-      const stageStart = stageEl.offsetTop;
-      const stageEnd = stageStart + stageEl.offsetHeight;
-      if (
-        bounds.bottom <= 0 ||
-        bounds.top >= window.innerHeight ||
-        window.scrollY < stageStart ||
-        window.scrollY >= stageEnd - 1
-      ) {
+      // Pure `scrollY` arithmetic against the cached numbers above — no
+      // layout reads. The two original bounds checks were always implied by
+      // these two: `bounds.top >= vh` means the scroll is a full viewport
+      // above the stage (already `< stageStart`), and `bounds.bottom <= 0`
+      // means it is past the stage's end (already `>= stageEnd - 1`).
+      const current = window.scrollY;
+      if (current < stageStart || current >= stageEnd - 1) {
         scrollTween.current?.kill();
         scrollTween.current = null;
         scrollTarget.current = null;
@@ -131,22 +150,21 @@ export function OpeningStage() {
       event.preventDefault();
 
       const unit =
-        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
-      const current = window.scrollY;
+        event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? vh : 1;
       const base =
         scrollTarget.current !== null &&
         Math.abs(current - scrollTarget.current) < 500
           ? scrollTarget.current
           : current;
-      const ritualStart = stageStart + window.innerHeight * 2;
-      const ritualEnd = stageStart + window.innerHeight * 4;
+      const ritualStart = stageStart + vh * 2;
+      const ritualEnd = stageStart + vh * 4;
       const inRitual = base >= ritualStart && base < ritualEnd;
       const resistance = inRitual ? 0.22 : 0.55;
       const maxDelta = inRitual ? 90 : 180;
       const next = Math.max(
         0,
         Math.min(
-          document.documentElement.scrollHeight - window.innerHeight,
+          maxScroll,
           base + Math.max(
             -maxDelta,
             Math.min(maxDelta, event.deltaY * unit * resistance),
@@ -173,6 +191,7 @@ export function OpeningStage() {
 
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => {
+      window.removeEventListener("resize", measure);
       window.removeEventListener("wheel", onWheel);
       scrollTween.current?.kill();
     };

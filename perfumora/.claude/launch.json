@@ -9,6 +9,16 @@
       "autoPort": true
     },
     {
+      "name": "perfumora-dev-fresh",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "lsof -tiTCP:3000 -sTCP:LISTEN | xargs kill 2>/dev/null; sleep 1; exec pnpm dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
       "name": "perfumora-attach",
       "url": "http://localhost:3000",
       "port": 3000
