@@ -1,10 +1,35 @@
 "use client";
 
+import { useRef } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Container } from "../ui/Container";
 import { Eyebrow } from "../ui/Eyebrow";
 import { RevealHeading } from "../ui/RevealHeading";
 import { Section } from "../ui/Section";
 import { SECTION_IDS } from "../../_lib/sections";
+import { prefersReducedMotion } from "../../_lib/motion";
+
+gsap.registerPlugin(ScrollTrigger);
+
+const PARAGRAPHS = [
+  "The lift of the cap, the press to the wrist, the pause before the day begins. A fragrance is worn — but first, each morning, it is chosen.",
+  "The vessel is made for that moment: weighted in the hand, sculpted to be reached for, a small ceremony repeated at the start of each day.",
+] as const;
+
+function WordReveal({ text }: { text: string }) {
+  return (
+    <p aria-label={text}>
+      {text.split(" ").map((word, index) => (
+        <span key={`${word}-${index}`} aria-hidden="true">
+          {index > 0 ? " " : null}
+          <span className="manifesto-word inline-block">{word}</span>
+        </span>
+      ))}
+    </p>
+  );
+}
 
 /**
  * Manifesto (§4.2): the brand's philosophy beat. The copy frames the daily ritual
@@ -63,6 +88,35 @@ import { SECTION_IDS } from "../../_lib/sections";
  * clickable through the beat.
  */
 export function Manifesto() {
+  const copyRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      if (prefersReducedMotion()) return;
+
+      const words = gsap.utils.toArray<HTMLElement>(
+        ".manifesto-word",
+        copyRef.current,
+      );
+      if (!words.length) return;
+
+      gsap.from(words, {
+        opacity: 0,
+        yPercent: 45,
+        ease: "power3.out",
+        duration: 0.5,
+        stagger: 0.08,
+        scrollTrigger: {
+          trigger: copyRef.current,
+          start: "top 78%",
+          end: "bottom 32%",
+          scrub: 1,
+        },
+      });
+    },
+    { scope: copyRef },
+  );
+
   return (
     <Section
       tone="light"
@@ -83,17 +137,13 @@ export function Manifesto() {
               Bounded by the measure above, so it stops short of the glass. */}
           <div className="border-hairline-on-light mt-6 border-t md:mt-11" />
 
-          <div className="mt-6 flex flex-col gap-4 md:mt-9 md:gap-5">
-            <p className="text-body text-muted-on-light">
-              The lift of the cap, the press to the wrist, the pause before the
-              day begins. A fragrance is worn — but first, each morning, it is
-              chosen.
-            </p>
-            <p className="text-body text-muted-on-light">
-              The vessel is made for that moment: weighted in the hand, sculpted
-              to be reached for, a small ceremony repeated at the start of each
-              day.
-            </p>
+          <div
+            ref={copyRef}
+            className="mt-6 flex flex-col gap-4 text-body text-muted-on-light md:mt-9 md:gap-5"
+          >
+            {PARAGRAPHS.map((text) => (
+              <WordReveal key={text} text={text} />
+            ))}
           </div>
         </div>
       </Container>

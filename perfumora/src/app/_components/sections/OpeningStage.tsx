@@ -298,7 +298,7 @@ export function OpeningStage() {
         };
       };
 
-      // Both changeovers on one timeline and one trigger, two screens long, so a single
+      // Both changeovers on one timeline and one trigger, three screens long, so a single
       // playhead owns every property across both beats. Two timelines over adjacent
       // windows would each claim the Manifesto's opacity and the vessel's drift, and on a
       // refresh ScrollTrigger renders them in start order — the later one stamping its own
@@ -307,7 +307,7 @@ export function OpeningStage() {
         scrollTrigger: {
           trigger: stageEl,
           start: "top top",
-          end: () => `+=${heroEl.offsetHeight * 2}`,
+          end: () => `+=${heroEl.offsetHeight * 3}`,
           scrub: true,
         },
       });
@@ -334,13 +334,13 @@ export function OpeningStage() {
         // gated on reduced motion, unlike the entry slide: this is where the vessel
         // *belongs* during the beat, not an ornament on the way there.
         .to(stageEl, { "--vessel-drift": 1, ...beat }, 0)
-        // Beat two: the Manifesto's entrance played backwards — out to the left, the way
-        // it came — under the Ritual arriving on the identical tween, so the changeover
-        // is one crossfade in one place, not two blocks moving past each other.
+        // Beat two: the Manifesto leaves completely before the Ritual begins to arrive.
+        // The pause between them gives the copy a clean handoff instead of a crossfade.
         .to(manifestoPanelEl, { opacity: 0, x: slide, ...beat }, 1)
-        .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 1)
-        // Return the bottle to center for the Ritual's step choreography.
-        .to(stageEl, { "--vessel-drift": 0, ...beat }, 1);
+        // Return the bottle to center with the completed Manifesto handoff.
+        .to(stageEl, { "--vessel-drift": 0, ...beat }, 1)
+        // Beat three: only after the Manifesto is fully gone does the Ritual enter.
+        .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 2);
 
       const teardowns = [lift(manifestoLiftEl, 1), lift(ritualLiftEl, 2)];
 
