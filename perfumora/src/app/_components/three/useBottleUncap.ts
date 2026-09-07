@@ -150,17 +150,14 @@ export function useBottleUncap(
           end: "bottom top",
           // Downward entry only. Every upward direction stays capped: `play` on
           // an upward re-entry would re-run the uncapping with no spray behind
-          // it, and a plain `reverse` from the end would pull the cap down from
-          // a pose it may no longer be in (the showcase closes it below),
-          // rendering its lifted end first. onLeaveBack handles the exit.
+          // it. The showcase timeline restores the lifted pose before this exit,
+          // so onLeaveBack can reverse the cap's lift smoothly from there.
           toggleActions: "play none none none",
-          // Rewind to the top of the lift and reverse only what came before it:
-          // the cap lands seated in one tick — the same instant reset the
-          // spray's own onLeaveBack gives the button and the mist — and the
-          // straighten then eases back out, so the bottle is whole and tilted
-          // for the beats above. Reversing from there also leaves the timeline
-          // ready to replay on the next downward entry.
-          onLeaveBack: () => tl.reverse(UNCAP_START),
+          // Reverse the lift continuously on the way back into the Hero and
+          // Manifesto, so the cap does not snap onto the bottle at the beat's
+          // upper boundary. The spray reset below remains instantaneous because
+          // it represents an event rather than a reversible visual state.
+          onLeaveBack: () => tl.reverse(),
         },
       });
 

@@ -284,7 +284,7 @@ export function OpeningStage() {
           trigger: stageEl,
           start: "top top",
           end: () => `+=${heroEl.offsetHeight * (screens + 0.5)}`,
-          onToggle: (self) => settle(isLifted(self)),
+          onUpdate: (self) => settle(isLifted(self)),
         });
 
         const drop = () => settle(false);
