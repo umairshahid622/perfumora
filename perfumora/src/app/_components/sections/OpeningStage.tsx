@@ -298,49 +298,38 @@ export function OpeningStage() {
         };
       };
 
-      // Both changeovers on one timeline and one trigger, three screens long, so a single
-      // playhead owns every property across both beats. Two timelines over adjacent
-      // windows would each claim the Manifesto's opacity and the vessel's drift, and on a
-      // refresh ScrollTrigger renders them in start order — the later one stamping its own
-      // start values over the earlier one's mid-dissolve state.
+      // Both changeovers on one timeline and one trigger over the stage's opening beats.
+      // Manifesto is given a generous hold window (0.6 → 1.4 screens) before transitioning
+      // seamlessly into Ritual at 2.0 screens, perfectly synced with the bottle uncap and spray.
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: stageEl,
           start: "top top",
-          end: () => `+=${heroEl.offsetHeight * 3}`,
+          end: () => `+=${heroEl.offsetHeight * 2}`,
           scrub: true,
         },
       });
 
-      // One duration and one ease for every arrival and departure, so the beats are
-      // literally the same curve rather than curves that happen to match.
-      const beat = { ease: "power1.inOut", duration: 1 };
+      const beat = { ease: "power1.inOut", duration: 0.6 };
 
       tl
-        // Beat one: the Manifesto arrives and the watermark goes. Not from the first
-        // pixel — for the first fifth the Hero is untouched, then the name leaves, and it
-        // is gone by the halfway point, where the copy crosses half opacity and becomes
-        // properly readable. One event rather than a slow erase and an unrelated fade.
+        // 0.0 → 0.6: Hero name leaves, Manifesto slides in and fades up to full opacity, vessel steps right.
         .to(manifestoPanelEl, { opacity: 1, x: 0, ...beat }, 0)
         .to(
           stageEl,
           { "--name-presence": 0, ease: "power1.inOut", duration: 0.3 },
-          0.2,
+          0.1,
         )
-        // The vessel travels with the copy, on the copy's own curve and window, so the
-        // two read as one move. Both halves of the composition step right — the glass
-        // further than the prose, which is where the air between them comes from — by
-        // amounts symmetric about one midpoint, so the pair still reads centred. Not
-        // gated on reduced motion, unlike the entry slide: this is where the vessel
-        // *belongs* during the beat, not an ornament on the way there.
         .to(stageEl, { "--vessel-drift": 1, ...beat }, 0)
-        // Beat two: the Manifesto leaves completely before the Ritual begins to arrive.
-        // The pause between them gives the copy a clean handoff instead of a crossfade.
-        .to(manifestoPanelEl, { opacity: 0, x: slide, ...beat }, 1)
-        // Return the bottle to center with the completed Manifesto handoff.
-        .to(stageEl, { "--vessel-drift": 0, ...beat }, 1)
-        // Beat three: only after the Manifesto is fully gone does the Ritual enter.
-        .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 2);
+
+        // 0.6 → 1.4: MANIFESTO READING WINDOW (held still at 100% opacity)
+
+        // 1.4 → 2.0: Manifesto fades out to the left and bottle returns to center.
+        .to(manifestoPanelEl, { opacity: 0, x: slide, ...beat }, 1.4)
+        .to(stageEl, { "--vessel-drift": 0, ...beat }, 1.4)
+
+        // 1.4 → 2.0: Ritual arrives cleanly right as you transition into the Ritual section!
+        .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 1.4);
 
       const teardowns = [lift(manifestoLiftEl, 1), lift(ritualLiftEl, 2)];
 

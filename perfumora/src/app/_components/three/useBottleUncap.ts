@@ -148,16 +148,27 @@ export function useBottleUncap(
           trigger,
           start: "top top",
           end: "bottom top",
-          // Downward entry only. Every upward direction stays capped: `play` on
-          // an upward re-entry would re-run the uncapping with no spray behind
-          // it. The showcase timeline restores the lifted pose before this exit,
-          // so onLeaveBack can reverse the cap's lift smoothly from there.
-          toggleActions: "play none none none",
-          // Reverse the lift continuously on the way back into the Hero and
-          // Manifesto, so the cap does not snap onto the bottle at the beat's
-          // upper boundary. The spray reset below remains instantaneous because
-          // it represents an event rather than a reversible visual state.
-          onLeaveBack: () => tl.reverse(),
+          // Downward entry only: uncapping only plays when scrolling down into Ritual.
+          toggleActions: "restart none none none",
+          onUpdate: (self) => {
+            // If the user scrolls upward at any point, ensure the cap never
+            // detaches or stays floating — glide it smoothly shut onto the bottle.
+            if (self.direction === -1 && cap.position.y > baseCapY + 0.001) {
+              gsap.to(cap.position, {
+                y: baseCapY,
+                duration: 0.35,
+                ease: "power2.out",
+                overwrite: "auto",
+              });
+            }
+          },
+          // Leaving through the top seats the cap outright so the bottle is
+          // whole again for Hero and Manifesto without any upward detach.
+          onLeaveBack: () => {
+            gsap.killTweensOf(cap.position);
+            gsap.set(cap.position, { y: baseCapY });
+            tl.pause(0);
+          },
         },
       });
 
@@ -206,6 +217,7 @@ export function useBottleUncap(
                 z: MIST_COLLAPSED,
               });
               gsap.set(material, { opacity: 0 });
+              sprayTl.pause(0);
               window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
             },
           },
@@ -272,8 +284,25 @@ export function useBottleUncap(
           );
       }
 
-      // Showcase scrubbed timeline: as scroll advances past the steps, close the cap
-      // and tilt/rotate the bottle to the dramatic showcase angle seen in the reference.
+      // One-way glide-shut on downward scroll into showcase.
+      // This runs only on downward scroll (onEnter), ensuring the cap never
+      // detaches or lifts off when scrolling back up.
+      ScrollTrigger.create({
+        trigger,
+        start: () => "top+=" + Math.round(window.innerHeight * 1.2) + " top",
+        onEnter: () => {
+          gsap.to(cap.position, {
+            y: baseCapY,
+            duration: still ? 0 : SHOWCASE_CLOSE_DURATION,
+            ease: "power2.inOut",
+            overwrite: "auto",
+          });
+        },
+      });
+
+      // Showcase scrubbed timeline: as scroll advances past the steps, tilt/rotate
+      // the bottle to the dramatic showcase angle seen in the reference.
+      // Note: cap.position is intentionally NOT scrubbed here so scrolling up never lifts the cap.
       const showcaseTl = gsap.timeline({
         scrollTrigger: {
           trigger,
@@ -282,13 +311,6 @@ export function useBottleUncap(
           scrub: 1,
         },
       });
-
-      showcaseTl.fromTo(
-        cap.position,
-        { y: baseCapY + height * LIFT },
-        { y: baseCapY, ease: "power2.inOut", immediateRender: false },
-        0,
-      );
 
       if (!still && tiltGroup) {
         showcaseTl.to(
