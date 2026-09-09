@@ -85,24 +85,17 @@ export function Ritual() {
           });
 
         const reveal = () => {
-          const tl = gsap.timeline();
-          tl.to(items, {
+          // Steps reveal on their own timeline, independent of heading/subtitle
+          const stepTl = gsap.timeline();
+          stepTl.to(items, {
             opacity: 1,
             y: 0,
             duration: STEP_DURATION,
             ease: "power3.out",
             stagger: STEP_STAGGER,
           });
-          if (subtitleRef.current) {
-            tl.to(subtitleRef.current, {
-              opacity: 1,
-              y: 0,
-              duration: STEP_DURATION,
-              ease: "power3.out",
-            }, "-=0.5");
-          }
           if (lines.length) {
-            tl.to(lines, {
+            stepTl.to(lines, {
               opacity: 1,
               scaleX: 1,
               duration: 0.6,
@@ -111,7 +104,7 @@ export function Ritual() {
             }, 0.08);
           }
           if (dots.length) {
-            tl.to(dots, {
+            stepTl.to(dots, {
               opacity: 1,
               scale: 1,
               duration: 0.35,
@@ -119,34 +112,35 @@ export function Ritual() {
               stagger: STEP_STAGGER,
             }, 0.16);
           }
+
+          // Subtitle reveals independently, slightly after the steps begin
+          if (subtitleRef.current) {
+            gsap.to(subtitleRef.current, {
+              opacity: 1,
+              y: 0,
+              duration: STEP_DURATION,
+              ease: "power3.out",
+              delay: 0.2,
+            });
+          }
         };
 
         const reset = () => {
+          // Steps reset independently
           gsap.killTweensOf([...items, ...lines, ...dots]);
           gsap.set(items, { opacity: 0, y: STEP_RISE });
           gsap.set(lines, { opacity: 0, scaleX: 0 });
           gsap.set(dots, { opacity: 0, scale: 0 });
-          if (subtitleRef.current) gsap.set(subtitleRef.current, { opacity: 0, y: STEP_RISE });
+
+          // Subtitle resets independently
+          if (subtitleRef.current) {
+            gsap.killTweensOf(subtitleRef.current);
+            gsap.set(subtitleRef.current, { opacity: 0, y: STEP_RISE });
+          }
         };
 
         window.addEventListener(SPRAY_COMPLETE_EVENT, reveal);
         window.addEventListener(SPRAY_RESET_EVENT, reset);
-
-        // Showcase scrubbed transition: as user scrolls from the steps into the showcase scene,
-        // fade out the step cards, keeping the subtitle on screen.
-        if (listRef.current) {
-          ScrollTrigger.create({
-            trigger: triggerEl,
-            start: () => "top+=" + Math.round(window.innerHeight * 1) + " top",
-            end: () => "top+=" + Math.round(window.innerHeight * 1.9) + " top",
-            scrub: 1,
-            animation: gsap.timeline().to(listRef.current, {
-              opacity: 0,
-              y: -24,
-              ease: "power2.inOut",
-            }),
-          });
-        }
 
         return () => {
           window.removeEventListener(SPRAY_COMPLETE_EVENT, reveal);
