@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, useState } from "react";
 import { useLoader, useThree, type ThreeElements } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Box3, Mesh, MeshPhysicalMaterial, Vector3 } from "three";
+import { Box3, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
 import type { BottleRefs } from "./useBottleRefs";
 
 /** The supplied product model, served from `public/`. */
@@ -143,7 +143,7 @@ function applyGlassEdge(
   material: MeshPhysicalMaterial,
   edgeColor: string = GLASS_EDGE_COLOR,
 ): void {
-  material.onBeforeCompile = (shader) => {
+  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
