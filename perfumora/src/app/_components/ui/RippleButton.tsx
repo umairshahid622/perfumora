@@ -165,7 +165,7 @@ export function RippleButton({
         // into the page and leave the label floating. The ring keeps the
         // silhouette, turning the hover into filled → outlined.
         "bg-accent text-accent-contrast ring-1 ring-accent relative inline-flex items-center justify-center overflow-hidden rounded-full",
-        "px-9 py-4 text-[0.8rem] font-semibold uppercase tracking-widest",
+        "px-4 md:px-9 py-3 md:py-4 text-[0.8rem] font-semibold uppercase tracking-widest",
         "select-none",
         // The same fade and cursor the sold-out size pill uses, so the two halves
         // of an out-of-stock SKU read as one state.
