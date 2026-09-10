@@ -229,30 +229,40 @@ export default function BottleScene({
     trigger: `#${SECTION_IDS.ritual}`,
   });
 
-  // The bottle leans into the Manifesto as it leaves the Hero's centre, giving
-  // the existing horizontal drift a physical handoff instead of a plain slide.
+  // Master scrubbed tilt choreography across the opening stage:
+  // 0.0 -> 0.6 screens: Leans into Manifesto pose (y: -0.14, z: -0.16)
+  // 0.6 -> 1.4 screens: Holds lean while reading Manifesto
+  // 1.4 -> 2.0 screens: Returns upright (0, 0, 0) as Ritual enters
+  // 2.0 -> 3.0 screens: Remains upright while Ritual uncapping and spray mist happen
+  // 3.0 -> 3.8 screens: Tilts to the showcase angle (x: 0.1, y: 0.35, z: 0.28) as cap glides shut
   useGSAP(
     () => {
       const tiltGroup = refs.tiltGroup.current;
-      const trigger = document.getElementById(SECTION_IDS.manifesto);
-      if (!ready || !tiltGroup || !trigger || prefersReducedMotion()) return;
+      const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]");
+      if (!ready || !tiltGroup || !stageEl || prefersReducedMotion()) return;
 
       gsap.set(tiltGroup.rotation, { x: 0, y: 0, z: 0 });
 
-      const transition = gsap.timeline({
+      const tl = gsap.timeline({
         scrollTrigger: {
-          trigger,
-          start: "top bottom",
-          end: "top top",
-          scrub: 1,
+          trigger: stageEl,
+          start: "top top",
+          end: "bottom top",
+          scrub: true,
         },
       });
 
-      transition.to(tiltGroup.rotation, {
-        y: -0.14,
-        z: -0.16,
-        ease: "power1.inOut",
-      });
+      const beat = { ease: "power1.inOut" };
+
+      tl
+        // 0.0 -> 0.6: Tilt into Manifesto lean as bottle drifts right
+        .to(tiltGroup.rotation, { y: -0.14, z: -0.16, duration: 0.6, ...beat }, 0)
+        // 0.6 -> 1.4: Held tilted during Manifesto reading
+        // 1.4 -> 2.0: Return upright cleanly as Ritual arrives and bottle drifts back center
+        .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 0.6, ...beat }, 1.4)
+        // 2.0 -> 3.0: Held upright during Ritual steps, uncap, and mist spray
+        // 3.0 -> 3.8: Smoothly transition to showcase pose as cap shuts
+        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.8, ...beat }, 3.0);
     },
     { dependencies: [ready], revertOnUpdate: true },
   );

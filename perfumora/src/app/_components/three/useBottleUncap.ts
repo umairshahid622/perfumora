@@ -172,15 +172,6 @@ export function useBottleUncap(
         },
       });
 
-      if (!still && tiltGroup) {
-        // Straighten the bottle before the closure begins to lift.
-        tl.to(
-          tiltGroup.rotation,
-          { x: 0, y: 0, z: 0, duration: STRAIGHTEN_DURATION, ease: "power2.inOut" },
-          0,
-        );
-      }
-
       tl.to(
         cap.position,
         {
@@ -299,31 +290,6 @@ export function useBottleUncap(
           });
         },
       });
-
-      // Showcase scrubbed timeline: as scroll advances past the steps, tilt/rotate
-      // the bottle to the dramatic showcase angle seen in the reference.
-      // Note: cap.position is intentionally NOT scrubbed here so scrolling up never lifts the cap.
-      const showcaseTl = gsap.timeline({
-        scrollTrigger: {
-          trigger,
-          start: () => "top+=" + Math.round(window.innerHeight * 1.2) + " top",
-          end: () => "top+=" + Math.round(window.innerHeight * 1.9) + " top",
-          scrub: 1,
-        },
-      });
-
-      if (!still && tiltGroup) {
-        showcaseTl.to(
-          tiltGroup.rotation,
-          {
-            x: 0.1,
-            y: 0.35,
-            z: 0.28,
-            ease: "power2.inOut",
-          },
-          0,
-        );
-      }
 
 
       // The trigger above is built long after the page is — the model downloads

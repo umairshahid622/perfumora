@@ -39,9 +39,9 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
     resizeObserver.observe(document.body);
 
     const tick = (_time: number, deltaTime: number) => {
-      // Velvety smooth easing (~0.085 per frame at 60fps, perfectly scaled for 120fps ProMotion)
+      // Direct, responsive, silky dampening (~0.12 per frame, perfectly fluid on 60Hz and 120Hz)
       const dt = Math.min(deltaTime / 1000, 0.05);
-      const factor = 1 - Math.exp(-6.2 * dt);
+      const factor = 1 - Math.exp(-8.5 * dt);
 
       currentY.current += (targetY.current - currentY.current) * factor;
 
@@ -80,16 +80,16 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
 
       event.preventDefault();
 
-      // Normalize and gently scale scroll deltas for silky-smooth control
+      // Granular, comfortable delta scaling — prevents skipping or rushing through 3D stages
       const unit =
         event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? vh : 1;
-      const rawDelta = event.deltaY * unit * 0.42;
-      const delta = Math.max(-90, Math.min(90, rawDelta));
+      const rawDelta = event.deltaY * unit * 0.26;
+      const delta = Math.max(-55, Math.min(55, rawDelta));
 
-      // Limit lead distance (max 450px) so fast swipes glide gracefully without overshooting
+      // Limit lead distance (max 220px) so scrolling stays tightly synced with visual cues
       const base =
-        Math.abs(targetY.current - currentY.current) > 450
-          ? currentY.current + Math.sign(targetY.current - currentY.current) * 450
+        Math.abs(targetY.current - currentY.current) > 220
+          ? currentY.current + Math.sign(targetY.current - currentY.current) * 220
           : targetY.current;
 
       // Keep target within page scroll boundaries
