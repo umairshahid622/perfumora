@@ -59,22 +59,9 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
           ? scrollTarget.current
           : current;
 
-      // Special gentle pacing when reading the Ritual beat inside the opening stage
-      const ritualEl = document.getElementById("ritual");
-      let resistance = 0.55;
-      let maxDelta = 200;
-
-      if (ritualEl) {
-        const rect = ritualEl.getBoundingClientRect();
-        if (rect.top <= 80 && rect.bottom >= 0) {
-          resistance = 0.25;
-          maxDelta = 100;
-        }
-      }
-
       const delta = Math.max(
-        -maxDelta,
-        Math.min(maxDelta, event.deltaY * unit * resistance),
+        -200,
+        Math.min(200, event.deltaY * unit * 0.55),
       );
 
       const next = Math.max(0, Math.min(maxScroll, base + delta));

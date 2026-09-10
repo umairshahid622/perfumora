@@ -4,7 +4,6 @@ import { useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { Hero } from "../hero/Hero";
 import { PersistentBottle } from "../three/PersistentBottle";
 import { Manifesto } from "./Manifesto";
@@ -13,7 +12,6 @@ import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
 
 gsap.registerPlugin(ScrollTrigger);
-gsap.registerPlugin(ScrollToPlugin);
 
 /**
  * The opening stage: the Hero, the Manifesto and the Ritual, dissolved between rather
