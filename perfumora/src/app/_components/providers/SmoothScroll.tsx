@@ -39,13 +39,13 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
     resizeObserver.observe(document.body);
 
     const tick = (_time: number, deltaTime: number) => {
-      // Delta-time based smoothing factor (~0.12 at 60fps, smoothly scaled for 120fps)
-      const dt = Math.min(deltaTime / 1000, 0.1);
-      const factor = 1 - Math.exp(-14 * dt);
+      // Velvety smooth easing (~0.085 per frame at 60fps, perfectly scaled for 120fps ProMotion)
+      const dt = Math.min(deltaTime / 1000, 0.05);
+      const factor = 1 - Math.exp(-6.2 * dt);
 
       currentY.current += (targetY.current - currentY.current) * factor;
 
-      if (Math.abs(targetY.current - currentY.current) < 0.5) {
+      if (Math.abs(targetY.current - currentY.current) < 0.25) {
         currentY.current = targetY.current;
         window.scrollTo(0, targetY.current);
         ScrollTrigger.update();
@@ -80,13 +80,20 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
 
       event.preventDefault();
 
-      // Normalize scroll deltas across wheel vs trackpad modes
+      // Normalize and gently scale scroll deltas for silky-smooth control
       const unit =
         event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? vh : 1;
-      const delta = event.deltaY * unit * 0.95;
+      const rawDelta = event.deltaY * unit * 0.42;
+      const delta = Math.max(-90, Math.min(90, rawDelta));
+
+      // Limit lead distance (max 450px) so fast swipes glide gracefully without overshooting
+      const base =
+        Math.abs(targetY.current - currentY.current) > 450
+          ? currentY.current + Math.sign(targetY.current - currentY.current) * 450
+          : targetY.current;
 
       // Keep target within page scroll boundaries
-      targetY.current = Math.max(0, Math.min(maxScroll, targetY.current + delta));
+      targetY.current = Math.max(0, Math.min(maxScroll, base + delta));
 
       startTicker();
     };
