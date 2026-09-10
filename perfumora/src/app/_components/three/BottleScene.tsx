@@ -315,6 +315,7 @@ function BottleDampingRig({
   ready: boolean;
 }) {
   const initialCapY = useRef<number | null>(null);
+  const maxProgressReached = useRef(0);
 
   useScrollScene("[data-opening-stage]", ({ currentProgress }) => {
     const tilt = refs.tiltGroup.current;
@@ -376,12 +377,24 @@ function BottleDampingRig({
       const baseCapY = initialCapY.current;
       const lift = getCapLiftHeight(cap);
 
+      // Track downward progress depth across the page
+      if (p > maxProgressReached.current) {
+        maxProgressReached.current = p;
+      } else if (p <= 0.20) {
+        maxProgressReached.current = 0;
+      }
+
       let capOffset = 0;
-      // 0.0 -> 0.38: Cap remains closed on Hero and Manifesto
-      if (p < 0.38) {
+
+      // When scrolling back up after having completed showcase, keep cap firmly seated
+      if (maxProgressReached.current >= 0.70 && p > 0.20) {
         capOffset = 0;
       }
-      // 0.38 -> 0.46: Cap smoothly uncaps upwards
+      // 0.0 -> 0.38: Cap remains closed on Hero and Manifesto
+      else if (p < 0.38) {
+        capOffset = 0;
+      }
+      // 0.38 -> 0.46: Cap smoothly uncaps upwards on downward entry
       else if (p < 0.46) {
         const t = (p - 0.38) / 0.08;
         const ease = t * t * (3 - 2 * t);
@@ -391,7 +404,7 @@ function BottleDampingRig({
       else if (p < 0.58) {
         capOffset = lift;
       }
-      // 0.58 -> 0.68: Smooth, weighted, continuous glide shut (no hitches, zero lag)
+      // 0.58 -> 0.68: Complete 100% continuous cubic smooth glide shut into showcase
       else if (p < 0.68) {
         const t = (p - 0.58) / 0.10;
         const ease = t * t * (3 - 2 * t);
