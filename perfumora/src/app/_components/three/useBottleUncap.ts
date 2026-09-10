@@ -31,7 +31,7 @@ const SPRAY_DURATION = 0.6;
 /** How quickly the mist arrives once the button bottoms out. */
 const MIST_IN = 0.12;
 /** How long the showcase takes to glide the cap shut once its window is entered. */
-const SHOWCASE_CLOSE_DURATION = 0.5;
+const SHOWCASE_CLOSE_DURATION = 0.9;
 
 /** The instant the pump fires: the button has just bottomed out. */
 const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
@@ -134,50 +134,6 @@ export function useBottleUncap(
       const tiltGroup = refs.tiltGroup.current;
 
       const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]") || document.body;
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: stageEl,
-          start: () => "top+=" + Math.round(window.innerHeight * 1.8) + " top",
-          end: () => "top+=" + Math.round(window.innerHeight * 3.2) + " top",
-          // Downward entry only: uncapping only plays when scrolling down into Ritual.
-          toggleActions: "restart none none none",
-          onUpdate: (self) => {
-            // If the user scrolls upward at any point, ensure the cap never
-            // detaches or stays floating — glide it smoothly shut onto the bottle.
-            if (self.direction === -1 && cap.position.y > baseCapY + 0.001) {
-              gsap.to(cap.position, {
-                y: baseCapY,
-                duration: 0.35,
-                ease: "power2.out",
-                overwrite: "auto",
-              });
-            }
-          },
-          // Leaving through the top seats the cap outright so the bottle is
-          // whole again for Hero and Manifesto without any upward detach.
-          onLeaveBack: () => {
-            gsap.killTweensOf(cap.position);
-            gsap.set(cap.position, { y: baseCapY });
-            tl.pause(0);
-          },
-          // Leaving through the bottom seats the cap so it never conflicts with showcase
-          onLeave: () => {
-            gsap.killTweensOf(cap.position);
-            gsap.set(cap.position, { y: baseCapY });
-          },
-        },
-      });
-
-      tl.to(
-        cap.position,
-        {
-          y: baseCapY + height * LIFT,
-          duration: still ? 0 : UNCAP_DURATION,
-          ease: "power2.out",
-        },
-        UNCAP_START,
-      );
 
       const button = refs.pumpButton.current;
       const mist = refs.mist.current;
@@ -283,21 +239,8 @@ export function useBottleUncap(
           );
       }
 
-      // One-way glide-shut on downward scroll into showcase.
-      // This runs only on downward scroll (onEnter), ensuring the cap never
-      // detaches or lifts off when scrolling back up.
-      ScrollTrigger.create({
-        trigger: stageEl,
-        start: () => "top+=" + Math.round(window.innerHeight * 3.0) + " top",
-        onEnter: () => {
-          gsap.to(cap.position, {
-            y: baseCapY,
-            duration: still ? 0 : SHOWCASE_CLOSE_DURATION,
-            ease: "power2.inOut",
-            overwrite: "auto",
-          });
-        },
-      });
+      // One-way spray mist event lifecycle is managed cleanly without cap collisions.
+      ScrollTrigger.refresh();
 
 
       // The trigger above is built long after the page is — the model downloads
