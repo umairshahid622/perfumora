@@ -37,6 +37,27 @@ export function BottlePreview({ liquidColor, className }: BottlePreviewProps) {
       fill="none"
       className={className}
     >
+      {/* Glass neck background */}
+      <path
+        d="M70.6111 97H193.389V178H70.6111V97Z"
+        fill="white"
+        fillOpacity={fillOpacity}
+      />
+      <path
+        d="M193.389 97H192.889V178H193.389H193.889V97H193.389ZM70.6111 178H71.1111V97H70.6111H70.1111V178H70.6111Z"
+        fill={EDGE}
+      />
+      <rect
+        x="57.5"
+        y="78.5"
+        width="149"
+        height="18"
+        rx="3.5"
+        fill="white"
+        fillOpacity={fillOpacity}
+      />
+
+      {/* Glass collar */}
       <rect
         x="41.5"
         y="178.5"
@@ -47,6 +68,7 @@ export function BottlePreview({ liquidColor, className }: BottlePreviewProps) {
         fillOpacity={fillOpacity}
         stroke={EDGE}
       />
+      {/* Glass main body */}
       <path
         d="M40 214.75H224C235.736 214.75 245.25 224.264 245.25 236V484C245.25 496.841 234.841 507.25 222 507.25H42C29.1594 507.25 18.75 496.841 18.75 484V236C18.75 224.264 28.2639 214.75 40 214.75Z"
         fill="white"
@@ -54,6 +76,7 @@ export function BottlePreview({ liquidColor, className }: BottlePreviewProps) {
         stroke={EDGE}
         strokeWidth="1.5"
       />
+      {/* Glass shoulder */}
       <path
         d="M54.5 196H208L220 214H43L54.5 196Z"
         fill="white"
@@ -73,31 +96,15 @@ export function BottlePreview({ liquidColor, className }: BottlePreviewProps) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Fragrance — cross-fades as the previewed variant changes. */}
+
+      {/* Fragrance liquid — cross-fades as the previewed variant changes */}
       <path
         d="M26 293C26 288.582 29.5817 285 34 285H230C234.418 285 238 288.582 238 293V425C238 458.137 211.137 485 178 485H86C52.8629 485 26 458.137 26 425V293Z"
         fill={liquidColor}
         className="transition-[fill] duration-300 ease-out motion-reduce:transition-none"
       />
-      <path
-        d="M70.6111 97H193.389V178H70.6111V97Z"
-        fill="white"
-        fillOpacity={fillOpacity}
-      />
-      <path
-        d="M193.389 97H192.889V178H193.389H193.889V97H193.389ZM70.6111 178H71.1111V97H70.6111H70.1111V178H70.6111Z"
-        fill={EDGE}
-      />
-      <rect
-        x="57.5"
-        y="78.5"
-        width="149"
-        height="18"
-        rx="3.5"
-        fill="white"
-        fillOpacity={fillOpacity}
-        stroke={EDGE}
-      />
+
+      {/* Inner black cap */}
       <path
         d="M80 47.6803C80 44.9188 82.2386 42.6803 85 42.6803H179C181.761 42.6803 184 44.9189 184 47.6803V164.488C184 166.144 182.657 167.488 181 167.488H83C81.3431 167.488 80 166.144 80 164.488V47.6803Z"
         fill={CAP_FILL}
@@ -115,6 +122,17 @@ export function BottlePreview({ liquidColor, className }: BottlePreviewProps) {
         stroke={EDGE}
         strokeOpacity={0.3}
         strokeWidth="1.5"
+      />
+
+      {/* Glass neck rim outline (CapOutside) — drawn in front of the black cap */}
+      <rect
+        x="57.5"
+        y="78.5"
+        width="149"
+        height="18"
+        rx="3.5"
+        fill="none"
+        stroke={EDGE}
       />
     </svg>
   );
