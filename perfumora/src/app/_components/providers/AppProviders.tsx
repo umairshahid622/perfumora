@@ -6,6 +6,7 @@ import { ScentProvider } from "../../_lib/scent-context";
 import { SoundProvider } from "../../_lib/sound-context";
 import type { Variant } from "../../_lib/variants";
 import { RouteTransitionProvider } from "./RouteTransition";
+import { SmoothScrollProvider } from "./SmoothScroll";
 
 /**
  * The one client boundary that hosts the page-root providers (§5): the mute
@@ -30,7 +31,9 @@ export function AppProviders({
     <SoundProvider>
       <CartProvider>
         <ScentProvider variants={variants}>
-          <RouteTransitionProvider>{children}</RouteTransitionProvider>
+          <RouteTransitionProvider>
+            <SmoothScrollProvider>{children}</SmoothScrollProvider>
+          </RouteTransitionProvider>
         </ScentProvider>
       </CartProvider>
     </SoundProvider>
