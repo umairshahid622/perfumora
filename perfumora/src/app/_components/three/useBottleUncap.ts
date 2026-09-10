@@ -19,7 +19,7 @@ gsap.registerPlugin(ScrollTrigger);
  * takes its lower rim clear of the pump head it was covering with air to spare;
  * the button's dip is a click, not a stroke.
  */
-const LIFT = 1.15;
+const LIFT = 1.22;
 const PRESS = 0.08;
 
 const UNCAP_DURATION = 0.45;

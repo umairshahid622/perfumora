@@ -54,9 +54,9 @@ const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
  * X and Y rotation are left at the identity pose, so they are not stated: the bottle
  * faces the camera dead centre and only the variant-change spin below turns it.
  */
-const REST = { y: 0.15, scale: 0.62 };
-const REST_TABLET = { y: -0.08, scale: 0.52 };
-const REST_COMPACT = { y: 0.4, scale: 0.38 };
+const REST = { y: -0.22, scale: 0.78 };
+const REST_TABLET = { y: -0.20, scale: 0.72 };
+const REST_COMPACT = { y: -0.16, scale: 0.66 };
 
 export interface BottleSceneProps {
   /** Variant colour for the fragrance; defaults to the live `--accent` token. */
@@ -299,7 +299,7 @@ function getCapLiftHeight(object: Object3D): number {
   const size = new Box3().setFromObject(object).getSize(new Vector3());
   const scale = object.parent?.getWorldScale(new Vector3());
   const h = scale ? size.y / scale.y : size.y;
-  return h * 1.15;
+  return h * 1.22;
 }
 
 /**

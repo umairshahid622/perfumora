@@ -95,8 +95,8 @@ export function Hero() {
 
         {/* Product bar */}
         <div className="grid grid-cols-2 items-end gap-3 py-4 md:grid-cols-3 md:gap-6 md:py-4">
-          <div className="order-2 md:order-1">
-            <Eyebrow>{variant.name} · Parfum</Eyebrow>
+          <div className="order-2 md:order-1 min-w-0">
+            <Eyebrow className="whitespace-nowrap">{variant.name} · Parfum</Eyebrow>
             <Price value={price} />
           </div>
 

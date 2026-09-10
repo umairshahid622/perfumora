@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -42,7 +42,9 @@ const STEP_DURATION = 0.8;
 const STEP_STAGGER = 0.14;
 
 export function Ritual() {
+  const [activeStep, setActiveStep] = useState(0);
   const listRef = useRef<HTMLOListElement>(null);
+  const mobileCardRef = useRef<HTMLDivElement>(null);
   const subtitleRef = useRef<HTMLParagraphElement>(null);
 
   useGSAP(
@@ -54,7 +56,17 @@ export function Ritual() {
 
       // Initial subtitle state: hidden until spray reveal with the steps
       if (subtitleRef.current) {
-        gsap.set(subtitleRef.current, { opacity: still ? 1 : 0, y: still ? 0 : STEP_RISE });
+        gsap.set(subtitleRef.current, {
+          opacity: still ? 1 : 0,
+          y: still ? 0 : STEP_RISE,
+        });
+      }
+
+      if (mobileCardRef.current) {
+        gsap.set(mobileCardRef.current, {
+          opacity: still ? 1 : 0,
+          y: still ? 0 : STEP_RISE,
+        });
       }
 
       const items = gsap.utils.toArray<HTMLElement>("li", listRef.current);
@@ -67,11 +79,8 @@ export function Ritual() {
         listRef.current,
       );
 
-      if (!items.length) return;
-
       if (!still) {
-        // Force initial hidden state so steps never show before the spray
-        gsap.set(items, { opacity: 0, y: STEP_RISE });
+        if (items.length) gsap.set(items, { opacity: 0, y: STEP_RISE });
         if (lines.length)
           gsap.set(lines, {
             opacity: 0,
@@ -88,30 +97,52 @@ export function Ritual() {
         const reveal = () => {
           // Steps reveal on their own timeline, independent of heading/subtitle
           const stepTl = gsap.timeline();
-          stepTl.to(items, {
-            opacity: 1,
-            y: 0,
-            duration: STEP_DURATION,
-            ease: "power3.out",
-            stagger: STEP_STAGGER,
-          });
-          if (lines.length) {
-            stepTl.to(lines, {
+          if (items.length) {
+            stepTl.to(items, {
               opacity: 1,
-              scaleX: 1,
-              duration: 0.6,
-              ease: "power2.out",
+              y: 0,
+              duration: STEP_DURATION,
+              ease: "power3.out",
               stagger: STEP_STAGGER,
-            }, 0.08);
+            });
+          }
+          if (mobileCardRef.current) {
+            stepTl.to(
+              mobileCardRef.current,
+              {
+                opacity: 1,
+                y: 0,
+                duration: STEP_DURATION,
+                ease: "power3.out",
+              },
+              0,
+            );
+          }
+          if (lines.length) {
+            stepTl.to(
+              lines,
+              {
+                opacity: 1,
+                scaleX: 1,
+                duration: 0.6,
+                ease: "power2.out",
+                stagger: STEP_STAGGER,
+              },
+              0.08,
+            );
           }
           if (dots.length) {
-            stepTl.to(dots, {
-              opacity: 1,
-              scale: 1,
-              duration: 0.35,
-              ease: "back.out(2)",
-              stagger: STEP_STAGGER,
-            }, 0.16);
+            stepTl.to(
+              dots,
+              {
+                opacity: 1,
+                scale: 1,
+                duration: 0.35,
+                ease: "back.out(2)",
+                stagger: STEP_STAGGER,
+              },
+              0.16,
+            );
           }
 
           // Subtitle reveals independently, slightly after the steps begin
@@ -129,9 +160,13 @@ export function Ritual() {
         const reset = () => {
           // Steps reset independently
           gsap.killTweensOf([...items, ...lines, ...dots]);
-          gsap.set(items, { opacity: 0, y: STEP_RISE });
-          gsap.set(lines, { opacity: 0, scaleX: 0 });
-          gsap.set(dots, { opacity: 0, scale: 0 });
+          if (items.length) gsap.set(items, { opacity: 0, y: STEP_RISE });
+          if (lines.length) gsap.set(lines, { opacity: 0, scaleX: 0 });
+          if (dots.length) gsap.set(dots, { opacity: 0, scale: 0 });
+          if (mobileCardRef.current) {
+            gsap.killTweensOf(mobileCardRef.current);
+            gsap.set(mobileCardRef.current, { opacity: 0, y: STEP_RISE });
+          }
 
           // Subtitle resets independently
           if (subtitleRef.current) {
@@ -151,7 +186,7 @@ export function Ritual() {
         };
       }
     },
-    { scope: listRef },
+    { dependencies: [] },
   );
 
   return (
@@ -159,32 +194,29 @@ export function Ritual() {
       tone="light"
       overlay
       full
-      className="bg-transparent pt-16 md:pt-20 pb-8 md:pb-12"
+      className="bg-transparent pt-16 md:pt-20 pb-8 md:pb-12 md:h-full"
     >
-      <Container className="relative z-20 flex flex-1 flex-col h-full justify-between">
-        <div className="flex flex-1 flex-col h-full justify-between">
+      <Container className="relative z-20 flex flex-1 flex-col justify-between">
+        <div className="flex flex-1 flex-col justify-between">
           {/* Top-left heading */}
-          <div className="flex max-w-xl flex-col gap-2 shrink-0">
+          <div className="flex max-w-xl flex-col gap-1.5 md:gap-2 shrink-0">
             <Eyebrow>The Ritual</Eyebrow>
-            <RevealHeading className="text-section text-balance">
+            <RevealHeading className="text-2xl sm:text-3xl md:text-section font-display uppercase tracking-tight text-balance">
               Three moments, one lasting impression
             </RevealHeading>
             <p
               ref={subtitleRef}
-              className="text-body text-muted-on-light mt-1 max-w-md text-sm md:text-base leading-relaxed"
+              className="text-body text-muted-on-light mt-0.5 md:mt-1 max-w-md text-xs sm:text-sm md:text-base leading-relaxed"
             >
               There are three moments, one lasting impression.
             </p>
           </div>
 
-          {/* Phone-only: the band the bottle occupies above the stacked steps */}
-          <div aria-hidden="true" className="h-[14vh] shrink-0 md:hidden" />
-
-          {/* 3-step grid surrounding the bottle with callout pointer lines */}
+          {/* Desktop 3-step grid surrounding the bottle with callout pointer lines */}
           <ol
             ref={listRef}
             className={cn(
-              "relative z-20 -top-40 mt-4 grid grid-cols-3 gap-2 md:top-0 md:mt-2",
+              "relative z-20 hidden md:grid md:top-0 md:mt-2",
               "md:grid-cols-[1fr_minmax(240px,340px)_1fr] md:grid-rows-2",
               "md:flex-1 md:items-center md:gap-x-4 md:gap-y-6",
             )}
@@ -192,7 +224,6 @@ export function Ritual() {
             {/* 01 Prime — Left side, vertically centered with bottle, line pointing right */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:items-center md:col-start-1 md:row-span-2 md:self-center md:justify-self-end">
               <div className="flex max-w-none flex-col text-left md:max-w-xs">
-                <span className="border-hairline-on-light w-full border-t mb-2 md:mb-3 md:hidden" />
                 <div className="flex items-baseline gap-1 md:gap-2.5">
                   <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
                     {STEPS[0].num}
@@ -201,13 +232,13 @@ export function Ritual() {
                     {STEPS[0].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 leading-[1.35] text-[0.7rem] md:mt-2 md:text-sm md:leading-relaxed">
+                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-2 md:text-sm">
                   {STEPS[0].body}
                 </p>
               </div>
 
               {/* Callout line from Prime to bottle shoulder */}
-              <div className="hidden md:flex items-center ml-3 shrink-0 pointer-events-none">
+              <div className="flex items-center ml-3 shrink-0 pointer-events-none">
                 <svg
                   width="110"
                   height="36"
@@ -236,7 +267,7 @@ export function Ritual() {
             {/* 02 Apply — Upper right, line pointing down-left to bottle collar */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-1 md:self-center md:justify-self-start">
               {/* Callout line from bottle collar to Apply */}
-              <div className="hidden md:flex items-center mr-3 shrink-0 pointer-events-none pt-1">
+              <div className="flex items-center mr-3 shrink-0 pointer-events-none pt-1">
                 <svg
                   width="110"
                   height="44"
@@ -262,7 +293,6 @@ export function Ritual() {
               </div>
 
               <div className="flex max-w-none flex-col text-left md:max-w-xs">
-                <span className="border-hairline-on-light w-full border-t mb-2 md:mb-3 md:hidden" />
                 <div className="flex items-baseline gap-1 md:gap-2.5">
                   <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
                     {STEPS[1].num}
@@ -271,7 +301,7 @@ export function Ritual() {
                     {STEPS[1].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 leading-[1.35] text-[0.7rem] md:mt-2 md:text-sm md:leading-relaxed">
+                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-2 md:text-sm">
                   {STEPS[1].body}
                 </p>
               </div>
@@ -280,7 +310,7 @@ export function Ritual() {
             {/* 03 Layer — Lower right, line pointing left to lower bottle body */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-2 md:self-center md:justify-self-start">
               {/* Callout line from bottle body to Layer */}
-              <div className="hidden md:flex items-center mr-3 shrink-0 pointer-events-none pt-1">
+              <div className="flex items-center mr-3 shrink-0 pointer-events-none pt-1">
                 <svg
                   width="110"
                   height="28"
@@ -306,7 +336,6 @@ export function Ritual() {
               </div>
 
               <div className="flex max-w-none flex-col text-left md:max-w-xs">
-                <span className="border-hairline-on-light w-full border-t mb-2 md:mb-3 md:hidden" />
                 <div className="flex items-baseline gap-1 md:gap-2.5">
                   <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
                     {STEPS[2].num}
@@ -315,12 +344,66 @@ export function Ritual() {
                     {STEPS[2].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 leading-[1.35] text-[0.7rem] md:mt-2 md:text-sm md:leading-relaxed">
+                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-2 md:text-sm">
                   {STEPS[2].body}
                 </p>
               </div>
             </li>
           </ol>
+
+          {/* Mobile Interactive Step Tabs Card (Applies ONLY to the 3 ritual steps) */}
+          <div
+            ref={mobileCardRef}
+            className="relative z-30 flex flex-col md:hidden pointer-events-auto mt-auto"
+          >
+            <div className=" border-hairline-on-light bg-bg-light/92 backdrop-blur-md rounded-2xl border p-4 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+              {/* Step tabs */}
+              <div className="grid grid-cols-3 gap-1.5 border-b border-hairline-on-light pb-3">
+                {STEPS.map((step, idx) => {
+                  const active = idx === activeStep;
+                  return (
+                    <button
+                      key={step.num}
+                      type="button"
+                      onClick={() => setActiveStep(idx)}
+                      className={cn(
+                        "flex items-center justify-center gap-1 rounded-xl py-2 px-1 transition-all text-xs uppercase tracking-wider",
+                        active
+                          ? "bg-accent-on-light text-white font-semibold shadow-xs"
+                          : "bg-black/[0.03] text-muted-on-light hover:text-ink font-medium",
+                      )}
+                    >
+                      <span
+                        className={
+                          active
+                            ? "text-white/80 font-display"
+                            : "text-accent-on-light font-display"
+                        }
+                      >
+                        {step.num}
+                      </span>
+                      <span className="truncate">{step.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active step description */}
+              <div className="pt-3 min-h-[4rem]">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-accent-on-light text-xl leading-none font-medium">
+                    {STEPS[activeStep].num}
+                  </span>
+                  <h3 className="text-sm font-medium tracking-tight text-ink">
+                    {STEPS[activeStep].title}
+                  </h3>
+                </div>
+                <p className="text-body text-muted-on-light mt-1 text-xs leading-relaxed">
+                  {STEPS[activeStep].body}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </Container>
     </Section>
