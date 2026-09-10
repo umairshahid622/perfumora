@@ -17,6 +17,7 @@ import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
 import { useBottleUncap } from "./useBottleUncap";
+import { useScrollScene } from "./useScrollScene";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -229,44 +230,6 @@ export default function BottleScene({
     trigger: `#${SECTION_IDS.ritual}`,
   });
 
-  // Master scrubbed tilt choreography across the opening stage:
-  // 0.0 -> 0.6 screens: Leans into Manifesto pose (y: -0.14, z: -0.16)
-  // 0.6 -> 1.4 screens: Holds lean while reading Manifesto
-  // 1.4 -> 2.0 screens: Returns upright (0, 0, 0) as Ritual enters
-  // 2.0 -> 3.0 screens: Remains upright while Ritual uncapping and spray mist happen
-  // 3.0 -> 3.8 screens: Tilts to the showcase angle (x: 0.1, y: 0.35, z: 0.28) as cap glides shut
-  useGSAP(
-    () => {
-      const tiltGroup = refs.tiltGroup.current;
-      const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]");
-      if (!ready || !tiltGroup || !stageEl || prefersReducedMotion()) return;
-
-      gsap.set(tiltGroup.rotation, { x: 0, y: 0, z: 0 });
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: stageEl,
-          start: "top top",
-          end: "bottom top",
-          scrub: true,
-        },
-      });
-
-      const beat = { ease: "power1.inOut" };
-
-      tl
-        // 0.0 -> 0.6: Tilt into Manifesto lean as bottle drifts right
-        .to(tiltGroup.rotation, { y: -0.14, z: -0.16, duration: 0.6, ...beat }, 0)
-        // 0.6 -> 1.4: Held tilted during Manifesto reading
-        // 1.4 -> 2.0: Return upright cleanly as Ritual arrives and bottle drifts back center
-        .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 0.6, ...beat }, 1.4)
-        // 2.0 -> 3.0: Held upright during Ritual steps, uncap, and mist spray
-        // 3.0 -> 3.8: Smoothly transition to showcase pose as cap shuts
-        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.8, ...beat }, 3.0);
-    },
-    { dependencies: [ready], revertOnUpdate: true },
-  );
-
   return (
     <div ref={hostRef} className={className ?? "h-full w-full"}>
       <Canvas
@@ -322,7 +285,72 @@ export default function BottleScene({
             <BottleMist refs={refs} color={juice} />
           </group>
         </group>
+
+        {/* Decoupled per-frame damped progress rig: guarantees smooth, continuous
+            transformations even during aggressive or fast scroll bursts. */}
+        <BottleDampingRig refs={refs} ready={ready} />
       </Canvas>
     </div>
   );
+}
+
+/**
+ * Decoupled 3D Scene Damping Component inside Canvas.
+ * Interpolates tiltGroup.rotation every frame with per-frame clamping,
+ * preventing any scene collision or rotation teleportation during fast scrolls.
+ */
+function BottleDampingRig({
+  refs,
+  ready,
+}: {
+  refs: ReturnType<typeof useBottleRefs>;
+  ready: boolean;
+}) {
+  useScrollScene("[data-opening-stage]", ({ currentProgress }) => {
+    const tilt = refs.tiltGroup.current;
+    if (!tilt || !ready || prefersReducedMotion()) return;
+
+    const p = currentProgress; // 0 to 1 across 500vh opening stage
+
+    let targetX = 0;
+    let targetY = 0;
+    let targetZ = 0;
+
+    // 0.0 -> 0.20: Lean into Manifesto pose (y: -0.14, z: -0.16)
+    if (p < 0.20) {
+      const t = p / 0.20;
+      targetY = -0.14 * t;
+      targetZ = -0.16 * t;
+    }
+    // 0.20 -> 0.35: Held tilted during Manifesto reading
+    else if (p < 0.35) {
+      targetY = -0.14;
+      targetZ = -0.16;
+    }
+    // 0.35 -> 0.48: Smoothly return upright for Ritual section
+    else if (p < 0.48) {
+      const t = (p - 0.35) / 0.13;
+      targetY = -0.14 * (1 - t);
+      targetZ = -0.16 * (1 - t);
+    }
+    // 0.48 -> 0.65: Held upright for Ritual uncap and spray
+    else if (p < 0.65) {
+      targetX = 0;
+      targetY = 0;
+      targetZ = 0;
+    }
+    // 0.65 -> 0.90: Transition to showcase dramatic tilt
+    else {
+      const t = Math.min(1, (p - 0.65) / 0.25);
+      targetX = 0.1 * t;
+      targetY = 0.35 * t;
+      targetZ = 0.28 * t;
+    }
+
+    tilt.rotation.x = targetX;
+    tilt.rotation.y = targetY;
+    tilt.rotation.z = targetZ;
+  });
+
+  return null;
 }

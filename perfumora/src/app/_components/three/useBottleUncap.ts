@@ -22,32 +22,22 @@ gsap.registerPlugin(ScrollTrigger);
 const LIFT = 1.15;
 const PRESS = 0.08;
 
-const UNCAP_DURATION = 0.7;
-const STRAIGHTEN_DURATION = 0.55;
+const UNCAP_DURATION = 0.45;
+const STRAIGHTEN_DURATION = 0.2;
 const UNCAP_START = STRAIGHTEN_DURATION;
-const PRESS_DOWN = 0.12;
-const PRESS_UP = 0.22;
-const SPRAY_DURATION = 0.9;
+const PRESS_DOWN = 0.1;
+const PRESS_UP = 0.18;
+const SPRAY_DURATION = 0.6;
 /** How quickly the mist arrives once the button bottoms out. */
-const MIST_IN = 0.18;
+const MIST_IN = 0.12;
 /** How long the showcase takes to glide the cap shut once its window is entered. */
-const SHOWCASE_CLOSE_DURATION = 0.6;
+const SHOWCASE_CLOSE_DURATION = 0.5;
 
 /** The instant the pump fires: the button has just bottomed out. */
 const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
 
-/**
- * When the Ritual's three steps may start arriving, in seconds from the top of
- * this choreography — the cue they wait on, exported so the two halves of one
- * sequence cannot drift apart. The steps live in the DOM and the spray in the
- * canvas, so there is no timeline that can hold both.
- *
- * Set a beat past the mist's peak rather than past its last droplet: the spray
- * has plainly happened by then, and waiting for the cloud to clear entirely
- * would stall the beat for the better part of two seconds before a word of it
- * could be read.
- */
-export const RITUAL_STEPS_DELAY = UNCAP_START + SPRAY_AT + MIST_IN + 0.1;
+export const RITUAL_STEPS_DELAY = UNCAP_START + 0.1;
+export const SPRAY_START_EVENT = "perfumora:spray-start";
 export const SPRAY_COMPLETE_EVENT = "perfumora:spray-complete";
 export const SPRAY_RESET_EVENT = "perfumora:spray-reset";
 
@@ -143,11 +133,13 @@ export function useBottleUncap(
       const height = localHeight(cap);
       const tiltGroup = refs.tiltGroup.current;
 
+      const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]") || document.body;
+
       const tl = gsap.timeline({
         scrollTrigger: {
-          trigger,
-          start: "top top",
-          end: "bottom top",
+          trigger: stageEl,
+          start: () => "top+=" + Math.round(window.innerHeight * 1.8) + " top",
+          end: () => "top+=" + Math.round(window.innerHeight * 3.2) + " top",
           // Downward entry only: uncapping only plays when scrolling down into Ritual.
           toggleActions: "restart none none none",
           onUpdate: (self) => {
@@ -168,6 +160,11 @@ export function useBottleUncap(
             gsap.killTweensOf(cap.position);
             gsap.set(cap.position, { y: baseCapY });
             tl.pause(0);
+          },
+          // Leaving through the bottom seats the cap so it never conflicts with showcase
+          onLeave: () => {
+            gsap.killTweensOf(cap.position);
+            gsap.set(cap.position, { y: baseCapY });
           },
         },
       });
@@ -196,9 +193,9 @@ export function useBottleUncap(
         // timeline prevents the mist from playing backward on upward scroll.
         const sprayTl = gsap.timeline({
           scrollTrigger: {
-            trigger,
-            start: "top top",
-            end: "bottom top",
+            trigger: stageEl,
+            start: () => "top+=" + Math.round(window.innerHeight * 1.8) + " top",
+            end: () => "top+=" + Math.round(window.innerHeight * 3.2) + " top",
             toggleActions: "restart none none none",
             onLeaveBack: () => {
               gsap.set(button.position, { y: baseButtonY });
@@ -211,6 +208,16 @@ export function useBottleUncap(
               sprayTl.pause(0);
               window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
             },
+            onLeave: () => {
+              gsap.set(button.position, { y: baseButtonY });
+              gsap.set(mist.scale, {
+                x: MIST_COLLAPSED,
+                y: MIST_COLLAPSED,
+                z: MIST_COLLAPSED,
+              });
+              gsap.set(material, { opacity: 0 });
+              sprayTl.pause(0);
+            },
           },
         });
 
@@ -222,6 +229,7 @@ export function useBottleUncap(
             y: baseButtonY - height * PRESS,
             duration: PRESS_DOWN,
             ease: "power2.in",
+            onStart: () => window.dispatchEvent(new Event(SPRAY_START_EVENT)),
           },
           UNCAP_START + UNCAP_DURATION,
         ).to(
@@ -279,8 +287,8 @@ export function useBottleUncap(
       // This runs only on downward scroll (onEnter), ensuring the cap never
       // detaches or lifts off when scrolling back up.
       ScrollTrigger.create({
-        trigger,
-        start: () => "top+=" + Math.round(window.innerHeight * 1.2) + " top",
+        trigger: stageEl,
+        start: () => "top+=" + Math.round(window.innerHeight * 3.0) + " top",
         onEnter: () => {
           gsap.to(cap.position, {
             y: baseCapY,

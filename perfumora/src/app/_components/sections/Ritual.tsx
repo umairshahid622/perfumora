@@ -12,6 +12,7 @@ import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
 import {
+  SPRAY_START_EVENT,
   SPRAY_COMPLETE_EVENT,
   SPRAY_RESET_EVENT,
 } from "../three/useBottleUncap";
@@ -139,10 +140,12 @@ export function Ritual() {
           }
         };
 
+        window.addEventListener(SPRAY_START_EVENT, reveal);
         window.addEventListener(SPRAY_COMPLETE_EVENT, reveal);
         window.addEventListener(SPRAY_RESET_EVENT, reset);
 
         return () => {
+          window.removeEventListener(SPRAY_START_EVENT, reveal);
           window.removeEventListener(SPRAY_COMPLETE_EVENT, reveal);
           window.removeEventListener(SPRAY_RESET_EVENT, reset);
         };

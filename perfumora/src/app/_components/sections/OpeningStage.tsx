@@ -194,14 +194,19 @@ export function OpeningStage() {
       };
 
       // Both changeovers on one timeline and one trigger over the stage's opening beats.
-      // Manifesto is given a generous hold window (0.6 → 1.4 screens) before transitioning
-      // seamlessly into Ritual at 2.0 screens, perfectly synced with the bottle uncap and spray.
+      // Numeric scrub (1.2) guarantees silky smooth transition even during fast scroll bursts.
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: stageEl,
           start: "top top",
           end: () => `+=${heroEl.offsetHeight * 2}`,
-          scrub: true,
+          scrub: 1.2,
+          snap: {
+            snapTo: [0, 0.5, 1.0],
+            duration: { min: 0.25, max: 0.6 },
+            delay: 0.1,
+            ease: "power1.inOut",
+          },
         },
       });
 
