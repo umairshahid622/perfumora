@@ -231,12 +231,13 @@ export function Navigation() {
     const midline = nav.getBoundingClientRect().height / 2;
     const duration = prefersReducedMotion() ? 0 : 0.4;
 
-    // `--ink`/`--paper` are declared as literal hexes, so they need no resolving.
+    // `--ink`/`--paper` are declared as literal hexes in tokens.
+    const COLOR_PAPER = "#f3ece0";
+    const COLOR_INK = "#1b1712";
+
     const paint = (tone: string | undefined, seconds: number) =>
       gsap.to(nav, {
-        color: getComputedStyle(nav)
-          .getPropertyValue(tone === "dark" ? "--paper" : "--ink")
-          .trim(),
+        color: tone === "dark" ? COLOR_PAPER : COLOR_INK,
         duration: seconds,
         ease: "power2.out",
         overwrite: true,
@@ -244,27 +245,16 @@ export function Navigation() {
 
     // Queried off `document`, not scoped to `navRef`: the sections being watched
     // are the nav's siblings, not its children.
+    const openingStage = document.querySelector<HTMLElement>("[data-opening-stage]");
+
     document
       .querySelectorAll<HTMLElement>("[data-tone], [data-nav-tone]")
       .forEach((section) => {
       const tone = section.dataset.navTone ?? section.dataset.tone;
-      const openingStage = document.querySelector<HTMLElement>("[data-opening-stage]");
-      const openingIsVisible = () => {
-        if (!openingStage) return false;
-        const bounds = openingStage.getBoundingClientRect();
-        return bounds.top <= midline && bounds.bottom > midline;
-      };
-      // Three jobs off one trigger: repaint the nav, record which section the
-      // header is over so the link pointing at it can read as current, and record
-      // that section's tone so the accent uses the form that reads on it. Sharing
-      // the trigger means the highlight, the accent form and the colour all hand
-      // over at the same scroll position by construction, rather than by three sets
-      // of matching numbers.
       const arrive = (seconds: number) => {
-        const effectiveTone = openingIsVisible() ? "light" : tone;
-        paint(effectiveTone, seconds);
+        paint(tone, seconds);
         setActiveSection(section.id);
-        setToneBehind(effectiveTone === "dark" ? "dark" : "light");
+        setToneBehind(tone === "dark" ? "dark" : "light");
       };
       ScrollTrigger.create({
         trigger: section,
@@ -272,9 +262,6 @@ export function Navigation() {
         end: `bottom top+=${midline}`,
         onEnter: () => arrive(duration),
         onEnterBack: () => arrive(duration),
-        // Covers the two cases where no crossing happens: the first evaluation
-        // after mount — a reload part-way down the page starts *inside* a section
-        // rather than entering it — and a resize that moves the boundaries.
         onRefresh: (self) => {
           if (self.isActive) arrive(0);
         },
@@ -285,7 +272,6 @@ export function Navigation() {
     // occupy the document flow behind its sticky overlays. It owns the nav tone
     // for its entire screen range, so Craft cannot repaint the nav while Ritual
     // is still the visible scene.
-    const openingStage = document.querySelector<HTMLElement>("[data-opening-stage]");
     if (openingStage) {
       const setOpeningTone = (seconds: number) => {
         paint("light", seconds);
@@ -407,14 +393,14 @@ export function Navigation() {
             >
               Collection
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={() => goTo(SECTION_IDS.contact)}
               aria-current={atContact ? "true" : undefined}
               className={`${CENTRE_LINK} ${linkTone(atContact && !menuVisible, accentTone)}`}
             >
               Contact
-            </button>
+            </button> */}
           </div>
 
           {/* Right — three icons only */}

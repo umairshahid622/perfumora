@@ -150,12 +150,6 @@ export function GalleryGrid({
             { autoAlpha: 0 },
             { autoAlpha: 1, ease: "power1.out", duration: 0.6 },
             0,
-          )
-          .fromTo(
-            card,
-            { filter: `blur(${7 + depth * 4}px)` },
-            { filter: "blur(0px)", ease: "power1.out", duration: 0.7 },
-            0,
           );
       });
     },

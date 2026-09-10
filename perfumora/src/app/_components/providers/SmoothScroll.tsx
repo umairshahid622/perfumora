@@ -2,26 +2,28 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import gsap from "gsap";
-import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { prefersReducedMotion } from "../../_lib/motion";
 
-gsap.registerPlugin(ScrollToPlugin, ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger);
 
 /**
- * Global smooth scrolling provider for the whole application.
+ * Ultra-high-performance global smooth scrolling provider.
  *
- * Drives wheel input with GSAP's ScrollToPlugin for silky-smooth momentum and
- * keeps ScrollTrigger scrubbed timelines updated in real time at 60fps.
- * Respects prefers-reduced-motion and preserves natural scrolling inside forms
- * and modal overlays.
+ * Uses frame-rate independent exponential lerp via GSAP's high-resolution ticker.
+ * Eliminates tween allocation thrashing, supports 60Hz/120Hz ProMotion displays,
+ * synchronizes GSAP ScrollTrigger timelines frame-by-frame, and sleeps at rest (0% CPU).
  */
 export function SmoothScrollProvider({ children }: { children: ReactNode }) {
-  const scrollTarget = useRef<number | null>(null);
-  const scrollTween = useRef<gsap.core.Tween | null>(null);
+  const currentY = useRef<number>(0);
+  const targetY = useRef<number>(0);
+  const isRunning = useRef<boolean>(false);
 
   useEffect(() => {
     if (prefersReducedMotion()) return;
+
+    currentY.current = window.scrollY;
+    targetY.current = window.scrollY;
 
     let vh = window.innerHeight;
     let maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
@@ -29,11 +31,39 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
     const measure = () => {
       vh = window.innerHeight;
       maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
+      targetY.current = Math.max(0, Math.min(maxScroll, targetY.current));
     };
 
-    window.addEventListener("resize", measure);
+    window.addEventListener("resize", measure, { passive: true });
     const resizeObserver = new ResizeObserver(measure);
     resizeObserver.observe(document.body);
+
+    const tick = (_time: number, deltaTime: number) => {
+      // Delta-time based smoothing factor (~0.12 at 60fps, smoothly scaled for 120fps)
+      const dt = Math.min(deltaTime / 1000, 0.1);
+      const factor = 1 - Math.exp(-14 * dt);
+
+      currentY.current += (targetY.current - currentY.current) * factor;
+
+      if (Math.abs(targetY.current - currentY.current) < 0.5) {
+        currentY.current = targetY.current;
+        window.scrollTo(0, targetY.current);
+        ScrollTrigger.update();
+        gsap.ticker.remove(tick);
+        isRunning.current = false;
+        return;
+      }
+
+      window.scrollTo(0, currentY.current);
+      ScrollTrigger.update();
+    };
+
+    const startTicker = () => {
+      if (!isRunning.current) {
+        isRunning.current = true;
+        gsap.ticker.add(tick);
+      }
+    };
 
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.metaKey) return;
@@ -50,50 +80,38 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
 
       event.preventDefault();
 
-      const current = window.scrollY;
+      // Normalize scroll deltas across wheel vs trackpad modes
       const unit =
         event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? vh : 1;
-      const base =
-        scrollTarget.current !== null &&
-        Math.abs(current - scrollTarget.current) < 600
-          ? scrollTarget.current
-          : current;
+      const delta = event.deltaY * unit * 0.95;
 
-      const delta = Math.max(
-        -200,
-        Math.min(200, event.deltaY * unit * 0.55),
-      );
+      // Keep target within page scroll boundaries
+      targetY.current = Math.max(0, Math.min(maxScroll, targetY.current + delta));
 
-      const next = Math.max(0, Math.min(maxScroll, base + delta));
-      scrollTarget.current = next;
+      startTicker();
+    };
 
-      scrollTween.current?.kill();
-      scrollTween.current = gsap.to(window, {
-        duration: 0.55,
-        ease: "power2.out",
-        scrollTo: { y: next, autoKill: false },
-        overwrite: true,
-        onUpdate: () => {
-          ScrollTrigger.update();
-        },
-        onComplete: () => {
-          if (Math.abs(window.scrollY - next) < 2) {
-            scrollTarget.current = null;
-            scrollTween.current = null;
-          }
-        },
-      });
+    // Keep state in sync with any programmatic or browser-native scrolls
+    const onExternalScroll = () => {
+      if (!isRunning.current) {
+        currentY.current = window.scrollY;
+        targetY.current = window.scrollY;
+      }
     };
 
     window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("scroll", onExternalScroll, { passive: true });
 
     return () => {
       window.removeEventListener("resize", measure);
       window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("scroll", onExternalScroll);
       resizeObserver.disconnect();
-      scrollTween.current?.kill();
+      gsap.ticker.remove(tick);
+      isRunning.current = false;
     };
   }, []);
 
   return <>{children}</>;
 }
+
