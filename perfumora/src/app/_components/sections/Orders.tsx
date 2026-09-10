@@ -104,46 +104,48 @@ function StatusRail({ status }: { status: OrderStatus }) {
  */
 function OrderCard({ order }: { order: AccountOrder }) {
   return (
-    <li className="border-hairline-on-light rounded-2xl border p-6 md:p-8">
-      {/* `items-baseline` sits the date on the eyebrow's line rather than the
-          reference's, so the two labels read as one row above the number. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <div>
-          <span className={LABEL}>Order</span>
-          <p className="font-display mt-2 text-2xl leading-none uppercase md:text-3xl">
-            {order.reference}
-          </p>
+    <li className="border-hairline-on-light flex flex-col justify-between rounded-2xl border p-6 md:p-8">
+      <div>
+        {/* `items-baseline` sits the date on the eyebrow's line rather than the
+            reference's, so the two labels read as one row above the number. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <div>
+            <span className={LABEL}>Order</span>
+            <p className="font-display mt-2 text-2xl leading-none uppercase md:text-3xl">
+              {order.reference}
+            </p>
+          </div>
+          <span className={LABEL}>{formatPlaced(order.placedAt)}</span>
         </div>
-        <span className={LABEL}>{formatPlaced(order.placedAt)}</span>
-      </div>
 
-      <div className="mt-6">
-        <span className={LABEL}>Status</span>
-        <div className="mt-2">
-          <StatusRail status={order.status} />
+        <div className="mt-6">
+          <span className={LABEL}>Status</span>
+          <div className="mt-2">
+            <StatusRail status={order.status} />
+          </div>
         </div>
-      </div>
 
-      <ul className="mt-8 flex flex-col gap-5">
-        {order.lines.map((line) => (
-          <li key={line.id} className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-base font-medium">{line.name}</p>
-              <p className="text-micro text-muted-on-light font-medium uppercase">
-                {line.size} · Qty {line.quantity}
-              </p>
-            </div>
-            <span className="text-base font-medium">
-              {formatPrice(line.unitPrice * line.quantity)}
-            </span>
-          </li>
-        ))}
-      </ul>
+        <ul className="mt-8 flex flex-col gap-5">
+          {order.lines.map((line) => (
+            <li key={line.id} className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-base font-medium">{line.name}</p>
+                <p className="text-micro text-muted-on-light font-medium uppercase">
+                  {line.size} · Qty {line.quantity}
+                </p>
+              </div>
+              <span className="text-base font-medium">
+                {formatPrice(line.unitPrice * line.quantity)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* The stored total, not the sum of the lines above: the two differ only if a
           bottle was repriced between the bag and the write, and this is the figure
           the courier collected. */}
-      <div className="border-hairline-on-light mt-6 flex items-baseline justify-between border-t pt-6">
+      <div className="border-hairline-on-light mt-8 flex items-baseline justify-between border-t pt-6">
         <span className={LABEL}>Total</span>
         <span className="text-price text-accent-on-light font-display">
           {formatPrice(order.total)}
@@ -166,50 +168,44 @@ function OrderCard({ order }: { order: AccountOrder }) {
  * Never an empty prop for a signed-out visitor: the route redirects them home before
  * this renders, so `orders` is always this customer's own list and an empty one means
  * they have not ordered yet — the one thing this page must not say wrongly.
- *
- * Two columns with a sticky heading, from <Checkout>: this page arrives from the
- * same account panel, and the narrow column keeps a receipt's line length honest
- * inside the layout's `max-w-[110rem]`.
  */
 export function Orders({ orders }: { orders: AccountOrder[] }) {
   const { navigate } = useRouteTransition();
 
   return (
     <Container>
-      <div className="grid gap-12 md:grid-cols-2 md:gap-20">
-        <div className="lg:sticky lg:top-[calc(4.75rem+2rem)] lg:self-start">
-          <Eyebrow>Your account</Eyebrow>
-          <RevealHeading className="text-section mt-4 max-w-[14ch] text-balance">
-            Your orders
-          </RevealHeading>
-          {/* Placeholder copy — not brand-approved final wording. */}
-          <p className="text-body text-muted-on-light mt-6 max-w-sm">
-            Every order you have placed with us, newest first. Quote its
-            reference if you need to ask the atelier about one.
-          </p>
-        </div>
+      <div>
+        <Eyebrow>Your account</Eyebrow>
+        <RevealHeading className="text-section mt-4 max-w-[18ch] text-balance">
+          Your orders
+        </RevealHeading>
+        {/* Placeholder copy — not brand-approved final wording. */}
+        <p className="text-body text-muted-on-light mt-4 max-w-xl">
+          Every order you have placed with us, newest first. Quote its
+          reference if you need to ask the atelier about one.
+        </p>
+      </div>
 
-        <div>
-          {orders.length === 0 ? (
-            <div className="flex flex-col items-start gap-8">
-              <p className="text-body text-muted-on-light">
-                You have not placed an order yet.
-              </p>
-              <RippleButton
-                onClick={() => navigate("/collection")}
-                aria-label="Explore the collection"
-              >
-                Explore the collection
-              </RippleButton>
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-6">
-              {orders.map((order) => (
-                <OrderCard key={order.reference} order={order} />
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="mt-8 md:mt-10">
+        {orders.length === 0 ? (
+          <div className="flex flex-col items-start gap-8">
+            <p className="text-body text-muted-on-light">
+              You have not placed an order yet.
+            </p>
+            <RippleButton
+              onClick={() => navigate("/collection")}
+              aria-label="Explore the collection"
+            >
+              Explore the collection
+            </RippleButton>
+          </div>
+        ) : (
+          <ul className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+            {orders.map((order) => (
+              <OrderCard key={order.reference} order={order} />
+            ))}
+          </ul>
+        )}
       </div>
     </Container>
   );
