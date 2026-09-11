@@ -137,13 +137,13 @@ export function useBottleUncap(
         document.body;
 
       // Master Cap Uncap & Smooth Glide-Shut Controller:
-      // - Entering Ritual (2.5 screens): Cap un-caps upwards smoothly.
-      // - Leaving upward to Manifesto (< 2.5 screens): Cap glides smoothly shut onto bottle.
-      // - Entering Showcase (>= 3.3 screens): Cap glides smoothly and gracefully shut.
+      // 1. Entering Ritual (>= 2.95 screens): Bottle has fully drifted to center, cap lifts upwards smoothly.
+      // 2. Leaving upward to Manifesto (< 2.95 screens): Cap glides smoothly shut onto bottle.
+      // 3. Entering Showcase (>= 3.8 screens): Cap glides smoothly and gracefully shut.
       ScrollTrigger.create({
         trigger: stageEl,
-        start: () => "top+=" + Math.round(window.innerHeight * 2.5) + " top",
-        end: () => "top+=" + Math.round(window.innerHeight * 3.6) + " top",
+        start: () => "top+=" + Math.round(window.innerHeight * 2.95) + " top",
+        end: () => "top+=" + Math.round(window.innerHeight * 4.2) + " top",
         onEnter: () => {
           gsap.to(cap.position, {
             y: baseCapY + height * LIFT,
@@ -176,8 +176,8 @@ export function useBottleUncap(
         const sprayTl = gsap.timeline({
           scrollTrigger: {
             trigger: stageEl,
-            start: () => "top+=" + Math.round(window.innerHeight * 2.5) + " top",
-            end: () => "top+=" + Math.round(window.innerHeight * 3.6) + " top",
+            start: () => "top+=" + Math.round(window.innerHeight * 2.95) + " top",
+            end: () => "top+=" + Math.round(window.innerHeight * 4.2) + " top",
             toggleActions: "restart none none none",
             onLeaveBack: () => {
               gsap.set(button.position, { y: baseButtonY });
@@ -262,10 +262,10 @@ export function useBottleUncap(
           );
       }
 
-      // Smooth, weighted glide-shut when scrolling past Ritual toward Showcase (3.3 screens)
+      // Smooth, weighted glide-shut when scrolling past Ritual toward Showcase (3.8 screens)
       ScrollTrigger.create({
         trigger: stageEl,
-        start: () => "top+=" + Math.round(window.innerHeight * 3.3) + " top",
+        start: () => "top+=" + Math.round(window.innerHeight * 3.8) + " top",
         onEnter: () => {
           gsap.to(cap.position, {
             y: baseCapY,

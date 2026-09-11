@@ -11,7 +11,7 @@
 export const GLASS_MATERIAL = {
   color: "#ffffff",
   transmission: 1,
-  roughness: 0.045,
+  roughness: 0.015,
   metalness: 0,
   ior: 1.5,
   thickness: 0.42,
@@ -35,7 +35,7 @@ export const GLASS_MATERIAL = {
  */
 export const LIQUID_MATERIAL = {
   transmission: 0.94,
-  roughness: 0.02,
+  roughness: 0.01,
   metalness: 0,
   ior: 1.37,
   thickness: 0.42,
@@ -48,7 +48,7 @@ export const LIQUID_MATERIAL = {
 export const DIP_TUBE_MATERIAL = {
   color: "#f7f9fa",
   transmission: 0.82,
-  roughness: 0.08,
+  roughness: 0.04,
   metalness: 0,
   ior: 1.45,
   thickness: 0.05,
@@ -64,10 +64,10 @@ export const DIP_TUBE_MATERIAL = {
  */
 export const CAP_MATERIAL = {
   color: "#08080a",
-  roughness: 0.1,
+  roughness: 0.04,
   metalness: 0,
   clearcoat: 1,
-  clearcoatRoughness: 0.02,
+  clearcoatRoughness: 0.01,
   envMapIntensity: 1.5,
 } as const;
 

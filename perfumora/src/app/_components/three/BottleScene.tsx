@@ -261,8 +261,9 @@ export default function BottleScene({
         // 1.0 -> 2.0 screens: Held tilted during Manifesto reading
         // 2.0 -> 3.0 screens: Return upright cleanly as Ritual arrives and bottle drifts back center
         .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 1.0, ...beat }, 2.0)
-        // 3.0 -> 3.8 screens: Smoothly transition to showcase pose as cap shuts
-        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.8, ...beat }, 3.0);
+        // 3.0 -> 3.7 screens: Held upright during Ritual uncapping, spray mist, and steps reveal
+        // 3.7 -> 4.3 screens: Smoothly transition to showcase pose as cap shuts
+        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.6, ...beat }, 3.7);
     },
     { dependencies: [ready], revertOnUpdate: true },
   );

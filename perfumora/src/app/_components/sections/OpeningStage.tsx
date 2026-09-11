@@ -134,12 +134,19 @@ export function OpeningStage() {
 
       // Both changeovers on one timeline and one trigger over the stage's opening beats.
       // Direct scrub (0.8) ensures continuous, smooth bidirectional scrubbing with Lenis.
+      // Snap ensures natural magnetic settling on Hero (0), Manifesto (0.375), Ritual (0.75), and Stage End (1.0).
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: stageEl,
           start: "top top",
           end: () => `+=${window.innerHeight * 4}`,
           scrub: 0.8,
+          snap: {
+            snapTo: [0, 0.375, 0.75, 1],
+            duration: { min: 0.25, max: 0.6 },
+            delay: 0.15,
+            ease: "power2.inOut",
+          },
         },
       });
 
@@ -170,7 +177,10 @@ export function OpeningStage() {
           ritualPanelEl,
           { autoAlpha: 1, x: 0, ...beat },
           2.0,
-        );
+        )
+
+        // 3.0 → 4.0: RITUAL READING WINDOW (held still at 100% opacity for 1 full screen)
+        .set({}, {}, 4.0);
 
       // On mobile viewports (<768px), smoothly fade out the Product Bar & Counter during the Manifesto -> Ritual transition (2.0 -> 3.0) so it doesn't collide with the Ritual 3-step card!
       if (barEl && isMobile) {
@@ -190,7 +200,7 @@ export function OpeningStage() {
       {/* Anchor targets for in-page navigation */}
       <div id={SECTION_IDS.hero} className="absolute top-0 h-px w-px pointer-events-none" />
       <div id={SECTION_IDS.manifesto} className="absolute top-[100vh] h-px w-px pointer-events-none" />
-      <div id={SECTION_IDS.ritual} className="absolute top-[200vh] h-px w-px pointer-events-none" />
+      <div id={SECTION_IDS.ritual} className="absolute top-[300vh] h-px w-px pointer-events-none" />
 
       {/* Single persistent sticky viewport across all opening stage beats */}
       <div className="sticky top-0 h-screen w-full overflow-hidden">

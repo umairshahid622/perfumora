@@ -64,30 +64,42 @@ const RENDER_ORDER = { liquid: 0, dipTube: 1, glass: 2 } as const;
 const GLASS_MATERIAL = {
   transmission: 0,
   transparent: true,
-  opacity: 0.16,
-  roughness: 0.04,
+  opacity: 0.20,
+  roughness: 0.015,
   metalness: 0,
   clearcoat: 1,
-  clearcoatRoughness: 0.03,
-  envMapIntensity: 1.6,
+  clearcoatRoughness: 0.015,
+  envMapIntensity: 1.8,
+  depthWrite: false,
+} as const;
+
+/**
+ * Dedicated high-definition glass material for the transparent cap outer piece / sleeve (`capOutside`).
+ * Gives the cap's crystal/acrylic outer sleeve distinct clarity, realistic refraction feel,
+ * and high specular presence so it is clearly visible and luxurious.
+ */
+const CAP_GLASS_MATERIAL = {
+  transmission: 0,
+  transparent: true,
+  opacity: 0.38,
+  roughness: 0.005,
+  metalness: 0.01,
+  clearcoat: 1,
+  clearcoatRoughness: 0.005,
+  envMapIntensity: 2.6,
+  ior: 1.54,
   depthWrite: false,
 } as const;
 
 /**
  * Clear glass reads on a light page through its *edges*, not its body: the
  * silhouette catches a Fresnel rim at grazing angles while the surface facing the
- * camera stays nearly clear. Transmission gave us that rim for free, but
- * transmission samples a scene-only buffer that cannot see the DOM watermark
- * behind the canvas (see `GLASS_MATERIAL`), so dropping it took the rim with it
- * and left the shell at a flat 16% — near-invisible on parchment.
- *
- * This restores only the rim, by hand. `power` sets how tight it is, `alpha` how
- * opaque it gets on top of the resting `opacity`, and `tint`/colour how far it
- * darkens toward a soft contour — the darkening is what guarantees the edge
- * contrasts with the page rather than the near-white environment it reflects.
- * These are the knobs to turn if the edge reads too heavy or too faint.
+ * camera stays nearly clear.
  */
-const GLASS_EDGE = { power: 2, alpha: 0.25, tint: 0.25 } as const;
+const GLASS_EDGE = { power: 2.0, alpha: 0.32, tint: 0.32 } as const;
+
+/** Dedicated pronounced Fresnel edge for the cap transparent casing */
+const CAP_GLASS_EDGE = { power: 1.6, alpha: 0.60, tint: 0.48 } as const;
 
 /** The contour the rim darkens toward, as sRGB channels — warm, to sit with the
  *  parchment. Read in output space: the patch runs after tone-mapping and the
@@ -95,14 +107,10 @@ const GLASS_EDGE = { power: 2, alpha: 0.25, tint: 0.25 } as const;
 const GLASS_EDGE_COLOR = "0.16, 0.14, 0.12";
 
 /**
- * The cap sleeve's Fresnel rim tints toward this warm cast instead of the wall's
- * neutral `GLASS_EDGE_COLOR`, so `capOutside` reads as smoked glass on its
- * *silhouette only* while its body stays as clear as the bottle wall. Same
- * output-space sRGB channels as `GLASS_EDGE_COLOR` (the patch runs after
- * tone-mapping); ≈ #5b4f45. Turned by eye — if the rim reads too faint, raise
- * `GLASS_EDGE.tint`/`.alpha`, though those lift the wall's rim with it.
+ * The cap sleeve's Fresnel rim tints toward this richer contour so `capOutside`
+ * reads as defined, premium bevelled glass on its silhouette with crisp definition.
  */
-const CAP_EDGE_COLOR = "0.36, 0.31, 0.27";
+const CAP_EDGE_COLOR = "0.22, 0.19, 0.17";
 
 /**
  * The fragrance's own Fresnel rim tints toward this neutral-cool contour. Every
@@ -128,29 +136,21 @@ const LIQUID_OPACITY = 0.5;
 /**
  * Injects the rim above into a material's compiled fragment shader. It hooks the
  * final chunk — by then `gl_FragColor` is fully lit, tone-mapped and in output
- * space — and rewrites its alpha and colour from a Fresnel term. `abs()` on the
- * view·normal dot so both faces of the double-sided bottle wall rim their own
- * silhouette. `vViewPosition` and `vNormal` are both declared by
- * `MeshPhysicalMaterial`'s own shader, and `#include <dithering_fragment>` is
- * always present (a no-op macro when dithering is off), so the replace always
- * lands. Kept out of `GLASS_MATERIAL` because it is a function on the instance,
- * not a copyable property — the two glass shells and the fragrance each need it
- * assigned. `edgeColor` is
- * a parameter so the cap sleeve can rim toward a warm tint (`CAP_EDGE_COLOR`)
- * while the wall keeps the neutral contour.
+ * space — and rewrites its alpha and colour from a Fresnel term.
  */
 function applyGlassEdge(
   material: MeshPhysicalMaterial,
   edgeColor: string = GLASS_EDGE_COLOR,
+  edgeConfig: { power: number; alpha: number; tint: number } = GLASS_EDGE,
 ): void {
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
   {
-    float edge = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), ${GLASS_EDGE.power.toFixed(1)});
-    gl_FragColor.a = clamp(gl_FragColor.a + edge * ${GLASS_EDGE.alpha.toFixed(2)}, 0.0, 1.0);
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${edgeColor}), edge * ${GLASS_EDGE.tint.toFixed(2)});
+    float edge = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), ${edgeConfig.power.toFixed(1)});
+    gl_FragColor.a = clamp(gl_FragColor.a + edge * ${edgeConfig.alpha.toFixed(2)}, 0.0, 1.0);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${edgeColor}), edge * ${edgeConfig.tint.toFixed(2)});
   }`,
     );
   };
@@ -263,20 +263,13 @@ export function BottleGltf({
     // the fragrance ships with no material at all — so once these are stepped
     // down nothing in the scene refracts.
     Object.assign(glass.material as MeshPhysicalMaterial, GLASS_MATERIAL);
-    Object.assign(capGlass.material as MeshPhysicalMaterial, GLASS_MATERIAL);
-    // The Fresnel rim that makes clear glass legible on the light page — assigned
-    // per instance because it is a shader hook, not a copyable material property.
-    // The cap sleeve rims toward a warm tint instead of the wall's neutral
-    // contour, so the smoked cast lands on its silhouette only and the body of
-    // the shell stays as clear as the wall.
-    applyGlassEdge(glass.material as MeshPhysicalMaterial);
-    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, CAP_EDGE_COLOR);
-    // The fragrance takes the same rim (see `LIQUID_EDGE_COLOR`): a translucent
-    // pale juice has no visible body edge on its own, so this draws its silhouette
-    // and meniscus and the thinned liquid reads as a lit volume, not an empty
-    // bottle. Rides over the colour/opacity the change timeline tweens — it only
-    // rewrites `gl_FragColor` at grazing angles, leaving the body those drive.
-    applyGlassEdge(liquid.material as MeshPhysicalMaterial, LIQUID_EDGE_COLOR);
+    Object.assign(capGlass.material as MeshPhysicalMaterial, CAP_GLASS_MATERIAL);
+
+    // Apply Fresnel edge contours
+    applyGlassEdge(glass.material as MeshPhysicalMaterial, GLASS_EDGE_COLOR, GLASS_EDGE);
+    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, CAP_EDGE_COLOR, CAP_GLASS_EDGE);
+    applyGlassEdge(liquid.material as MeshPhysicalMaterial, LIQUID_EDGE_COLOR, GLASS_EDGE);
+
     const tube = dipTube.material as MeshPhysicalMaterial;
     tube.transmission = 0;
     tube.transparent = false;

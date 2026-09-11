@@ -181,12 +181,10 @@ export function Ritual() {
           }
         };
 
-        window.addEventListener(SPRAY_START_EVENT, reveal);
         window.addEventListener(SPRAY_COMPLETE_EVENT, reveal);
         window.addEventListener(SPRAY_RESET_EVENT, reset);
 
         return () => {
-          window.removeEventListener(SPRAY_START_EVENT, reveal);
           window.removeEventListener(SPRAY_COMPLETE_EVENT, reveal);
           window.removeEventListener(SPRAY_RESET_EVENT, reset);
         };
