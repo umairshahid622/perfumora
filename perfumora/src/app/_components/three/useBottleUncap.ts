@@ -136,143 +136,157 @@ export function useBottleUncap(
         document.querySelector<HTMLElement>("[data-opening-stage]") ||
         document.body;
 
-      // Master Cap Uncap & Smooth Glide-Shut Controller:
-      // 1. Entering Ritual (>= 2.95 screens): Bottle has fully drifted to center, cap lifts upwards smoothly.
-      // 2. Leaving upward to Manifesto (< 2.95 screens): Cap glides smoothly shut onto bottle.
-      // 3. Entering Showcase (>= 3.8 screens): Cap glides smoothly and gracefully shut.
-      ScrollTrigger.create({
-        trigger: stageEl,
-        start: () => "top+=" + Math.round(window.innerHeight * 2.95) + " top",
-        end: () => "top+=" + Math.round(window.innerHeight * 4.2) + " top",
-        onEnter: () => {
-          gsap.to(cap.position, {
-            y: baseCapY + height * LIFT,
-            duration: still ? 0 : UNCAP_DURATION,
-            ease: "power2.out",
-            overwrite: "auto",
-          });
-        },
-        onLeaveBack: () => {
-          gsap.to(cap.position, {
-            y: baseCapY,
-            duration: still ? 0 : 0.45,
-            ease: "power2.inOut",
-            overwrite: "auto",
-          });
-        },
-      });
-
       const button = refs.pumpButton.current;
       const mist = refs.mist.current;
       const material = refs.mistMaterial.current;
 
-      if (!still && button && mist && material) {
-        if (initialButtonY.current === null) {
-          initialButtonY.current = button.position.y;
-        }
-        const baseButtonY = initialButtonY.current;
+      if (button && initialButtonY.current === null) {
+        initialButtonY.current = button.position.y;
+      }
+      const baseButtonY = initialButtonY.current ?? 0;
 
-        // The spray is a one-way event triggered upon entering the Ritual beat.
-        const sprayTl = gsap.timeline({
-          scrollTrigger: {
-            trigger: stageEl,
-            start: () => "top+=" + Math.round(window.innerHeight * 2.95) + " top",
-            end: () => "top+=" + Math.round(window.innerHeight * 4.2) + " top",
-            toggleActions: "restart none none none",
-            onLeaveBack: () => {
-              gsap.set(button.position, { y: baseButtonY });
-              gsap.set(mist.scale, {
-                x: MIST_COLLAPSED,
-                y: MIST_COLLAPSED,
-                z: MIST_COLLAPSED,
-              });
-              gsap.set(material, { opacity: 0 });
-              sprayTl.pause(0);
-              window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
-            },
-            onLeave: () => {
-              gsap.set(button.position, { y: baseButtonY });
-              gsap.set(mist.scale, {
-                x: MIST_COLLAPSED,
-                y: MIST_COLLAPSED,
-                z: MIST_COLLAPSED,
-              });
-              gsap.set(material, { opacity: 0 });
-              sprayTl.pause(0);
-            },
-          },
-        });
-
-        // The press, and the spray it causes. Down sharply and back up slower.
-        sprayTl.to(
-          button.position,
-          {
-            y: baseButtonY - height * PRESS,
-            duration: PRESS_DOWN,
-            ease: "power2.in",
-            onStart: () => window.dispatchEvent(new Event(SPRAY_START_EVENT)),
-          },
-          UNCAP_START + UNCAP_DURATION,
-        ).to(
-          button.position,
-          { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
-          UNCAP_START + SPRAY_AT,
-        );
-
-        // Guarantee the one-way event starts from a clean state.
-        sprayTl.set(
-          mist.scale,
-          {
+      // Clean state helper for spray effects
+      const resetSprayState = () => {
+        if (button) gsap.set(button.position, { y: baseButtonY });
+        if (mist) {
+          gsap.set(mist.scale, {
             x: MIST_COLLAPSED,
             y: MIST_COLLAPSED,
             z: MIST_COLLAPSED,
-          },
-          0,
-        );
-        sprayTl.set(material, { opacity: 0 }, 0);
+          });
+        }
+        if (material) gsap.set(material, { opacity: 0 });
+      };
 
-        // The mist expands away from the nozzle and dissipates gently.
-        sprayTl.to(
-          mist.scale,
-          {
-            x: 1,
-            y: 1,
-            z: 1,
-            duration: SPRAY_DURATION,
-            ease: "power2.out",
-            onStart: () => playSprayRef.current(),
-          },
-          UNCAP_START + SPRAY_AT,
-        )
-          .to(
-            material,
-            { opacity: MIST_OPACITY, duration: MIST_IN, ease: "power1.out" },
-            UNCAP_START + SPRAY_AT,
-          )
-          .to(
-            material,
-            {
-              opacity: 0,
-              duration: SPRAY_DURATION - MIST_IN,
-              ease: "power1.in",
-              onComplete: () =>
-                window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT)),
-            },
-            UNCAP_START + SPRAY_AT + MIST_IN,
-          );
-      }
+      let activeSprayTl: gsap.core.Timeline | null = null;
 
-      // Smooth, weighted glide-shut when scrolling past Ritual toward Showcase (3.8 screens)
+      // Master Directional Ritual Controller:
+      // - Downward entry: Cap smoothly un-caps, pump fires, mist sprays, steps reveal.
+      // - Downward exit into Craft: Cap smoothly glides shut with a weighted 0.6s ease.
+      // - Upward scrolling (from Craft through Ritual back to Hero): CAP STAYS CLOSED!
+      // - Upward exit into Manifesto: Resets trigger so future downward passes uncap fresh.
       ScrollTrigger.create({
         trigger: stageEl,
-        start: () => "top+=" + Math.round(window.innerHeight * 3.8) + " top",
-        onEnter: () => {
+        start: () => "top+=" + Math.round(window.innerHeight * 2.95) + " top",
+        end: () => "top+=" + Math.round(window.innerHeight * 3.6) + " top",
+        fastScrollEnd: true,
+        preventOverlaps: true,
+        onEnter: (self) => {
+          const isFast = Math.abs(self.getVelocity()) > 2000;
+
+          // Lift cap smoothly on downward entry
+          gsap.to(cap.position, {
+            y: baseCapY + height * LIFT,
+            duration: still || isFast ? 0.2 : UNCAP_DURATION,
+            ease: "power2.out",
+            overwrite: "auto",
+          });
+
+          if (still || isFast || !button || !mist || !material) {
+            resetSprayState();
+            window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
+            return;
+          }
+
+          if (activeSprayTl) activeSprayTl.kill();
+          resetSprayState();
+
+          activeSprayTl = gsap.timeline({
+            onComplete: () => {
+              window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
+            },
+          });
+
+          // Press pump button
+          activeSprayTl
+            .to(
+              button.position,
+              {
+                y: baseButtonY - height * PRESS,
+                duration: PRESS_DOWN,
+                ease: "power2.in",
+                onStart: () => window.dispatchEvent(new Event(SPRAY_START_EVENT)),
+              },
+              UNCAP_START + UNCAP_DURATION,
+            )
+            .to(
+              button.position,
+              { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
+              UNCAP_START + SPRAY_AT,
+            );
+
+          // Mist spray & sound cue
+          activeSprayTl
+            .to(
+              mist.scale,
+              {
+                x: 1,
+                y: 1,
+                z: 1,
+                duration: SPRAY_DURATION,
+                ease: "power2.out",
+                onStart: () => playSprayRef.current(),
+              },
+              UNCAP_START + SPRAY_AT,
+            )
+            .to(
+              material,
+              { opacity: MIST_OPACITY, duration: MIST_IN, ease: "power1.out" },
+              UNCAP_START + SPRAY_AT,
+            )
+            .to(
+              material,
+              {
+                opacity: 0,
+                duration: SPRAY_DURATION - MIST_IN,
+                ease: "power1.in",
+              },
+              UNCAP_START + SPRAY_AT + MIST_IN,
+            );
+        },
+        onLeave: () => {
+          // Exiting downward past Ritual toward Craft:
+          // Smooth, weighted glide-shut as bottle seals
+          if (activeSprayTl) activeSprayTl.kill();
+          resetSprayState();
+
           gsap.to(cap.position, {
             y: baseCapY,
-            duration: still ? 0 : 0.75,
+            duration: still ? 0 : 0.6,
             ease: "power2.inOut",
             overwrite: "auto",
           });
+
+          window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
+        },
+        onEnterBack: () => {
+          // Re-entering upward from Craft:
+          // DO NOT open cap — the bottle remains sealed when scrolling up!
+          if (activeSprayTl) activeSprayTl.kill();
+          resetSprayState();
+
+          gsap.to(cap.position, {
+            y: baseCapY,
+            duration: 0,
+            overwrite: "auto",
+          });
+
+          window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
+        },
+        onLeaveBack: () => {
+          // Exiting upward back into Manifesto:
+          // Ensure cap is seated and reset spray trigger so downward entries can uncap fresh
+          if (activeSprayTl) activeSprayTl.kill();
+          resetSprayState();
+
+          gsap.to(cap.position, {
+            y: baseCapY,
+            duration: still ? 0 : 0.35,
+            ease: "power2.inOut",
+            overwrite: "auto",
+          });
+
+          window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
         },
       });
 

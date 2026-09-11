@@ -94,8 +94,18 @@ export function Ritual() {
             transformOrigin: "center center",
           });
 
+        const allStepElements = () => [
+          ...items,
+          ...lines,
+          ...dots,
+          mobileCardRef.current,
+          subtitleRef.current,
+        ].filter(Boolean);
+
         const reveal = () => {
-          // Steps reveal on their own timeline, independent of heading/subtitle
+          gsap.killTweensOf(allStepElements());
+
+          // Steps reveal cleanly on their own timeline
           const stepTl = gsap.timeline();
           if (items.length) {
             stepTl.to(items, {
@@ -104,7 +114,8 @@ export function Ritual() {
               duration: STEP_DURATION,
               ease: "power3.out",
               stagger: STEP_STAGGER,
-            });
+              overwrite: "auto",
+            }, 0);
           }
           if (mobileCardRef.current) {
             stepTl.to(
@@ -114,6 +125,7 @@ export function Ritual() {
                 y: 0,
                 duration: STEP_DURATION,
                 ease: "power3.out",
+                overwrite: "auto",
               },
               0,
             );
@@ -127,6 +139,7 @@ export function Ritual() {
                 duration: 0.6,
                 ease: "power2.out",
                 stagger: STEP_STAGGER,
+                overwrite: "auto",
               },
               0.08,
             );
@@ -140,44 +153,45 @@ export function Ritual() {
                 duration: 0.35,
                 ease: "back.out(2)",
                 stagger: STEP_STAGGER,
+                overwrite: "auto",
               },
               0.16,
             );
           }
 
-          // Subtitle reveals independently, slightly after the steps begin
+          // Subtitle reveals with steps
           if (subtitleRef.current) {
-            gsap.to(subtitleRef.current, {
-              opacity: 1,
-              y: 0,
-              duration: STEP_DURATION,
-              ease: "power3.out",
-              delay: 0.2,
-            });
+            stepTl.to(
+              subtitleRef.current,
+              {
+                opacity: 1,
+                y: 0,
+                duration: STEP_DURATION,
+                ease: "power3.out",
+                overwrite: "auto",
+              },
+              0.1,
+            );
           }
         };
 
         const reset = () => {
-          // Steps and subtitle reset smoothly on scroll-up
-          gsap.killTweensOf([...items, ...lines, ...dots]);
+          // Steps and subtitle reset smoothly
+          gsap.killTweensOf(allStepElements());
           if (items.length) {
-            gsap.to(items, { opacity: 0, y: STEP_RISE, duration: 0.35, ease: "power2.inOut" });
+            gsap.to(items, { opacity: 0, y: STEP_RISE, duration: 0.3, ease: "power2.inOut", overwrite: "auto" });
           }
           if (lines.length) {
-            gsap.to(lines, { opacity: 0, scaleX: 0, duration: 0.3, ease: "power2.inOut" });
+            gsap.to(lines, { opacity: 0, scaleX: 0, duration: 0.25, ease: "power2.inOut", overwrite: "auto" });
           }
           if (dots.length) {
-            gsap.to(dots, { opacity: 0, scale: 0, duration: 0.25, ease: "power2.inOut" });
+            gsap.to(dots, { opacity: 0, scale: 0, duration: 0.2, ease: "power2.inOut", overwrite: "auto" });
           }
           if (mobileCardRef.current) {
-            gsap.killTweensOf(mobileCardRef.current);
-            gsap.to(mobileCardRef.current, { opacity: 0, y: STEP_RISE, duration: 0.35, ease: "power2.inOut" });
+            gsap.to(mobileCardRef.current, { opacity: 0, y: STEP_RISE, duration: 0.3, ease: "power2.inOut", overwrite: "auto" });
           }
-
-          // Subtitle resets smoothly
           if (subtitleRef.current) {
-            gsap.killTweensOf(subtitleRef.current);
-            gsap.to(subtitleRef.current, { opacity: 0, y: STEP_RISE, duration: 0.35, ease: "power2.inOut" });
+            gsap.to(subtitleRef.current, { opacity: 0, y: STEP_RISE, duration: 0.3, ease: "power2.inOut", overwrite: "auto" });
           }
         };
 

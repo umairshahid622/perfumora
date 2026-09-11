@@ -133,14 +133,16 @@ export function OpeningStage() {
       }
 
       // Both changeovers on one timeline and one trigger over the stage's opening beats.
-      // Direct scrub (0.8) ensures continuous, smooth bidirectional scrubbing with Lenis.
+      // Direct scrub (0.5) ensures responsive, smooth bidirectional scrubbing with Lenis.
       // Snap ensures natural magnetic settling on Hero (0), Manifesto (0.375), Ritual (0.75), and Stage End (1.0).
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: stageEl,
           start: "top top",
           end: () => `+=${window.innerHeight * 4}`,
-          scrub: 0.8,
+          scrub: 0.5,
+          fastScrollEnd: true,
+          preventOverlaps: true,
           snap: {
             snapTo: [0, 0.375, 0.75, 1],
             duration: { min: 0.25, max: 0.6 },

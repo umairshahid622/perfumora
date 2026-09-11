@@ -249,7 +249,9 @@ export default function BottleScene({
           trigger: stageEl,
           start: "top top",
           end: () => `+=${window.innerHeight * 4}`,
-          scrub: 1.2,
+          scrub: 0.5,
+          fastScrollEnd: true,
+          preventOverlaps: true,
         },
       });
 
@@ -263,7 +265,8 @@ export default function BottleScene({
         .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 1.0, ...beat }, 2.0)
         // 3.0 -> 3.7 screens: Held upright during Ritual uncapping, spray mist, and steps reveal
         // 3.7 -> 4.3 screens: Smoothly transition to showcase pose as cap shuts
-        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.6, ...beat }, 3.7);
+        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.6, ...beat }, 3.7)
+        .set({}, {}, 4.0);
     },
     { dependencies: [ready], revertOnUpdate: true },
   );
