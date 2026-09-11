@@ -7,14 +7,14 @@ import type { BottleRefs } from "./useBottleRefs";
 /**
  * Where the plume starts, right at the pump's nozzle orifice on the collar.
  */
-const NOZZLE: [number, number, number] = [0.1, 1.05, 0.05];
+const NOZZLE: [number, number, number] = [0.15, 0.985, 0.02];
 
 /**
  * The cone the mist is scattered through:
  * Shoots horizontally to the right (+X) with a slight natural upward arc (+Y),
  * fanning out into an atomized cloud as seen in the reference image.
  */
-const PLUME = { axis: [1.0, 0.12, 0.03], reach: 1.35, spread: 0.38 } as const;
+const PLUME = { axis: [1.0, 0.06, 0.02], reach: 1.35, spread: 0.38 } as const;
 
 /** Droplet count: rich atomized plume matching the reference photograph. */
 const COUNT = 420;
