@@ -153,8 +153,8 @@ export function MobileMenu({
                   : "text-paper hover:text-accent-on-dark",
               )}
             >
-              <span>Home</span>
-              <span className="text-micro font-sans font-medium text-white/40">01</span>
+              Home
+
             </button>
 
             {/* Fragrances Section with Sub-List */}
@@ -220,8 +220,7 @@ export function MobileMenu({
                   : "text-paper hover:text-accent-on-dark",
               )}
             >
-              <span>Collection</span>
-              <span className="text-micro font-sans font-medium text-white/40">02</span>
+              Collection
             </button>
           </nav>
 

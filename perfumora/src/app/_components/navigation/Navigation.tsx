@@ -11,6 +11,7 @@ import { prefersReducedMotion } from "../../_lib/motion";
 import { scrollToSection } from "../../_lib/scroll-to";
 import { SECTION_IDS } from "../../_lib/sections";
 import { useRouteTransition } from "../providers/RouteTransition";
+import { useLenis } from "../providers/SmoothScroll";
 import { AccountMenu } from "./AccountMenu";
 import { AuthModal } from "./AuthModal";
 import { CartDrawer } from "./CartDrawer";
@@ -76,6 +77,7 @@ const initial = (name: string) => name.charAt(0).toUpperCase();
 export function Navigation() {
   const { count } = useCart();
   const { navigate } = useRouteTransition();
+  const lenis = useLenis();
   const pathname = usePathname();
   const [panel, setPanel] = useState<Panel>(null);
   // Whether the Fragrances panel is on screen at all: true from the click that opens
@@ -175,13 +177,53 @@ export function Navigation() {
     return () => window.removeEventListener("keydown", onKey);
   }, [panel]);
 
-  // Lock body scroll while any overlay is open.
+  // Comprehensive scroll lock on both documentElement and body while any overlay is open.
   useEffect(() => {
-    document.body.style.overflow = panel ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
+    if (!panel) {
+      lenis?.start();
+      return;
+    }
+
+    lenis?.stop();
+
+    const html = document.documentElement;
+    const body = document.body;
+
+    const origHtmlOverflow = html.style.overflow;
+    const origBodyOverflow = body.style.overflow;
+    const origHtmlOverscroll = html.style.overscrollBehavior;
+    const origBodyOverscroll = body.style.overscrollBehavior;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+
+    // Prevent background scrolling and bouncing during touch/wheel interactions
+    const preventBackgroundScroll = (e: TouchEvent | WheelEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const scrollable = target.closest(".overflow-y-auto, .overflow-auto");
+      if (!scrollable) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+      }
     };
-  }, [panel]);
+
+    window.addEventListener("touchmove", preventBackgroundScroll, { passive: false });
+    window.addEventListener("wheel", preventBackgroundScroll, { passive: false });
+
+    return () => {
+      lenis?.start();
+      html.style.overflow = origHtmlOverflow;
+      body.style.overflow = origBodyOverflow;
+      html.style.overscrollBehavior = origHtmlOverscroll;
+      body.style.overscrollBehavior = origBodyOverscroll;
+      window.removeEventListener("touchmove", preventBackgroundScroll);
+      window.removeEventListener("wheel", preventBackgroundScroll);
+    };
+  }, [panel, lenis]);
 
   // The header outlives every route now, so an open overlay — and the body scroll
   // lock it sets — would otherwise ride along to the next page and sit there over
