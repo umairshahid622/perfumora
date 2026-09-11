@@ -162,49 +162,60 @@ export function MobileMenu({
               <button
                 type="button"
                 onClick={() => setFragrancesExpanded((prev) => !prev)}
+                aria-expanded={fragrancesExpanded}
                 className="flex items-center justify-between px-3 py-3 font-display text-2xl uppercase text-paper transition-colors hover:text-accent-on-dark"
               >
                 <span>Fragrances</span>
                 <ChevronIcon
                   className={cn(
-                    "size-4 transition-transform duration-300",
+                    "size-4 transition-transform duration-300 ease-out",
                     fragrancesExpanded ? "rotate-180" : "rotate-0",
                   )}
                 />
               </button>
 
-              {fragrancesExpanded && (
-                <div className="grid grid-cols-1 gap-1.5 pb-2 pt-1">
-                  {variants.map((variant, i) => {
-                    const isSelected = i === index;
-                    return (
-                      <button
-                        key={variant.id}
-                        type="button"
-                        onClick={() => selectFragrance(i)}
-                        className={cn(
-                          "flex items-center justify-between rounded-lg px-3 py-2.5 text-left transition-all active:scale-[0.98]",
-                          isSelected
-                            ? "bg-white/10 text-paper font-medium"
-                            : "hover:bg-white/5 text-white/75",
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            aria-hidden="true"
-                            className="size-4 shrink-0 rounded-full border border-white/20"
-                            style={{ backgroundColor: variant.hex }}
-                          />
-                          <span className="text-sm font-medium">{variant.name}</span>
-                        </div>
-                        <span className="text-micro font-sans uppercase text-white/40">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                      </button>
-                    );
-                  })}
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] duration-300 ease-in-out",
+                  fragrancesExpanded
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0 pointer-events-none",
+                )}
+              >
+                <div className="overflow-hidden">
+                  <div className="grid grid-cols-1 gap-1.5 pb-2 pt-1">
+                    {variants.map((variant, i) => {
+                      const isSelected = i === index;
+                      return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          tabIndex={fragrancesExpanded ? 0 : -1}
+                          onClick={() => selectFragrance(i)}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-3 py-2.5 text-left transition-all active:scale-[0.98]",
+                            isSelected
+                              ? "bg-white/10 text-paper font-medium"
+                              : "hover:bg-white/5 text-white/75",
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              aria-hidden="true"
+                              className="size-4 shrink-0 rounded-full border border-white/20"
+                              style={{ backgroundColor: variant.hex }}
+                            />
+                            <span className="text-sm font-medium">{variant.name}</span>
+                          </div>
+                          <span className="text-micro font-sans uppercase text-white/40">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
             <button
