@@ -216,14 +216,14 @@ export function Ritual() {
           <ol
             ref={listRef}
             className={cn(
-              "relative z-20 hidden md:grid md:top-0 md:my-auto md:w-full md:max-w-4xl lg:max-w-5xl xl:max-w-6xl md:mx-auto",
-              "md:grid-cols-[1fr_minmax(120px,160px)_1fr] md:grid-rows-2",
-              "md:items-center md:gap-x-1 lg:gap-x-3 md:gap-y-6 lg:gap-y-8",
+              "relative z-20 hidden md:grid md:top-0 md:my-auto md:w-full md:max-w-5xl lg:max-w-6xl xl:max-w-7xl md:mx-auto md:px-6 lg:px-10",
+              "md:grid-cols-[1fr_minmax(220px,300px)_1fr] md:grid-rows-2",
+              "md:items-center md:gap-x-2 lg:gap-x-4 md:gap-y-8 lg:gap-y-12",
             )}
           >
             {/* 01 Prime — Left side, vertically centered with bottle, line pointing right */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:items-center md:col-start-1 md:row-span-2 md:self-center md:justify-self-end">
-              <div className="flex max-w-none flex-col text-left md:max-w-[220px] lg:max-w-[260px] xl:max-w-[280px]">
+              <div className="flex max-w-none flex-col text-left md:max-w-[220px] lg:max-w-[260px] xl:max-w-[290px]">
                 <div className="flex items-baseline gap-1 md:gap-2">
                   <span className="font-display text-accent-on-light text-xl md:text-2xl lg:text-3xl leading-none font-medium">
                     {STEPS[0].num}
@@ -237,23 +237,23 @@ export function Ritual() {
                 </p>
               </div>
 
-              {/* Callout line from Prime to bottle shoulder — scales with screen width */}
-              <div className="flex items-center ml-1 sm:ml-2 shrink-0 pointer-events-none w-[clamp(44px,5vw,100px)]">
+              {/* Callout line from Prime to bottle shoulder — elongated and responsive */}
+              <div className="flex items-center ml-2 lg:ml-3 shrink-0 pointer-events-none w-[clamp(70px,8vw,140px)]">
                 <svg
-                  viewBox="0 0 80 24"
+                  viewBox="0 0 140 28"
                   fill="none"
                   className="w-full h-auto overflow-visible stroke-accent-on-light/75 text-accent-on-light"
                 >
                   <path
-                    d="M 0 6 L 32 6 L 54 18 L 74 18"
+                    d="M 0 6 L 65 6 L 98 22 L 132 22"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     className="ritual-line"
                   />
                   <circle
-                    cx="74"
-                    cy="18"
+                    cx="132"
+                    cy="22"
                     r="3.5"
                     fill="currentColor"
                     className="ritual-dot"
@@ -264,22 +264,22 @@ export function Ritual() {
 
             {/* 02 Apply — Upper right, line pointing down-left to bottle collar */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-1 md:self-center md:justify-self-start">
-              {/* Callout line from bottle collar to Apply — scales with screen width */}
-              <div className="flex items-center mr-1 sm:mr-2 shrink-0 pointer-events-none pt-1 w-[clamp(44px,5vw,100px)]">
+              {/* Callout line from bottle collar to Apply — elongated and responsive */}
+              <div className="flex items-center mr-2 lg:mr-3 shrink-0 pointer-events-none pt-1 w-[clamp(70px,8vw,140px)]">
                 <svg
-                  viewBox="0 0 80 24"
+                  viewBox="0 0 140 28"
                   fill="none"
                   className="w-full h-auto overflow-visible stroke-accent-on-light/75 text-accent-on-light"
                 >
                   <circle
-                    cx="6"
-                    cy="18"
+                    cx="8"
+                    cy="22"
                     r="3.5"
                     fill="currentColor"
                     className="ritual-dot"
                   />
                   <path
-                    d="M 6 18 L 26 18 L 48 6 L 80 6"
+                    d="M 8 22 L 42 22 L 75 6 L 140 6"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -288,7 +288,7 @@ export function Ritual() {
                 </svg>
               </div>
 
-              <div className="flex max-w-none flex-col text-left md:max-w-[220px] lg:max-w-[260px] xl:max-w-[280px]">
+              <div className="flex max-w-none flex-col text-left md:max-w-[220px] lg:max-w-[260px] xl:max-w-[290px]">
                 <div className="flex items-baseline gap-1 md:gap-2">
                   <span className="font-display text-accent-on-light text-xl md:text-2xl lg:text-3xl leading-none font-medium">
                     {STEPS[1].num}
@@ -305,22 +305,22 @@ export function Ritual() {
 
             {/* 03 Layer — Lower right, line pointing left to lower bottle body */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-2 md:self-center md:justify-self-start">
-              {/* Callout line from bottle body to Layer — scales with screen width */}
-              <div className="flex items-center mr-1 sm:mr-2 shrink-0 pointer-events-none pt-1 w-[clamp(44px,5vw,100px)]">
+              {/* Callout line from bottle body to Layer — elongated and responsive */}
+              <div className="flex items-center mr-2 lg:mr-3 shrink-0 pointer-events-none pt-1 w-[clamp(70px,8vw,140px)]">
                 <svg
-                  viewBox="0 0 80 20"
+                  viewBox="0 0 140 20"
                   fill="none"
                   className="w-full h-auto overflow-visible stroke-accent-on-light/75 text-accent-on-light"
                 >
                   <circle
-                    cx="6"
+                    cx="8"
                     cy="10"
                     r="3.5"
                     fill="currentColor"
                     className="ritual-dot"
                   />
                   <path
-                    d="M 6 10 L 30 10 L 55 10 L 80 10"
+                    d="M 8 10 L 50 10 L 95 10 L 140 10"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -329,7 +329,7 @@ export function Ritual() {
                 </svg>
               </div>
 
-              <div className="flex max-w-none flex-col text-left md:max-w-[220px] lg:max-w-[260px] xl:max-w-[280px]">
+              <div className="flex max-w-none flex-col text-left md:max-w-[220px] lg:max-w-[260px] xl:max-w-[290px]">
                 <div className="flex items-baseline gap-1 md:gap-2">
                   <span className="font-display text-accent-on-light text-xl md:text-2xl lg:text-3xl leading-none font-medium">
                     {STEPS[2].num}

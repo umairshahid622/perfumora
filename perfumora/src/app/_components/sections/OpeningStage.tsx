@@ -340,7 +340,7 @@ export function OpeningStage() {
 
           {/* Persistent Stage Controls: Variant Arrows & Position Counter
               Held persistent across Hero, Manifesto, and Ritual. */}
-          <div className="pointer-events-none absolute inset-0 z-35 pt-[4.75rem] pb-20 md:pb-24">
+          <div className="pointer-events-none absolute inset-0 z-35 md:z-55 pt-[4.75rem] pb-20 md:pb-24">
             <Container className="relative flex h-full flex-1 flex-col">
               <div className="relative flex flex-1 items-center justify-center py-0 md:py-1">
                 {/* Reserved bottle box */}
@@ -363,7 +363,7 @@ export function OpeningStage() {
 
           {/* Persistent Product Bar (Price, Variant Name, Size Selector, Add to Bag)
               Live and interactable across Hero & Manifesto on mobile; stays visible on desktop across all beats. */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 transition-all [opacity:var(--counter-presence,1)] [visibility:var(--bar-visibility,visible)] md:!opacity-100 md:!visibility-visible">
+          <div className="pointer-events-none md:pointer-events-auto absolute inset-x-0 bottom-0 z-40 md:z-60 transition-all [opacity:var(--counter-presence,1)] [visibility:var(--bar-visibility,visible)] md:!opacity-100 md:!visible">
             <Container className="pointer-events-auto">
               <ProductBar />
             </Container>

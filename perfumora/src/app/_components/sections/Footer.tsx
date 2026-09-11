@@ -62,7 +62,7 @@ export function Footer() {
 
         <div className="border-hairline-on-dark mt-16 flex flex-col gap-3 border-t pt-8 md:mt-24 md:flex-row md:items-center md:justify-between">
           <span className="text-micro text-muted-on-dark font-medium uppercase">
-            © 2026 Perfumora — front-end concept
+            © 2026 Perfumora
           </span>
           <span className="text-micro text-muted-on-dark font-medium uppercase">
             Sound can be muted from the header
