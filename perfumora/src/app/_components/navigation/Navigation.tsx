@@ -14,9 +14,10 @@ import { useRouteTransition } from "../providers/RouteTransition";
 import { AccountMenu } from "./AccountMenu";
 import { AuthModal } from "./AuthModal";
 import { CartDrawer } from "./CartDrawer";
-import { ChevronIcon, BagIcon, PersonIcon } from "./icons";
+import { ChevronIcon, BagIcon, PersonIcon, MenuIcon } from "./icons";
 import { LogoutConfirm } from "./LogoutConfirm";
 import { MegaMenu } from "./MegaMenu";
+import { MobileMenu } from "./MobileMenu";
 import { SoundToggle } from "./SoundToggle";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -25,7 +26,7 @@ gsap.registerPlugin(ScrollTrigger);
  *  when nobody is signed in, the dropdown when someone is, and the confirmation that
  *  dropdown's Log out row hands over to. One value, so opening any of them puts the
  *  last away. */
-type Panel = "menu" | "cart" | "auth" | "account" | "logout" | null;
+type Panel = "menu" | "cart" | "auth" | "account" | "logout" | "mobileMenu" | null;
 
 /**
  * The centre links' shared shape. A plain string, deliberately not run through
@@ -351,13 +352,13 @@ export function Navigation() {
       <header className="fixed inset-x-0 top-0 z-[60] h-[4.75rem]">
         <nav
           ref={navRef}
-          className="text-ink mx-auto flex h-full max-w-[110rem] items-center justify-between px-6 md:px-16"
+          className="text-ink mx-auto flex h-full max-w-[110rem] items-center justify-between px-4 sm:px-6 md:px-16"
         >
           {/* Left — wordmark */}
           <button
             type="button"
             onClick={() => goTo(SECTION_IDS.hero)}
-            className="font-display hover:text-accent-on-light text-2xl tracking-[0.02em] uppercase transition-colors"
+            className="font-display hover:text-accent-on-light text-xl sm:text-2xl tracking-[0.02em] uppercase transition-colors"
           >
             Perfumora
           </button>
@@ -403,20 +404,13 @@ export function Navigation() {
             </button> */}
           </div>
 
-          {/* Right — three icons only */}
-          <div className="flex items-center gap-1">
+          {/* Right — icons & mobile menu trigger */}
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {/* Signed in, the person glyph gives way to the customer's initial in a
                 ring, and the click opens the account dropdown instead of the login
                 card. Drawn in `currentColor` like the two icons beside it, so it
                 rides the nav's ink↔paper tween and stays legible over both the
-                parchment and the near-black sections. A filled copper disc was the
-                first instinct, but `--accent` behind `--accent-contrast` is about
-                3.4:1 — under AA at this size — and the cart badge is already the
-                one accent-filled thing in the header.
-
-                `relative` because <AccountMenu> anchors to this button rather than
-                to the viewport: it is the one header panel that hangs off its
-                trigger instead of covering the page. */}
+                parchment and the near-black sections. */}
             <div className="relative">
               <button
                 type="button"
@@ -461,6 +455,17 @@ export function Navigation() {
             </button>
 
             <SoundToggle />
+
+            {/* Mobile Menu Trigger (Hamburger) */}
+            <button
+              type="button"
+              onClick={() => toggle("mobileMenu")}
+              aria-expanded={panel === "mobileMenu"}
+              aria-label="Open navigation menu"
+              className="hover:text-accent-on-light grid size-10 place-items-center transition-colors md:hidden"
+            >
+              <MenuIcon className="size-5" />
+            </button>
           </div>
         </nav>
       </header>
@@ -477,6 +482,20 @@ export function Navigation() {
         open={panel === "cart"}
         onClose={close}
         onCheckout={onCheckOut}
+      />
+
+      <MobileMenu
+        open={panel === "mobileMenu"}
+        onClose={close}
+        onNavigateHomeSection={goTo}
+        onNavigateRoute={(href) => {
+          close();
+          navigate(href);
+        }}
+        activeSection={activeSection}
+        pathname={pathname}
+        onCartOpen={() => setPanel("cart")}
+        cartCount={count}
       />
 
       <AuthModal
@@ -497,3 +516,4 @@ export function Navigation() {
     </>
   );
 }
+
