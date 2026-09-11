@@ -230,6 +230,44 @@ export default function BottleScene({
     trigger: `#${SECTION_IDS.ritual}`,
   });
 
+  // Master scrubbed tilt choreography across the opening stage:
+  // 0.0 -> 0.6 screens: Leans into Manifesto pose (y: -0.14, z: -0.16)
+  // 0.6 -> 1.4 screens: Holds lean while reading Manifesto
+  // 1.4 -> 2.0 screens: Returns upright (0, 0, 0) as Ritual enters
+  // 2.0 -> 3.0 screens: Remains upright while Ritual uncapping and spray mist happen
+  // 3.0 -> 3.8 screens: Tilts to the showcase angle (x: 0.1, y: 0.35, z: 0.28) as cap glides shut
+  useGSAP(
+    () => {
+      const tiltGroup = refs.tiltGroup.current;
+      const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]");
+      if (!ready || !tiltGroup || !stageEl || prefersReducedMotion()) return;
+
+      gsap.set(tiltGroup.rotation, { x: 0, y: 0, z: 0 });
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: stageEl,
+          start: "top top",
+          end: () => `+=${window.innerHeight * 4}`,
+          scrub: 1.2,
+        },
+      });
+
+      const beat = { ease: "power1.inOut" };
+
+      tl
+        // 0.0 -> 0.6 screens (0vh -> 60vh): Tilt into Manifesto lean as bottle drifts right
+        .to(tiltGroup.rotation, { y: -0.14, z: -0.16, duration: 0.6, ...beat }, 0)
+        // 0.6 -> 1.4 screens (60vh -> 140vh): Held tilted during Manifesto reading
+        // 1.4 -> 2.0 screens (140vh -> 200vh): Return upright cleanly as Ritual arrives and bottle drifts back center
+        .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 0.6, ...beat }, 1.4)
+        // 2.0 -> 3.0 screens (200vh -> 300vh): Held upright during Ritual steps, uncap, and mist spray
+        // 3.0 -> 3.8 screens (300vh -> 380vh): Smoothly transition to showcase pose as cap shuts
+        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.8, ...beat }, 3.0);
+    },
+    { dependencies: [ready], revertOnUpdate: true },
+  );
+
   return (
     <div ref={hostRef} className={className ?? "h-full w-full"}>
       <Canvas
@@ -285,139 +323,7 @@ export default function BottleScene({
             <BottleMist refs={refs} color={juice} />
           </group>
         </group>
-
-        {/* Decoupled per-frame damped progress rig: guarantees smooth, continuous
-            transformations even during aggressive or fast scroll bursts. */}
-        <BottleDampingRig refs={refs} ready={ready} />
       </Canvas>
     </div>
   );
-}
-
-function getCapLiftHeight(object: Object3D): number {
-  object.updateWorldMatrix(true, true);
-  const size = new Box3().setFromObject(object).getSize(new Vector3());
-  const scale = object.parent?.getWorldScale(new Vector3());
-  const h = scale ? size.y / scale.y : size.y;
-  return h * 1.22;
-}
-
-/**
- * Decoupled 3D Scene Damping Component inside Canvas.
- * Interpolates tiltGroup.rotation and cap elevation every frame with per-frame clamping,
- * guaranteeing completely continuous, lag-free, and hitch-free movement across all stages.
- */
-function BottleDampingRig({
-  refs,
-  ready,
-}: {
-  refs: ReturnType<typeof useBottleRefs>;
-  ready: boolean;
-}) {
-  const initialCapY = useRef<number | null>(null);
-  const maxProgressReached = useRef(0);
-
-  useScrollScene("[data-opening-stage]", ({ currentProgress }) => {
-    const tilt = refs.tiltGroup.current;
-    const cap = refs.cap.current;
-    if (!ready || prefersReducedMotion()) return;
-
-    const p = currentProgress; // 0 to 1 across 500vh opening stage
-
-    // 1. Smooth Bottle Tilt (Manifesto -> Ritual -> Showcase)
-    if (tilt) {
-      let targetX = 0;
-      let targetY = 0;
-      let targetZ = 0;
-
-      // 0.0 -> 0.20: Lean into Manifesto pose (y: -0.14, z: -0.16)
-      if (p < 0.20) {
-        const t = p / 0.20;
-        const ease = t * t * (3 - 2 * t);
-        targetY = -0.14 * ease;
-        targetZ = -0.16 * ease;
-      }
-      // 0.20 -> 0.35: Held tilted during Manifesto reading
-      else if (p < 0.35) {
-        targetY = -0.14;
-        targetZ = -0.16;
-      }
-      // 0.35 -> 0.48: Smoothly return upright for Ritual section
-      else if (p < 0.48) {
-        const t = (p - 0.35) / 0.13;
-        const ease = t * t * (3 - 2 * t);
-        targetY = -0.14 * (1 - ease);
-        targetZ = -0.16 * (1 - ease);
-      }
-      // 0.48 -> 0.68: Held upright for Ritual uncap, spray, and reading
-      else if (p < 0.68) {
-        targetX = 0;
-        targetY = 0;
-        targetZ = 0;
-      }
-      // 0.68 -> 0.90: Transition to showcase dramatic tilt after cap is seated
-      else {
-        const t = Math.min(1, (p - 0.68) / 0.22);
-        const ease = t * t * (3 - 2 * t);
-        targetX = 0.1 * ease;
-        targetY = 0.35 * ease;
-        targetZ = 0.28 * ease;
-      }
-
-      tilt.rotation.x = targetX;
-      tilt.rotation.y = targetY;
-      tilt.rotation.z = targetZ;
-    }
-
-    // 2. Mathematically Continuous Cap Elevation (Uncap & Weighted Close)
-    if (cap) {
-      if (initialCapY.current === null) {
-        initialCapY.current = cap.position.y;
-      }
-      const baseCapY = initialCapY.current;
-      const lift = getCapLiftHeight(cap);
-
-      // Track downward progress depth across the page
-      if (p > maxProgressReached.current) {
-        maxProgressReached.current = p;
-      } else if (p <= 0.20) {
-        maxProgressReached.current = 0;
-      }
-
-      let capOffset = 0;
-
-      // When scrolling back up after having completed showcase, keep cap firmly seated
-      if (maxProgressReached.current >= 0.70 && p > 0.20) {
-        capOffset = 0;
-      }
-      // 0.0 -> 0.38: Cap remains closed on Hero and Manifesto
-      else if (p < 0.38) {
-        capOffset = 0;
-      }
-      // 0.38 -> 0.46: Cap smoothly uncaps upwards on downward entry
-      else if (p < 0.46) {
-        const t = (p - 0.38) / 0.08;
-        const ease = t * t * (3 - 2 * t);
-        capOffset = lift * ease;
-      }
-      // 0.46 -> 0.58: Held uncapped during Ritual reading
-      else if (p < 0.58) {
-        capOffset = lift;
-      }
-      // 0.58 -> 0.68: Complete 100% continuous cubic smooth glide shut into showcase
-      else if (p < 0.68) {
-        const t = (p - 0.58) / 0.10;
-        const ease = t * t * (3 - 2 * t);
-        capOffset = lift * (1 - ease);
-      }
-      // 0.68+: Cap remains firmly seated on bottle
-      else {
-        capOffset = 0;
-      }
-
-      cap.position.y = baseCapY + capOffset;
-    }
-  });
-
-  return null;
 }

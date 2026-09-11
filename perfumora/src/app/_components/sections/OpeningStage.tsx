@@ -5,6 +5,10 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Hero } from "../hero/Hero";
+import { PositionCounter } from "../hero/PositionCounter";
+import { ProductBar } from "../hero/ProductBar";
+import { VariantArrows } from "../hero/VariantArrows";
+import { Container } from "../ui/Container";
 import { PersistentBottle } from "../three/PersistentBottle";
 import { Manifesto } from "./Manifesto";
 import { Ritual } from "./Ritual";
@@ -204,8 +208,9 @@ export function OpeningStage() {
           snap: {
             snapTo: [0, 0.5, 1.0],
             duration: { min: 0.25, max: 0.6 },
-            delay: 0.1,
+            delay: 0.05,
             ease: "power1.inOut",
+            inertia: false,
           },
         },
       });
@@ -225,11 +230,19 @@ export function OpeningStage() {
         // 0.6 → 1.4: MANIFESTO READING WINDOW (held still at 100% opacity)
 
         // 1.4 → 2.0: Manifesto fades out to the left and bottle returns to center.
-        .to(manifestoPanelEl, { opacity: 0, x: slide, ...beat }, 1.4)
+        .to(
+          manifestoPanelEl,
+          { opacity: 0, x: slide, immediateRender: false, ...beat },
+          1.4,
+        )
         .to(stageEl, { "--vessel-drift": 0, ...beat }, 1.4)
 
         // 1.4 → 2.0: Ritual arrives cleanly right as you transition into the Ritual section!
-        .to(ritualPanelEl, { opacity: 1, x: 0, ...beat }, 1.4);
+        .to(
+          ritualPanelEl,
+          { opacity: 1, x: 0, immediateRender: false, ...beat },
+          1.4,
+        );
 
       const teardowns = [lift(manifestoLiftEl, 1), lift(ritualLiftEl, 2)];
 
@@ -320,6 +333,37 @@ export function OpeningStage() {
               canvas, the vessel being a fraction of its width. */}
           <div className="absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*21vw)]">
             <PersistentBottle />
+          </div>
+
+          {/* Persistent Stage Controls: Variant Arrows & Position Counter
+              Held persistent across Hero, Manifesto, and Ritual. */}
+          <div className="pointer-events-none absolute inset-0 z-35 pt-[4.75rem] pb-20 md:pb-24">
+            <Container className="relative flex h-full flex-1 flex-col">
+              <div className="relative flex flex-1 items-center justify-center py-0 md:py-1">
+                {/* Reserved bottle box */}
+                <div className="relative z-10 flex h-[33vh] sm:h-[42vh] md:h-[60vh] w-full max-w-lg flex-col items-center justify-center">
+                  <div aria-hidden="true" className="h-full w-full" />
+
+                  {/* Position counter — positioned exactly below the vessel (§4.1). */}
+                  <div className="absolute -bottom-3 sm:-bottom-2 md:bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+                    <PositionCounter />
+                  </div>
+                </div>
+
+                {/* Flanking prev/next arrows */}
+                <div className="pointer-events-none absolute inset-0 z-20">
+                  <VariantArrows />
+                </div>
+              </div>
+            </Container>
+          </div>
+
+          {/* Persistent Product Bar (Price, Variant Name, Size Selector, Add to Bag)
+              Live and interactable across all Opening Stage beats (Hero, Manifesto, Ritual). */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40">
+            <Container>
+              <ProductBar />
+            </Container>
           </div>
         </div>
       </div>

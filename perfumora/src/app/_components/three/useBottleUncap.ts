@@ -131,9 +131,36 @@ export function useBottleUncap(
 
       const still = prefersReducedMotion();
       const height = localHeight(cap);
-      const tiltGroup = refs.tiltGroup.current;
 
-      const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]") || document.body;
+      const stageEl =
+        document.querySelector<HTMLElement>("[data-opening-stage]") ||
+        document.body;
+
+      // Master Cap Uncap & Smooth Glide-Shut Controller:
+      // - Entering Ritual (1.85 screens): Cap un-caps upwards smoothly.
+      // - Leaving upward to Manifesto (< 1.85 screens): Cap glides smoothly shut onto bottle.
+      // - Entering Showcase (>= 2.8 screens): Cap glides smoothly and gracefully shut.
+      ScrollTrigger.create({
+        trigger: stageEl,
+        start: () => "top+=" + Math.round(window.innerHeight * 1.85) + " top",
+        end: () => "top+=" + Math.round(window.innerHeight * 3.4) + " top",
+        onEnter: () => {
+          gsap.to(cap.position, {
+            y: baseCapY + height * LIFT,
+            duration: still ? 0 : UNCAP_DURATION,
+            ease: "power2.out",
+            overwrite: "auto",
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(cap.position, {
+            y: baseCapY,
+            duration: still ? 0 : 0.45,
+            ease: "power2.inOut",
+            overwrite: "auto",
+          });
+        },
+      });
 
       const button = refs.pumpButton.current;
       const mist = refs.mist.current;
@@ -145,13 +172,12 @@ export function useBottleUncap(
         }
         const baseButtonY = initialButtonY.current;
 
-        // The spray is a one-way event. Keeping it out of the reversible cap
-        // timeline prevents the mist from playing backward on upward scroll.
+        // The spray is a one-way event triggered upon entering the Ritual beat.
         const sprayTl = gsap.timeline({
           scrollTrigger: {
             trigger: stageEl,
-            start: () => "top+=" + Math.round(window.innerHeight * 1.8) + " top",
-            end: () => "top+=" + Math.round(window.innerHeight * 3.2) + " top",
+            start: () => "top+=" + Math.round(window.innerHeight * 1.85) + " top",
+            end: () => "top+=" + Math.round(window.innerHeight * 3.4) + " top",
             toggleActions: "restart none none none",
             onLeaveBack: () => {
               gsap.set(button.position, { y: baseButtonY });
@@ -177,8 +203,7 @@ export function useBottleUncap(
           },
         });
 
-        // The press, and the spray it causes. Down sharply and back up slower,
-        // so it reads as a finger releasing rather than a spring.
+        // The press, and the spray it causes. Down sharply and back up slower.
         sprayTl.to(
           button.position,
           {
@@ -206,9 +231,7 @@ export function useBottleUncap(
         );
         sprayTl.set(material, { opacity: 0 }, 0);
 
-        // The cloud expands away from the nozzle it is parked on, and fades in
-        // fast and out slow across the same span — so the mist is thickest as it
-        // leaves the spout and gone by the time it has travelled its length.
+        // The mist expands away from the nozzle and dissipates gently.
         sprayTl.to(
           mist.scale,
           {
@@ -239,18 +262,20 @@ export function useBottleUncap(
           );
       }
 
-      // One-way spray mist event lifecycle is managed cleanly without cap collisions.
-      ScrollTrigger.refresh();
+      // Smooth, weighted glide-shut when scrolling past Ritual toward Showcase (2.8 screens)
+      ScrollTrigger.create({
+        trigger: stageEl,
+        start: () => "top+=" + Math.round(window.innerHeight * 2.8) + " top",
+        onEnter: () => {
+          gsap.to(cap.position, {
+            y: baseCapY,
+            duration: still ? 0 : 0.75,
+            ease: "power2.inOut",
+            overwrite: "auto",
+          });
+        },
+      });
 
-
-      // The trigger above is built long after the page is — the model downloads
-      // and parses first — so by now the beat's wrapper is back to being lifted
-      // over the viewport, and `#ritual` would measure as the screen the Hero is
-      // filling instead of the third screen of the stage. Everything else on the
-      // page was measured inside the stage's own refresh, which drops every lift
-      // for exactly this reason; one more refresh is what buys this trigger the
-      // same honest position. Last, so nothing is added to the timeline after a
-      // refresh has possibly played it.
       ScrollTrigger.refresh();
     },
     { dependencies: [enabled, ready, trigger] },
