@@ -24,7 +24,7 @@ export function Hero() {
         }}
       />
 
-      <Container className="relative z-10 flex flex-1 flex-col pb-20 md:pb-24">
+      <Container className="pointer-events-none relative z-10 flex flex-1 flex-col pb-20 md:pb-24">
         {/* Stage */}
         <div className="relative flex flex-1 items-center justify-center py-0 md:py-1">
           {/* Oversized variant name, behind the bottle */}

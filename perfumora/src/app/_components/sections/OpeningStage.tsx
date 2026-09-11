@@ -132,7 +132,11 @@ export function OpeningStage() {
       // places instead of invisible ones shifted off their measures. `useGSAP` runs
       // before paint, so nothing flashes. Their inertness is the holders'
       // `pointer-events`, stated in the markup where it can be seen.
-      gsap.set([manifestoPanelEl, ritualPanelEl], { opacity: 0, x: slide });
+      gsap.set([manifestoPanelEl, ritualPanelEl], {
+        opacity: 0,
+        x: slide,
+        visibility: "hidden",
+      });
 
       // The watermark's presence and the vessel's drift, as unitless progress on the
       // stage element. GSAP writes the number below; CSS owns what the number means —
@@ -140,7 +144,12 @@ export function OpeningStage() {
       // multiplies a 19vw step inside an `md:` utility. That split is what lets the drift
       // be desktop-only without a media query in here, and lets a resize re-resolve the
       // distance with no refresh.
-      gsap.set(stageEl, { "--name-presence": 1, "--vessel-drift": 0 });
+      gsap.set(stageEl, {
+        "--name-presence": 1,
+        "--vessel-drift": 0,
+        "--counter-presence": 1,
+        "--bar-visibility": "visible",
+      });
 
       /**
        * Hold one overlay's wrapper over the viewport until its own sticky reaches the
@@ -158,25 +167,12 @@ export function OpeningStage() {
        * 240px of lag is a 240px jump, and in the Ritual's wrapper the vessel jumps with
        * it. Scrolling down the same lag costs nothing, the holder being stuck already —
        * which is why the jerk only ever showed on the way up. Half a screen puts the
-       * switch far enough inside the window that no plausible lag reaches the edge of it.
-       * The room to spend is the stage's fourth screen: the Ritual's handover lands at
-       * 2.5 screens and the release is at 3.
-       *
-       * Returns its own teardown, because every other ScrollTrigger on the page reads
-       * these sections' positions in the document — the nav's tone handover, the
-       * `#manifesto` and `#ritual` anchors, each heading's own reveal. While a wrapper is
-       * lifted, `getBoundingClientRect` answers with the viewport, which would key all of
-       * them to the Hero's screen. So the lift is dropped for the length of a refresh and
-       * restored once every trigger has been measured; both events fire inside one frame,
-       * so nothing paints in between.
+       * handover inside that safe window without having to guess the customer's scroll speed.
        */
       const lift = (el: HTMLDivElement, screens: number) => {
         const settle = (lifted: boolean) =>
           gsap.set(el, { position: lifted ? "fixed" : "absolute" });
 
-        // Progress, not `isActive`. ScrollTrigger reports a trigger inactive at progress
-        // 0 exactly as it does at 1, and progress 0 is scroll 0 — the one place the lift
-        // matters most, since dropping it there parks the panel a screen below the fold.
         const isLifted = (self: ScrollTrigger) => self.progress < 1;
 
         const st = ScrollTrigger.create({
@@ -186,6 +182,8 @@ export function OpeningStage() {
           onUpdate: (self) => settle(isLifted(self)),
         });
 
+        settle(isLifted(st));
+
         const drop = () => settle(false);
         const restore = () => settle(isLifted(st));
         ScrollTrigger.addEventListener("refreshInit", drop);
@@ -194,6 +192,7 @@ export function OpeningStage() {
         return () => {
           ScrollTrigger.removeEventListener("refreshInit", drop);
           ScrollTrigger.removeEventListener("refresh", restore);
+          st.kill();
         };
       };
 
@@ -219,7 +218,7 @@ export function OpeningStage() {
 
       tl
         // 0.0 → 0.6: Hero name leaves, Manifesto slides in and fades up to full opacity, vessel steps right.
-        .to(manifestoPanelEl, { opacity: 1, x: 0, ...beat }, 0)
+        .to(manifestoPanelEl, { opacity: 1, x: 0, visibility: "visible", ...beat }, 0)
         .to(
           stageEl,
           { "--name-presence": 0, ease: "power1.inOut", duration: 0.3 },
@@ -232,7 +231,7 @@ export function OpeningStage() {
         // 1.4 → 2.0: Manifesto fades out to the left and bottle returns to center.
         .to(
           manifestoPanelEl,
-          { opacity: 0, x: slide, immediateRender: false, ...beat },
+          { opacity: 0, x: slide, visibility: "hidden", immediateRender: false, ...beat },
           1.4,
         )
         .to(stageEl, { "--vessel-drift": 0, ...beat }, 1.4)
@@ -240,7 +239,12 @@ export function OpeningStage() {
         // 1.4 → 2.0: Ritual arrives cleanly right as you transition into the Ritual section!
         .to(
           ritualPanelEl,
-          { opacity: 1, x: 0, immediateRender: false, ...beat },
+          { opacity: 1, x: 0, visibility: "visible", immediateRender: false, ...beat },
+          1.4,
+        )
+        .to(
+          stageEl,
+          { "--counter-presence": 0, "--bar-visibility": "hidden", ...beat },
           1.4,
         );
 
@@ -288,8 +292,7 @@ export function OpeningStage() {
             the same z-30 and is the later sibling.
 
             `overflow-hidden` keeps the panel to the screen it occupies: it holds a
-            full-height section inside a box that is `fixed` for that screen, and it is
-            the box the 80px entry slide happens in. */}
+            full-screen backdrop that would otherwise spill onto the page below. */}
         <div ref={manifestoLift} className="absolute inset-0 z-30 overflow-hidden">
           <div ref={manifestoPanel} className="h-full">
             <Manifesto />
@@ -312,8 +315,8 @@ export function OpeningStage() {
             both are laid over it. Sharing a wrapper with a panel is also what gives the
             bottle its whole lifecycle for free: nailed to the viewport for as long as
             this box is lifted or stuck, then away with the stage. */}
-        <div ref={ritualLift} className="absolute inset-0 z-30 overflow-hidden">
-          <div ref={ritualPanel} className="h-full">
+        <div ref={ritualLift} className="absolute inset-0 z-30 overflow-y-auto md:overflow-hidden pointer-events-none">
+          <div ref={ritualPanel} className="min-h-full h-auto md:h-full">
             <Ritual />
           </div>
 
@@ -331,7 +334,7 @@ export function OpeningStage() {
               transformed box still counts toward the document's scrollable width, which
               is a horizontal scrollbar on every screen. What gets clipped is empty
               canvas, the vessel being a fraction of its width. */}
-          <div className="absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*21vw)]">
+          <div className="pointer-events-none absolute inset-0 md:translate-x-[calc(var(--vessel-drift,0)*21vw)]">
             <PersistentBottle />
           </div>
 
@@ -341,11 +344,11 @@ export function OpeningStage() {
             <Container className="relative flex h-full flex-1 flex-col">
               <div className="relative flex flex-1 items-center justify-center py-0 md:py-1">
                 {/* Reserved bottle box */}
-                <div className="relative z-10 flex h-[33vh] sm:h-[42vh] md:h-[60vh] w-full max-w-lg flex-col items-center justify-center">
+                <div className="relative z-10 flex h-[48vh] sm:h-[54vh] md:h-[65vh] max-h-[580px] w-full max-w-[320px] sm:max-w-[420px] md:max-w-[520px] flex-col items-center justify-center">
                   <div aria-hidden="true" className="h-full w-full" />
 
                   {/* Position counter — positioned exactly below the vessel (§4.1). */}
-                  <div className="absolute -bottom-3 sm:-bottom-2 md:bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+                  <div className="absolute -bottom-2 md:bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-auto transition-opacity [opacity:var(--counter-presence,1)] md:!opacity-100">
                     <PositionCounter />
                   </div>
                 </div>
@@ -359,8 +362,8 @@ export function OpeningStage() {
           </div>
 
           {/* Persistent Product Bar (Price, Variant Name, Size Selector, Add to Bag)
-              Live and interactable across all Opening Stage beats (Hero, Manifesto, Ritual). */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40">
+              Live and interactable across Hero & Manifesto on mobile; stays visible on desktop across all beats. */}
+          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 transition-all [opacity:var(--counter-presence,1)] [visibility:var(--bar-visibility,visible)] md:!opacity-100 md:!visibility-visible">
             <Container>
               <ProductBar />
             </Container>

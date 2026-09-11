@@ -37,17 +37,18 @@ export function PersistentBottle() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute left-1/2 top-14 md:top-[4.25rem] -translate-x-1/2 w-full max-w-[360px] sm:max-w-[440px] md:max-w-[520px] h-[56vh] md:h-[70vh] max-h-[620px] z-10 md:z-40"
+      className="pointer-events-none absolute inset-0 z-10 md:z-40"
     >
-      {/* Fragrance colour comes from the variant itself rather than the `--accent`
-          token: <ScentProvider> writes that token in an effect, so reading it
-          during this render trails one variant behind. */}
-      <BottleSceneMount
-        className="h-full w-full"
-        liquidColor={variant.hex}
-        variantIndex={index}
-        spinDirection={direction}
-      />
+      <div className="relative flex h-full w-full items-center justify-center pt-[4.75rem] pb-20 md:pb-24">
+        <div className="relative h-[48vh] sm:h-[54vh] md:h-[65vh] max-h-[580px] w-full max-w-[320px] sm:max-w-[420px] md:max-w-[520px]">
+          <BottleSceneMount
+            className="h-full w-full"
+            liquidColor={variant.hex}
+            variantIndex={index}
+            spinDirection={direction}
+          />
+        </div>
+      </div>
     </div>
   );
 }

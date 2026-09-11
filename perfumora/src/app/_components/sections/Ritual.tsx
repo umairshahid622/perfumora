@@ -194,19 +194,19 @@ export function Ritual() {
       tone="light"
       overlay
       full
-      className="bg-transparent pt-14 md:pt-20 pb-24 md:pb-12 h-screen max-h-screen"
+      className="bg-transparent pt-14 md:pt-20 pb-4 md:pb-12 h-screen max-h-screen md:h-full md:min-h-full"
     >
       <Container className="relative z-20 flex h-full flex-1 flex-col justify-between">
-        <div className="flex h-full flex-1 flex-col justify-between pb-6 md:pb-0">
+        <div className="flex h-full flex-1 flex-col justify-between pb-3 md:pb-0">
           {/* Top-left heading */}
-          <div className="flex max-w-xl flex-col gap-1 md:gap-2 shrink-0">
+          <div className="flex max-w-xl flex-col gap-0.5 sm:gap-1 md:gap-2 shrink-0">
             <Eyebrow>The Ritual</Eyebrow>
-            <RevealHeading className="text-xl sm:text-2xl md:text-section font-display uppercase tracking-tight text-balance">
+            <RevealHeading className="text-lg sm:text-2xl md:text-section font-display uppercase tracking-tight text-balance leading-tight">
               Three moments, one lasting impression
             </RevealHeading>
             <p
               ref={subtitleRef}
-              className="text-body text-muted-on-light mt-0.5 max-w-md text-xs sm:text-sm md:text-base leading-relaxed"
+              className="text-body text-muted-on-light mt-0.5 max-w-md text-[11px] sm:text-xs md:text-base leading-relaxed"
             >
               There are three moments, one lasting impression.
             </p>
@@ -216,46 +216,46 @@ export function Ritual() {
           <ol
             ref={listRef}
             className={cn(
-              "relative z-20 hidden md:grid md:top-0 md:mt-2",
-              "md:grid-cols-[1fr_minmax(240px,340px)_1fr] md:grid-rows-2",
-              "md:flex-1 md:items-center md:gap-x-4 md:gap-y-6",
+              "relative z-20 hidden md:grid md:top-0 md:my-auto md:w-full md:max-w-4xl md:mx-auto",
+              "md:grid-cols-[1fr_minmax(200px,260px)_1fr] md:grid-rows-2",
+              "md:items-center md:gap-x-1 lg:gap-x-3 md:gap-y-8",
             )}
           >
             {/* 01 Prime — Left side, vertically centered with bottle, line pointing right */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:items-center md:col-start-1 md:row-span-2 md:self-center md:justify-self-end">
-              <div className="flex max-w-none flex-col text-left md:max-w-xs">
-                <div className="flex items-baseline gap-1 md:gap-2.5">
-                  <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
+              <div className="flex max-w-none flex-col text-left md:max-w-[240px] lg:max-w-[260px]">
+                <div className="flex items-baseline gap-1 md:gap-2">
+                  <span className="font-display text-accent-on-light text-xl md:text-2xl lg:text-3xl leading-none font-medium">
                     {STEPS[0].num}
                   </span>
-                  <h3 className="text-base md:text-xl font-medium tracking-tight text-ink">
+                  <h3 className="text-base md:text-lg font-medium tracking-tight text-ink">
                     {STEPS[0].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-2 md:text-sm">
+                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-1.5 md:text-xs lg:text-sm">
                   {STEPS[0].body}
                 </p>
               </div>
 
               {/* Callout line from Prime to bottle shoulder */}
-              <div className="flex items-center ml-3 shrink-0 pointer-events-none">
+              <div className="flex items-center ml-2 shrink-0 pointer-events-none">
                 <svg
-                  width="110"
-                  height="36"
-                  viewBox="0 0 110 36"
+                  width="54"
+                  height="28"
+                  viewBox="0 0 54 28"
                   fill="none"
                   className="overflow-visible stroke-accent-on-light/75 text-accent-on-light"
                 >
                   <path
-                    d="M 0 10 L 45 10 L 78 26 L 105 26"
+                    d="M 0 8 L 22 8 L 38 20 L 50 20"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     className="ritual-line"
                   />
                   <circle
-                    cx="105"
-                    cy="26"
+                    cx="50"
+                    cy="20"
                     r="3"
                     fill="currentColor"
                     className="ritual-dot"
@@ -267,23 +267,23 @@ export function Ritual() {
             {/* 02 Apply — Upper right, line pointing down-left to bottle collar */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-1 md:self-center md:justify-self-start">
               {/* Callout line from bottle collar to Apply */}
-              <div className="flex items-center mr-3 shrink-0 pointer-events-none pt-1">
+              <div className="flex items-center mr-2 shrink-0 pointer-events-none pt-1">
                 <svg
-                  width="110"
-                  height="44"
-                  viewBox="0 0 110 44"
+                  width="54"
+                  height="32"
+                  viewBox="0 0 54 32"
                   fill="none"
                   className="overflow-visible stroke-accent-on-light/75 text-accent-on-light"
                 >
                   <circle
                     cx="4"
-                    cy="36"
+                    cy="24"
                     r="3"
                     fill="currentColor"
                     className="ritual-dot"
                   />
                   <path
-                    d="M 4 36 L 40 36 L 72 10 L 110 10"
+                    d="M 4 24 L 18 24 L 34 8 L 54 8"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -292,16 +292,16 @@ export function Ritual() {
                 </svg>
               </div>
 
-              <div className="flex max-w-none flex-col text-left md:max-w-xs">
-                <div className="flex items-baseline gap-1 md:gap-2.5">
-                  <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
+              <div className="flex max-w-none flex-col text-left md:max-w-[240px] lg:max-w-[260px]">
+                <div className="flex items-baseline gap-1 md:gap-2">
+                  <span className="font-display text-accent-on-light text-xl md:text-2xl lg:text-3xl leading-none font-medium">
                     {STEPS[1].num}
                   </span>
-                  <h3 className="text-base md:text-xl font-medium tracking-tight text-ink">
+                  <h3 className="text-base md:text-lg font-medium tracking-tight text-ink">
                     {STEPS[1].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-2 md:text-sm">
+                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-1.5 md:text-xs lg:text-sm">
                   {STEPS[1].body}
                 </p>
               </div>
@@ -310,23 +310,23 @@ export function Ritual() {
             {/* 03 Layer — Lower right, line pointing left to lower bottle body */}
             <li className="flex min-w-0 flex-col md:flex-row items-start md:col-start-3 md:row-start-2 md:self-center md:justify-self-start">
               {/* Callout line from bottle body to Layer */}
-              <div className="flex items-center mr-3 shrink-0 pointer-events-none pt-1">
+              <div className="flex items-center mr-2 shrink-0 pointer-events-none pt-1">
                 <svg
-                  width="110"
-                  height="28"
-                  viewBox="0 0 110 28"
+                  width="54"
+                  height="20"
+                  viewBox="0 0 54 20"
                   fill="none"
                   className="overflow-visible stroke-accent-on-light/75 text-accent-on-light"
                 >
                   <circle
                     cx="4"
-                    cy="14"
+                    cy="10"
                     r="3"
                     fill="currentColor"
                     className="ritual-dot"
                   />
                   <path
-                    d="M 4 14 L 45 14 L 70 14 L 110 14"
+                    d="M 4 10 L 22 10 L 36 10 L 54 10"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -335,16 +335,16 @@ export function Ritual() {
                 </svg>
               </div>
 
-              <div className="flex max-w-none flex-col text-left md:max-w-xs">
-                <div className="flex items-baseline gap-1 md:gap-2.5">
-                  <span className="font-display text-accent-on-light text-xl md:text-3xl leading-none font-medium">
+              <div className="flex max-w-none flex-col text-left md:max-w-[240px] lg:max-w-[260px]">
+                <div className="flex items-baseline gap-1 md:gap-2">
+                  <span className="font-display text-accent-on-light text-xl md:text-2xl lg:text-3xl leading-none font-medium">
                     {STEPS[2].num}
                   </span>
-                  <h3 className="text-base md:text-xl font-medium tracking-tight text-ink">
+                  <h3 className="text-base md:text-lg font-medium tracking-tight text-ink">
                     {STEPS[2].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-2 md:text-sm">
+                <p className="text-body text-muted-on-light mt-0.5 leading-relaxed text-xs md:mt-1.5 md:text-xs lg:text-sm">
                   {STEPS[2].body}
                 </p>
               </div>
@@ -354,10 +354,10 @@ export function Ritual() {
           {/* Mobile Interactive Step Tabs Card (Applies ONLY to the 3 ritual steps) */}
           <div
             ref={mobileCardRef}
-            className="relative z-30 flex flex-col md:hidden pointer-events-auto mt-auto pb-1"
+            className="relative z-50 flex flex-col md:hidden pointer-events-auto mt-auto mb-2 sm:mb-4 md:mb-0"
           >
-            <div className="border-hairline-on-light bg-bg-light/95 backdrop-blur-md rounded-2xl border p-2.5 sm:p-3 shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
-              <div className="grid grid-cols-3 gap-1 border-b border-hairline-on-light pb-2">
+            <div className="border-hairline-on-light bg-bg-light/95 backdrop-blur-md rounded-2xl border p-2 sm:p-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+              <div className="grid grid-cols-3 gap-1 border-b border-hairline-on-light pb-1.5">
                 {STEPS.map((step, idx) => {
                   const active = idx === activeStep;
                   return (
@@ -387,9 +387,9 @@ export function Ritual() {
                 })}
               </div>
 
-              <div className="pt-2 min-h-[2.5rem]">
+              <div className="pt-1.5 min-h-[2.25rem]">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="font-display text-accent-on-light text-base leading-none font-medium">
+                  <span className="font-display text-accent-on-light text-sm sm:text-base leading-none font-medium">
                     {STEPS[activeStep].num}
                   </span>
                   <h3 className="text-xs font-medium tracking-tight text-ink">
