@@ -158,135 +158,164 @@ export function useBottleUncap(
         if (material) gsap.set(material, { opacity: 0 });
       };
 
+      let hasUncapped = false;
       let activeSprayTl: gsap.core.Timeline | null = null;
 
       // Master Directional Ritual Controller:
-      // - Downward entry: Cap smoothly un-caps, pump fires, mist sprays, steps reveal.
-      // - Downward exit into Craft: Cap smoothly glides shut with a weighted 0.6s ease.
-      // - Upward scrolling (from Craft through Ritual back to Hero): CAP STAYS CLOSED!
-      // - Upward exit into Manifesto: Resets trigger so future downward passes uncap fresh.
+      // - Downward entry (2.4+ screens): Cap smoothly un-caps, pump fires, mist sprays, sound plays, steps reveal.
+      // - Inside Ritual runway (3.0 -> 3.85 screens): Cap smoothly closes on scroll right inside Ritual!
+      // - Upward scrolling (from Craft/Showcase through Ritual back to Hero): CAP STAYS CLOSED!
+      // - Upward exit into Manifesto (< 2.0 screens): Resets trigger so future downward passes uncap fresh.
       ScrollTrigger.create({
         trigger: stageEl,
-        start: () => "top+=" + Math.round(window.innerHeight * 2.95) + " top",
-        end: () => "top+=" + Math.round(window.innerHeight * 3.6) + " top",
-        fastScrollEnd: true,
-        preventOverlaps: true,
-        onEnter: (self) => {
-          const isFast = Math.abs(self.getVelocity()) > 2000;
+        start: "top top",
+        end: () => `+=${window.innerHeight * 5}`,
+        onUpdate: (self) => {
+          const currentScreen = self.progress * 5; // 0.0 to 5.0 screens across the OpeningStage
+          const isScrollingDown = self.direction > 0;
+          const isScrollingUp = self.direction < 0;
 
-          // Lift cap smoothly on downward entry
-          gsap.to(cap.position, {
-            y: baseCapY + height * LIFT,
-            duration: still || isFast ? 0.2 : UNCAP_DURATION,
-            ease: "power2.out",
-            overwrite: "auto",
-          });
-
-          if (still || isFast || !button || !mist || !material) {
-            resetSprayState();
-            window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
+          // Zone 1: Upward Reset Zone (< 2.0 screens into Manifesto / Hero)
+          if (currentScreen < 2.0) {
+            if (hasUncapped) {
+              hasUncapped = false;
+              if (activeSprayTl) activeSprayTl.kill();
+              resetSprayState();
+              gsap.to(cap.position, {
+                y: baseCapY,
+                duration: still ? 0 : 0.25,
+                ease: "power2.inOut",
+                overwrite: "auto",
+              });
+              window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
+            }
             return;
           }
 
-          if (activeSprayTl) activeSprayTl.kill();
-          resetSprayState();
+          // Zone 2: Uncap & Mist Spray Trigger (>= 2.4 screens on downward scroll)
+          if (currentScreen >= 2.4 && !hasUncapped && isScrollingDown) {
+            hasUncapped = true;
 
-          activeSprayTl = gsap.timeline({
-            onComplete: () => {
+            // 1. Gentle momentum dampening during mist theatre
+            if (
+              typeof window !== "undefined" &&
+              (window as unknown as { lenis?: { velocity?: number } }).lenis
+            ) {
+              const lenis = (
+                window as unknown as { lenis?: { velocity?: number } }
+              ).lenis;
+              if (
+                lenis &&
+                typeof lenis.velocity === "number" &&
+                Math.abs(lenis.velocity) > 1.2
+              ) {
+                lenis.velocity *= 0.35;
+              }
+            }
+
+            // 2. Lift cap smoothly
+            gsap.to(cap.position, {
+              y: baseCapY + height * LIFT,
+              duration: still ? 0 : UNCAP_DURATION,
+              ease: "power2.out",
+              overwrite: "auto",
+            });
+
+            if (still || !button || !mist || !material) {
+              resetSprayState();
               window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
-            },
-          });
+              return;
+            }
 
-          // Press pump button
-          activeSprayTl
-            .to(
-              button.position,
-              {
-                y: baseButtonY - height * PRESS,
-                duration: PRESS_DOWN,
-                ease: "power2.in",
-                onStart: () => window.dispatchEvent(new Event(SPRAY_START_EVENT)),
+            if (activeSprayTl) activeSprayTl.kill();
+            resetSprayState();
+
+            activeSprayTl = gsap.timeline({
+              onComplete: () => {
+                window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
               },
-              UNCAP_START + UNCAP_DURATION,
-            )
-            .to(
-              button.position,
-              { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
-              UNCAP_START + SPRAY_AT,
-            );
+            });
 
-          // Mist spray & sound cue
-          activeSprayTl
-            .to(
-              mist.scale,
-              {
-                x: 1,
-                y: 1,
-                z: 1,
-                duration: SPRAY_DURATION,
-                ease: "power2.out",
-                onStart: () => playSprayRef.current(),
-              },
-              UNCAP_START + SPRAY_AT,
-            )
-            .to(
-              material,
-              { opacity: MIST_OPACITY, duration: MIST_IN, ease: "power1.out" },
-              UNCAP_START + SPRAY_AT,
-            )
-            .to(
-              material,
-              {
-                opacity: 0,
-                duration: SPRAY_DURATION - MIST_IN,
-                ease: "power1.in",
-              },
-              UNCAP_START + SPRAY_AT + MIST_IN,
-            );
-        },
-        onLeave: () => {
-          // Exiting downward past Ritual toward Craft:
-          // Smooth, weighted glide-shut as bottle seals
-          if (activeSprayTl) activeSprayTl.kill();
-          resetSprayState();
+            // Press pump button
+            activeSprayTl
+              .to(
+                button.position,
+                {
+                  y: baseButtonY - height * PRESS,
+                  duration: PRESS_DOWN,
+                  ease: "power2.in",
+                  onStart: () => window.dispatchEvent(new Event(SPRAY_START_EVENT)),
+                },
+                UNCAP_START + UNCAP_DURATION,
+              )
+              .to(
+                button.position,
+                { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
+                UNCAP_START + SPRAY_AT,
+              );
 
-          gsap.to(cap.position, {
-            y: baseCapY,
-            duration: still ? 0 : 0.6,
-            ease: "power2.inOut",
-            overwrite: "auto",
-          });
+            // Mist spray & sound cue
+            activeSprayTl
+              .to(
+                mist.scale,
+                {
+                  x: 1,
+                  y: 1,
+                  z: 1,
+                  duration: SPRAY_DURATION,
+                  ease: "power2.out",
+                  onStart: () => playSprayRef.current(),
+                },
+                UNCAP_START + SPRAY_AT,
+              )
+              .to(
+                material,
+                { opacity: MIST_OPACITY, duration: MIST_IN, ease: "power1.out" },
+                UNCAP_START + SPRAY_AT,
+              )
+              .to(
+                material,
+                {
+                  opacity: 0,
+                  duration: SPRAY_DURATION - MIST_IN,
+                  ease: "power1.in",
+                },
+                UNCAP_START + SPRAY_AT + MIST_IN,
+              );
+            return;
+          }
 
-          window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
-        },
-        onEnterBack: () => {
-          // Re-entering upward from Craft:
-          // DO NOT open cap — the bottle remains sealed when scrolling up!
-          if (activeSprayTl) activeSprayTl.kill();
-          resetSprayState();
+          // Zone 3: Cap Closing inside Ritual (3.9 -> 4.7 screens on downward scroll)
+          // Keeps the bottle un-capped and open through the entire Ritual reading window (2.4 -> 3.9 screens)
+          // Then smoothly glides the cap shut as the user scrolls towards the end of Ritual (3.9 -> 4.7 screens)
+          if (hasUncapped) {
+            if (currentScreen >= 3.9 && isScrollingDown) {
+              const closeProgress = Math.min(
+                1,
+                Math.max(0, (currentScreen - 3.9) / (4.7 - 3.9)),
+              );
+              const targetY = baseCapY + height * LIFT * (1 - closeProgress);
 
-          gsap.to(cap.position, {
-            y: baseCapY,
-            duration: 0,
-            overwrite: "auto",
-          });
+              // Smoothly glide cap down towards baseCapY with scroll
+              gsap.to(cap.position, {
+                y: targetY,
+                duration: 0.15,
+                ease: "power1.out",
+                overwrite: "auto",
+              });
 
-          window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
-        },
-        onLeaveBack: () => {
-          // Exiting upward back into Manifesto:
-          // Ensure cap is seated and reset spray trigger so downward entries can uncap fresh
-          if (activeSprayTl) activeSprayTl.kill();
-          resetSprayState();
-
-          gsap.to(cap.position, {
-            y: baseCapY,
-            duration: still ? 0 : 0.35,
-            ease: "power2.inOut",
-            overwrite: "auto",
-          });
-
-          window.dispatchEvent(new Event(SPRAY_RESET_EVENT));
+              if (closeProgress >= 1) {
+                if (activeSprayTl) activeSprayTl.kill();
+                resetSprayState();
+                window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
+              }
+            } else if (isScrollingUp) {
+              // When scrolling up through Ritual, keep cap firmly closed — NEVER reopen!
+              if (currentScreen >= 3.9) {
+                gsap.killTweensOf(cap.position);
+              }
+            }
+          }
         },
       });
 

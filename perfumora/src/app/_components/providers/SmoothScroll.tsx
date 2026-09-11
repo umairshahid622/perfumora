@@ -51,6 +51,9 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
 
     lenisRef.current = lenis;
     setLenisInstance(lenis);
+    if (typeof window !== "undefined") {
+      (window as unknown as { lenis: Lenis | null }).lenis = lenis;
+    }
 
     // 2. Direct GSAP ScrollTrigger update from Lenis scroll events
     lenis.on("scroll", ScrollTrigger.update);
@@ -68,6 +71,9 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
       lenis.destroy();
       lenisRef.current = null;
       setLenisInstance(null);
+      if (typeof window !== "undefined") {
+        (window as unknown as { lenis: Lenis | null }).lenis = null;
+      }
     };
   }, []);
 
