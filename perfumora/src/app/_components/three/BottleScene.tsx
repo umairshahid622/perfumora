@@ -256,13 +256,12 @@ export default function BottleScene({
       const beat = { ease: "power1.inOut" };
 
       tl
-        // 0.0 -> 0.6 screens (0vh -> 60vh): Tilt into Manifesto lean as bottle drifts right
-        .to(tiltGroup.rotation, { y: -0.14, z: -0.16, duration: 0.6, ...beat }, 0)
-        // 0.6 -> 1.4 screens (60vh -> 140vh): Held tilted during Manifesto reading
-        // 1.4 -> 2.0 screens (140vh -> 200vh): Return upright cleanly as Ritual arrives and bottle drifts back center
-        .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 0.6, ...beat }, 1.4)
-        // 2.0 -> 3.0 screens (200vh -> 300vh): Held upright during Ritual steps, uncap, and mist spray
-        // 3.0 -> 3.8 screens (300vh -> 380vh): Smoothly transition to showcase pose as cap shuts
+        // 0.0 -> 1.0 screens: Tilt into Manifesto lean as bottle drifts right
+        .to(tiltGroup.rotation, { y: -0.14, z: -0.16, duration: 1.0, ...beat }, 0)
+        // 1.0 -> 2.0 screens: Held tilted during Manifesto reading
+        // 2.0 -> 3.0 screens: Return upright cleanly as Ritual arrives and bottle drifts back center
+        .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 1.0, ...beat }, 2.0)
+        // 3.0 -> 3.8 screens: Smoothly transition to showcase pose as cap shuts
         .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.8, ...beat }, 3.0);
     },
     { dependencies: [ready], revertOnUpdate: true },

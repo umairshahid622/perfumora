@@ -158,20 +158,26 @@ export function Ritual() {
         };
 
         const reset = () => {
-          // Steps reset independently
+          // Steps and subtitle reset smoothly on scroll-up
           gsap.killTweensOf([...items, ...lines, ...dots]);
-          if (items.length) gsap.set(items, { opacity: 0, y: STEP_RISE });
-          if (lines.length) gsap.set(lines, { opacity: 0, scaleX: 0 });
-          if (dots.length) gsap.set(dots, { opacity: 0, scale: 0 });
+          if (items.length) {
+            gsap.to(items, { opacity: 0, y: STEP_RISE, duration: 0.35, ease: "power2.inOut" });
+          }
+          if (lines.length) {
+            gsap.to(lines, { opacity: 0, scaleX: 0, duration: 0.3, ease: "power2.inOut" });
+          }
+          if (dots.length) {
+            gsap.to(dots, { opacity: 0, scale: 0, duration: 0.25, ease: "power2.inOut" });
+          }
           if (mobileCardRef.current) {
             gsap.killTweensOf(mobileCardRef.current);
-            gsap.set(mobileCardRef.current, { opacity: 0, y: STEP_RISE });
+            gsap.to(mobileCardRef.current, { opacity: 0, y: STEP_RISE, duration: 0.35, ease: "power2.inOut" });
           }
 
-          // Subtitle resets independently
+          // Subtitle resets smoothly
           if (subtitleRef.current) {
             gsap.killTweensOf(subtitleRef.current);
-            gsap.set(subtitleRef.current, { opacity: 0, y: STEP_RISE });
+            gsap.to(subtitleRef.current, { opacity: 0, y: STEP_RISE, duration: 0.35, ease: "power2.inOut" });
           }
         };
 
