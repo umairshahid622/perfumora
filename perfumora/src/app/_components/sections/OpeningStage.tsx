@@ -316,7 +316,7 @@ export function OpeningStage() {
             bottle its whole lifecycle for free: nailed to the viewport for as long as
             this box is lifted or stuck, then away with the stage. */}
         <div ref={ritualLift} className="absolute inset-0 z-30 overflow-y-auto md:overflow-hidden pointer-events-none">
-          <div ref={ritualPanel} className="min-h-full h-auto md:h-full">
+          <div ref={ritualPanel} className="relative z-50 min-h-full h-auto md:h-full pointer-events-none">
             <Ritual />
           </div>
 
@@ -363,8 +363,8 @@ export function OpeningStage() {
 
           {/* Persistent Product Bar (Price, Variant Name, Size Selector, Add to Bag)
               Live and interactable across Hero & Manifesto on mobile; stays visible on desktop across all beats. */}
-          <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 transition-all [opacity:var(--counter-presence,1)] [visibility:var(--bar-visibility,visible)] md:!opacity-100 md:!visibility-visible">
-            <Container>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 transition-all [opacity:var(--counter-presence,1)] [visibility:var(--bar-visibility,visible)] md:!opacity-100 md:!visibility-visible">
+            <Container className="pointer-events-auto">
               <ProductBar />
             </Container>
           </div>
