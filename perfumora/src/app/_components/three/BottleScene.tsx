@@ -56,7 +56,7 @@ const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
  */
 const REST = { y: -0.22, scale: 0.78 };
 const REST_TABLET = { y: -0.20, scale: 0.72 };
-const REST_COMPACT = { y: -0.16, scale: 0.66 };
+const REST_COMPACT = { y: -0.22, scale: 0.74 };
 
 export interface BottleSceneProps {
   /** Variant colour for the fragrance; defaults to the live `--accent` token. */

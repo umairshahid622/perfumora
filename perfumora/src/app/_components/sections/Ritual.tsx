@@ -194,19 +194,19 @@ export function Ritual() {
       tone="light"
       overlay
       full
-      className="bg-transparent pt-16 md:pt-20 pb-8 md:pb-12 md:h-full"
+      className="bg-transparent pt-14 md:pt-20 pb-24 md:pb-12 h-screen max-h-screen"
     >
-      <Container className="relative z-20 flex flex-1 flex-col justify-between">
-        <div className="flex flex-1 flex-col justify-between">
+      <Container className="relative z-20 flex h-full flex-1 flex-col justify-between">
+        <div className="flex h-full flex-1 flex-col justify-between pb-6 md:pb-0">
           {/* Top-left heading */}
-          <div className="flex max-w-xl flex-col gap-1.5 md:gap-2 shrink-0">
+          <div className="flex max-w-xl flex-col gap-1 md:gap-2 shrink-0">
             <Eyebrow>The Ritual</Eyebrow>
-            <RevealHeading className="text-2xl sm:text-3xl md:text-section font-display uppercase tracking-tight text-balance">
+            <RevealHeading className="text-xl sm:text-2xl md:text-section font-display uppercase tracking-tight text-balance">
               Three moments, one lasting impression
             </RevealHeading>
             <p
               ref={subtitleRef}
-              className="text-body text-muted-on-light mt-0.5 md:mt-1 max-w-md text-xs sm:text-sm md:text-base leading-relaxed"
+              className="text-body text-muted-on-light mt-0.5 max-w-md text-xs sm:text-sm md:text-base leading-relaxed"
             >
               There are three moments, one lasting impression.
             </p>
@@ -354,11 +354,10 @@ export function Ritual() {
           {/* Mobile Interactive Step Tabs Card (Applies ONLY to the 3 ritual steps) */}
           <div
             ref={mobileCardRef}
-            className="relative z-30 flex flex-col md:hidden pointer-events-auto mt-auto"
+            className="relative z-30 flex flex-col md:hidden pointer-events-auto mt-auto pb-1"
           >
-            <div className=" border-hairline-on-light bg-bg-light/92 backdrop-blur-md rounded-2xl border p-4 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-              {/* Step tabs */}
-              <div className="grid grid-cols-3 gap-1.5 border-b border-hairline-on-light pb-3">
+            <div className="border-hairline-on-light bg-bg-light/95 backdrop-blur-md rounded-2xl border p-2.5 sm:p-3 shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+              <div className="grid grid-cols-3 gap-1 border-b border-hairline-on-light pb-2">
                 {STEPS.map((step, idx) => {
                   const active = idx === activeStep;
                   return (
@@ -367,7 +366,7 @@ export function Ritual() {
                       type="button"
                       onClick={() => setActiveStep(idx)}
                       className={cn(
-                        "flex items-center justify-center gap-1 rounded-xl py-2 px-1 transition-all text-xs uppercase tracking-wider",
+                        "flex items-center justify-center gap-1 rounded-lg py-1.5 px-1 transition-all text-[11px] uppercase tracking-wider",
                         active
                           ? "bg-accent-on-light text-white font-semibold shadow-xs"
                           : "bg-black/[0.03] text-muted-on-light hover:text-ink font-medium",
@@ -388,17 +387,16 @@ export function Ritual() {
                 })}
               </div>
 
-              {/* Active step description */}
-              <div className="pt-3 min-h-[4rem]">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-display text-accent-on-light text-xl leading-none font-medium">
+              <div className="pt-2 min-h-[2.5rem]">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-display text-accent-on-light text-base leading-none font-medium">
                     {STEPS[activeStep].num}
                   </span>
-                  <h3 className="text-sm font-medium tracking-tight text-ink">
+                  <h3 className="text-xs font-medium tracking-tight text-ink">
                     {STEPS[activeStep].title}
                   </h3>
                 </div>
-                <p className="text-body text-muted-on-light mt-1 text-xs leading-relaxed">
+                <p className="text-body text-muted-on-light mt-0.5 text-[11px] leading-snug">
                   {STEPS[activeStep].body}
                 </p>
               </div>

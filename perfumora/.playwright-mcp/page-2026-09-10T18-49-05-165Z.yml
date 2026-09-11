@@ -1,0 +1,330 @@
+- generic [active] [ref=e1]:
+  - status "Loading Perfumora" [ref=e2]:
+    - heading [level=1] [aria-hidden] [ref=e3]:
+      - generic [ref=e4]: P
+      - generic [ref=e5]: E
+      - generic [ref=e6]: R
+      - generic [ref=e7]: F
+      - generic [ref=e8]: U
+      - generic [ref=e9]: M
+      - generic [ref=e10]: O
+      - generic [ref=e11]: R
+      - generic [ref=e12]: A
+    - generic [ref=e13]: "000"
+  - banner [ref=e17]:
+    - navigation [ref=e18]:
+      - button "Perfumora" [ref=e19]
+      - generic [ref=e20]:
+        - button "Home" [ref=e21]
+        - button "Fragrances" [ref=e22]
+        - button "Collection" [ref=e25]
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - button "Account" [ref=e28]
+          - button
+          - generic:
+            - list:
+              - listitem:
+                - button: Your orders
+              - listitem:
+                - button: Settings
+              - listitem:
+                - button: Log out
+        - button "Cart, 0 items" [ref=e32]
+        - button "Mute interaction sounds" [pressed] [ref=e36]
+  - button
+  - dialog:
+    - button
+    - generic:
+      - generic:
+        - generic: The Collection
+        - generic:
+          - paragraph: Rose Taif
+          - generic: 01 / Parfum
+      - list:
+        - listitem:
+          - button:
+            - generic:
+              - generic: Rose Taif
+              - generic: 01 / Parfum
+        - listitem:
+          - button:
+            - generic:
+              - generic: Sandalwood Dusk
+              - generic: 02 / Parfum
+        - listitem:
+          - button:
+            - generic:
+              - generic: Vetiver Green
+              - generic: 03 / Parfum
+        - listitem:
+          - button:
+            - generic:
+              - generic: Sea Salt & Sage
+              - generic: 04 / Parfum
+  - button
+  - dialog:
+    - banner:
+      - heading [level=2]: Cart
+      - button
+    - generic:
+      - paragraph: Your cart is empty.
+    - contentinfo:
+      - generic:
+        - generic: Subtotal
+        - generic: Rs. 0
+      - button:
+        - generic: Checkout
+  - button
+  - generic:
+    - dialog:
+      - button
+      - heading [level=2]: Welcome back
+      - paragraph: Log in to continue
+      - generic:
+        - generic:
+          - generic:
+            - textbox:
+              - /placeholder: you@example.com
+            - generic: Email
+        - generic:
+          - generic:
+            - textbox
+            - generic: Password
+        - button: Forgot password?
+        - button:
+          - generic: Log in
+      - button: Need an account? Sign up
+  - button
+  - generic:
+    - alertdialog:
+      - heading [level=2]: Log out?
+      - paragraph: This ends your session on this device. Your orders and details stay on your account, and your bag stays in this browser.
+      - generic:
+        - button:
+          - generic: Log out
+        - button: Cancel
+  - main [ref=e45]:
+    - generic [ref=e46]:
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - generic [aria-hidden]:
+            - generic:
+              - generic: R
+              - generic: o
+              - generic: s
+              - generic: e
+              - generic: T
+              - generic: a
+              - generic: i
+              - generic: f
+          - generic [ref=e54]:
+            - generic [ref=e55]: "01"
+            - generic [ref=e57]: / 04
+          - generic:
+            - button "Previous fragrance" [ref=e58]
+            - button "Next fragrance" [ref=e61]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - generic [ref=e66]: Rose Taif · Parfum
+            - paragraph [ref=e67]: Rs. 4,100
+          - radiogroup "Size" [ref=e69]:
+            - radio "30ml" [ref=e70]
+            - radio "50ml" [checked] [ref=e71]
+          - button "Add Rose Taif to bag" [ref=e73] [cursor=pointer]:
+            - generic [ref=e74]: Add to Bag
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Manifesto
+                  - heading "First, the ritual." [level=2]
+                  - generic:
+                    - paragraph: The lift of the cap, the press to the wrist, the pause before the day begins. A fragrance is worn — but first, each morning, it is chosen.
+                    - paragraph: "The vessel is made for that moment: weighted in the hand, sculpted to be reached for, a small ceremony repeated at the start of each day."
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: The Ritual
+                    - heading "Three moments, one lasting impression" [level=2]:
+                      - generic: Three
+                      - generic: moments,
+                      - generic: one
+                      - generic: lasting
+                      - generic: impression
+                    - paragraph: There are three moments, one lasting impression.
+                  - list:
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic: "01"
+                          - heading "Prime" [level=3]
+                        - paragraph: A single press to warm pulse points — wrist, throat, the nape of the neck.
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic: "02"
+                          - heading "Apply" [level=3]
+                        - paragraph: Hold the vessel a hand's width away and let the mist settle, never rub.
+                    - listitem:
+                      - generic:
+                        - generic:
+                          - generic: "03"
+                          - heading "Layer" [level=3]
+                        - paragraph: Return through the day as the scent softens; the refill is always close.
+    - generic [ref=e77]:
+      - generic [ref=e78]: Craft imagery · asset pending
+      - generic [ref=e80]:
+        - generic [ref=e81]: Craft
+        - heading "Composed in three movements" [level=2] [ref=e82]:
+          - generic [ref=e83]: Composed
+          - generic [ref=e84]: in
+          - generic [ref=e85]: three
+          - generic [ref=e86]: movements
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - term [ref=e89]: Top
+            - definition [ref=e90]: Bergamot · Pink Pepper
+          - generic [ref=e91]:
+            - term [ref=e92]: Heart
+            - definition [ref=e93]: Orris · Jasmine Absolute
+          - generic [ref=e94]:
+            - term [ref=e95]: Base
+            - definition [ref=e96]: Amber · Sandalwood · Musk
+    - generic [ref=e97]:
+      - generic [ref=e98]:
+        - generic [aria-hidden]:
+          - generic: Perfumora
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - generic [ref=e101]: The Collection
+            - heading "Selected fragrances" [level=2] [ref=e102]:
+              - generic [ref=e103]: Selected
+              - generic [ref=e104]: fragrances
+          - list [ref=e105]:
+            - listitem [ref=e106]:
+              - article [ref=e108]:
+                - generic [ref=e109]:
+                  - generic [ref=e110]: "01"
+                  - generic [ref=e111]: Rose Taif · asset pending
+                - generic [ref=e115]:
+                  - generic [ref=e116]: Rs. 4,100
+                  - generic [ref=e118]:
+                    - heading "Rose Taif" [level=3] [ref=e119]
+                    - generic [ref=e120]: Parfum
+                  - generic [ref=e121]:
+                    - radiogroup "Size" [ref=e122]:
+                      - radio "30ml" [ref=e123]
+                      - radio "50ml" [checked] [ref=e124]
+                    - button "Add Rose Taif, 50ml, to bag" [ref=e125] [cursor=pointer]:
+                      - generic [ref=e126]: Add to Bag
+            - listitem [ref=e127]:
+              - article [ref=e129]:
+                - generic [ref=e130]:
+                  - generic [ref=e131]: "02"
+                  - generic [ref=e132]: Sandalwood Dusk · asset pending
+                - generic [ref=e136]:
+                  - generic [ref=e137]: Rs. 3,900
+                  - generic [ref=e139]:
+                    - heading "Sandalwood Dusk" [level=3] [ref=e140]
+                    - generic [ref=e141]: Parfum
+                  - generic [ref=e142]:
+                    - radiogroup "Size" [ref=e143]:
+                      - radio "30ml" [ref=e144]
+                      - radio "50ml" [checked] [ref=e145]
+                    - button "Add Sandalwood Dusk, 50ml, to bag" [ref=e146] [cursor=pointer]:
+                      - generic [ref=e147]: Add to Bag
+            - listitem [ref=e148]:
+              - article [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]: "03"
+                  - generic [ref=e153]: Vetiver Green · asset pending
+                - generic [ref=e157]:
+                  - generic [ref=e158]: Rs. 3,600
+                  - generic [ref=e160]:
+                    - heading "Vetiver Green" [level=3] [ref=e161]
+                    - generic [ref=e162]: Parfum
+                  - generic [ref=e163]:
+                    - radiogroup "Size" [ref=e164]:
+                      - radio "30ml" [ref=e165]
+                      - radio "50ml" [checked] [ref=e166]
+                    - button "Add Vetiver Green, 50ml, to bag" [ref=e167] [cursor=pointer]:
+                      - generic [ref=e168]: Add to Bag
+            - listitem [ref=e169]:
+              - article [ref=e171]:
+                - generic [ref=e172]:
+                  - generic [ref=e173]: "04"
+                  - generic [ref=e174]: Sea Salt & Sage · asset pending
+                - generic [ref=e178]:
+                  - generic [ref=e179]: Rs. 3,700
+                  - generic [ref=e181]:
+                    - heading "Sea Salt & Sage" [level=3] [ref=e182]
+                    - generic [ref=e183]: Parfum
+                  - generic [ref=e184]:
+                    - radiogroup "Size" [ref=e185]:
+                      - radio "30ml" [ref=e186]
+                      - radio "50ml" [checked] [ref=e187]
+                    - button "Add Sea Salt & Sage, 50ml, to bag" [ref=e188] [cursor=pointer]:
+                      - generic [ref=e189]: Add to Bag
+      - button "View the full collection" [ref=e191] [cursor=pointer]
+    - generic [ref=e194]:
+      - generic [ref=e195]: Begin
+      - heading "Find the one that becomes yours" [level=2] [ref=e196]:
+        - generic [ref=e197]: Find
+        - generic [ref=e198]: the
+        - generic [ref=e199]: one
+        - generic [ref=e200]: that
+        - generic [ref=e201]: becomes
+        - generic [ref=e202]: yours
+      - button "Explore the collection" [ref=e203] [cursor=pointer]
+    - generic [ref=e207]:
+      - generic [ref=e208]:
+        - generic [ref=e209]: Contact
+        - heading "Speak with the atelier" [level=2] [ref=e210]:
+          - generic [ref=e211]: Speak
+          - generic [ref=e212]: with
+          - generic [ref=e213]: the
+          - generic [ref=e214]: atelier
+        - paragraph [ref=e215]: Questions on layering, refills, or a bespoke commission — leave a note and we’ll respond in kind.
+        - generic [ref=e216]:
+          - generic [ref=e217]: hello@perfumora.example
+          - generic [ref=e218]: By appointment · Pakistan
+      - generic [ref=e219]:
+        - generic [ref=e221]:
+          - textbox "Name" [ref=e222]:
+            - /placeholder: Your name
+          - generic: Name
+        - generic [ref=e224]:
+          - textbox "Email" [ref=e225]:
+            - /placeholder: you@example.com
+          - generic: Email
+        - generic [ref=e227]:
+          - textbox "Message" [ref=e228]:
+            - /placeholder: How can we help?
+          - generic: Message
+        - button "Send message" [ref=e229] [cursor=pointer]
+  - contentinfo [ref=e231]:
+    - generic [ref=e232]:
+      - generic [ref=e233]:
+        - generic [ref=e234]:
+          - button "Perfumora" [ref=e235]
+          - paragraph [ref=e236]: One sculpted vessel. Four expressions. Endlessly refillable.
+        - navigation "Footer" [ref=e237]:
+          - button "The Collection" [ref=e238]
+          - button "Manifesto" [ref=e239]
+          - button "The Ritual" [ref=e240]
+          - button "Craft" [ref=e241]
+          - button "Gallery" [ref=e242]
+          - button "Contact" [ref=e243]
+      - generic [ref=e244]:
+        - generic [ref=e245]: © 2026 Perfumora — front-end concept
+        - generic [ref=e246]: Sound can be muted from the header
+  - generic [aria-hidden]:
+    - generic: Perfumora
+  - button "Open Next.js Dev Tools" [ref=e252] [cursor=pointer]

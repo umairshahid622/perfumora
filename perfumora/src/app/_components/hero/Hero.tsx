@@ -75,23 +75,21 @@ export function Hero() {
 
           {/* Reserved space the persistent bottle rests over while the Hero is in
               view. Kept as a real box, not a bare gap, so the stage keeps its
-              height and the arrows and product bar stay where they were. The
-              phone value is the tighter one on purpose: below `md` the product bar
-              breaks into three stacked rows, and this box plus those rows plus the
-              counter have to stay inside one screen. */}
-          <div
-            aria-hidden="true"
-            className="relative z-10 h-[46vh] w-full max-w-lg md:h-[60vh]"
-          />
+              height and the arrows and product bar stay where they were. */}
+          <div className="relative z-10 flex h-[33vh] sm:h-[42vh] md:h-[60vh] w-full max-w-lg flex-col items-center justify-center">
+            <div aria-hidden="true" className="h-full w-full" />
+
+            {/* Position counter — positioned exactly below the vessel (§4.1). */}
+            <div className="absolute -bottom-3 sm:-bottom-2 md:bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+              <PositionCounter />
+            </div>
+          </div>
 
           {/* Flanking prev/next arrows */}
           <div className="pointer-events-none absolute inset-0 z-20">
             <VariantArrows />
           </div>
         </div>
-
-        {/* Position counter — the Hero's sole position indicator (§4.1). */}
-        <PositionCounter />
 
         {/* Product bar */}
         <div className="grid grid-cols-2 items-end gap-3 py-4 md:grid-cols-3 md:gap-6 md:py-4">
