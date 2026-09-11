@@ -283,13 +283,31 @@ export async function signUp(
   const supabase = await supabaseAuth(meta);
   const { data, error } = await supabase.auth.signUp({
     ...creds,
-    // `full_name` rather than `display_name`: it is the key `customerFrom` reads
-    // first, what GoTrue's email templates and most providers use, and what the
-    // accounts already in this project carry. Left off entirely when there is no
-    // name, so the metadata never holds an empty one.
-    options: stored ? { data: { full_name: stored } } : undefined,
+    options: {
+      data: {
+        ...(stored ? { full_name: stored } : {}),
+        signup_source: "storefront_app",
+        role: "customer",
+      },
+    },
   });
   if (error) return refused(error, "signUp", meta);
+
+  // Ensure user_roles entity is populated for customer role
+  if (data.user?.id) {
+    try {
+      const { supabaseAdmin } = await import("./supabase-admin");
+      const admin = supabaseAdmin();
+      await admin
+        .from("user_roles")
+        .upsert(
+          { user_id: data.user.id, role: "customer" },
+          { onConflict: "user_id", ignoreDuplicates: true },
+        );
+    } catch (roleErr) {
+      console.warn("user_roles insertion failed or table not found:", roleErr);
+    }
+  }
 
   // Two honest outcomes, decided by the project's "Confirm email" setting: with
   // it on, GoTrue creates the user and withholds the session until the link is

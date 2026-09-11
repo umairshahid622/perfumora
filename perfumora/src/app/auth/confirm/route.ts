@@ -68,12 +68,28 @@ export async function GET(request: NextRequest) {
   // reaches a writable cookie store here — a Route Handler may set cookies, which
   // is the one thing this route exists to do.
   const supabase = await supabaseAuth();
-  const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+  const { data: verified, error } = await supabase.auth.verifyOtp({ type, token_hash });
 
   // A link that has expired, or one already spent. Not logged: GoTrue does not
   // distinguish the two, and both are a stale email in someone's inbox rather
   // than a fault of ours.
   if (error) return back("/?confirm=expired");
+
+  // Ensure user_roles has customer entry
+  if (verified?.user?.id) {
+    try {
+      const { supabaseAdmin } = await import("../../_lib/supabase-admin");
+      const admin = supabaseAdmin();
+      await admin
+        .from("user_roles")
+        .upsert(
+          { user_id: verified.user.id, role: "customer" },
+          { onConflict: "user_id", ignoreDuplicates: true },
+        );
+    } catch (roleErr) {
+      console.warn("user_roles insertion failed or table not found:", roleErr);
+    }
+  }
 
   // Signed in — the session cookies ride out on this redirect, and <Navigation>
   // asks `currentCustomer()` on mount, so the account button is already wearing
