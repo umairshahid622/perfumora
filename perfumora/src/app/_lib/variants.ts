@@ -42,6 +42,8 @@ export interface Variant {
   hex: string;
   /** Which text token stays legible on a button filled with `hex` (§3.3). */
   contrast: "ink" | "paper";
+  /** Optional public URL to transparent bottle shot (stored in Supabase Storage). */
+  imageUrl?: string | null;
   /** Price + stock per size sold. Never empty: `getCatalogue` drops fragrances
    *  with no size rows, since they have no price and cannot be bought. */
   sizes: SizeMap;

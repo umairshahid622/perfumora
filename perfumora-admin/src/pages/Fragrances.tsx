@@ -248,14 +248,22 @@ function FragranceCard({
     >
       {/* Image / color swatch */}
       <div
-        className="relative flex h-32 items-center justify-center"
+        className="relative flex h-32 items-center justify-center overflow-hidden"
         style={{ backgroundColor: frag.color }}
       >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(120% 78% at 50% 14%, rgba(255,255,255,0.18), transparent 60%)",
+          }}
+        />
         {isPreviewable && (
           <img
             src={frag.imageUrl}
             alt={frag.name}
-            className="h-full w-full object-cover"
+            className="relative z-10 h-full w-full object-contain p-2 filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.3)] transition-transform duration-300 group-hover:scale-105"
           />
         )}
         <div className="absolute left-2 top-2 flex gap-1.5">

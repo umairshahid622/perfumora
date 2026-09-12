@@ -92,15 +92,24 @@ export function GalleryCard({
               {position}
             </span>
 
-            {/* Product — placeholder now, HD bottle shot later. The drop shadow
-                reads it as lifted off the panel. */}
+            {/* Product — transparent bottle shot when uploaded, placeholder otherwise.
+                The drop shadow reads it as lifted off the panel. */}
             <div className="relative z-10 px-7 pt-9 pb-11">
               <div className="mx-auto aspect-[3/4] w-[74%] drop-shadow-[0_24px_30px_rgba(11,11,12,0.55)]">
-                <ImagePlaceholder
-                  tone="dark"
-                  label={variant.name}
-                  className="h-full w-full"
-                />
+                {variant.imageUrl ? (
+                  <img
+                    src={variant.imageUrl}
+                    alt={variant.name}
+                    className="h-full w-full object-contain filter drop-shadow-[0_12px_20px_rgba(0,0,0,0.3)] transition-transform duration-500 hover:scale-105"
+                    loading="lazy"
+                  />
+                ) : (
+                  <ImagePlaceholder
+                    tone="dark"
+                    label={variant.name}
+                    className="h-full w-full"
+                  />
+                )}
               </div>
             </div>
           </div>

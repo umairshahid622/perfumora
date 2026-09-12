@@ -27,6 +27,7 @@ interface FragranceRow {
   id: string;
   name: string;
   color: string;
+  image_url: string | null;
   fragrance_sizes: SizeRow[];
 }
 
@@ -59,6 +60,7 @@ function toVariant(row: FragranceRow): Variant {
     id: row.id,
     name: row.name,
     hex: row.color,
+    imageUrl: row.image_url ?? null,
     // Derived, not stored: the database holds one colour per fragrance and every
     // other colour on the page — the readable foregrounds, the glow, the 3D
     // juice, this label token — is computed from it in `variants.ts`.
@@ -68,7 +70,7 @@ function toVariant(row: FragranceRow): Variant {
 }
 
 // Nested select: one round trip brings each fragrance and its size rows.
-const FRAGRANCE_SELECT = "id, name, color, fragrance_sizes ( size, price, stock )";
+const FRAGRANCE_SELECT = "id, name, color, image_url, fragrance_sizes ( size, price, stock )";
 
 /**
  * Every fragrance the shop currently sells, in the order the catalogue was built.

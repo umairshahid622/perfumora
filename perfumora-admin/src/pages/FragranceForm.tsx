@@ -3,9 +3,16 @@ import type { Fragrance, SizeKey, SizeMap, SizeVariant } from "../lib/types";
 import { SIZE_KEYS, offeredSizes } from "../lib/types";
 import { uploadFragranceImage } from "../lib/api";
 import { errorMessage } from "../lib/errors";
+import {
+  removeImageBackground,
+  trimImageBottom,
+  blobToFile,
+  type BgRemovalProgress,
+} from "../lib/bgRemoval";
 import { Button } from "../components/Button";
 import { TextField, TextAreaField } from "../components/Field";
 import { Icon } from "../components/Icon";
+import { Modal } from "../components/Modal";
 
 /* Add/Edit fragrance form (rendered inside a Modal). Controlled local state;
    on submit it hands a fully-formed Fragrance back to the page, which saves it.
@@ -85,6 +92,7 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
           <ImagePicker
             value={draft.imageUrl}
             color={draft.color}
+            fragranceName={draft.name}
             onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
           />
         </div>
@@ -234,70 +242,426 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
   );
 }
 
-/* Small square image dropzone. The file goes straight to the Supabase Storage
-   bucket and what's kept on the draft is the returned public URL — an object
-   URL would only survive until the next reload. */
+/* Image picker with in-browser AI background removal, reflection trimmer, and
+   storefront card preview. Transparent PNGs are uploaded directly to Supabase Storage. */
 function ImagePicker({
   value,
   color,
+  fragranceName,
   onChange,
 }: {
   value: string;
   color: string;
+  fragranceName?: string;
   onChange: (url: string) => void;
 }) {
+  const [autoRemoveBg, setAutoRemoveBg] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState<BgRemovalProgress>({
+    message: "",
+    percent: 0,
+  });
   const [error, setError] = useState<string | null>(null);
+
+  // In-memory references to enable toggling between Cutout and Original
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  const [cutoutBlob, setCutoutBlob] = useState<Blob | null>(null);
+  const [activeMode, setActiveMode] = useState<"cutout" | "original">("cutout");
+  const [trimPercent, setTrimPercent] = useState(0);
+  const [showTrimSlider, setShowTrimSlider] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
+
   const isPreviewable = value.startsWith("http");
 
-  const upload = async (file: File) => {
+  const processAndUpload = async (file: File) => {
+    setError(null);
+    setRawFile(file);
+
+    if (!autoRemoveBg) {
+      setUploading(true);
+      try {
+        const publicUrl = await uploadFragranceImage(file);
+        onChange(publicUrl);
+      } catch (err) {
+        setError(errorMessage(err, "Upload failed."));
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
+    setProcessing(true);
+    setProgress({ message: "Starting AI cutout...", percent: 10 });
+
+    try {
+      // 1. Run client-side AI background removal
+      const processedBlob = await removeImageBackground(file, (p) => {
+        setProgress(p);
+      });
+
+      setCutoutBlob(processedBlob);
+      setActiveMode("cutout");
+      setTrimPercent(0);
+
+      // 2. Upload the transparent PNG
+      setUploading(true);
+      setProgress({ message: "Uploading transparent PNG...", percent: 95 });
+      const pngFile = blobToFile(processedBlob, file.name);
+      const publicUrl = await uploadFragranceImage(pngFile);
+      onChange(publicUrl);
+    } catch (err) {
+      console.warn("AI background removal error:", err);
+      setError("AI cutout encountered an issue. Uploading original image instead.");
+      try {
+        setUploading(true);
+        const publicUrl = await uploadFragranceImage(file);
+        onChange(publicUrl);
+      } catch (uploadErr) {
+        setError(errorMessage(uploadErr, "Upload failed."));
+      }
+    } finally {
+      setProcessing(false);
+      setUploading(false);
+    }
+  };
+
+  const switchMode = async (mode: "cutout" | "original") => {
+    if (mode === activeMode || !rawFile) return;
+    setActiveMode(mode);
     setUploading(true);
     setError(null);
     try {
-      onChange(await uploadFragranceImage(file));
+      if (mode === "original") {
+        const publicUrl = await uploadFragranceImage(rawFile);
+        onChange(publicUrl);
+      } else if (cutoutBlob) {
+        const toUpload =
+          trimPercent > 0
+            ? await trimImageBottom(cutoutBlob, trimPercent)
+            : cutoutBlob;
+        const pngFile = blobToFile(toUpload, rawFile.name);
+        const publicUrl = await uploadFragranceImage(pngFile);
+        onChange(publicUrl);
+      }
     } catch (err) {
-      setError(errorMessage(err, "Upload failed."));
+      setError(errorMessage(err, "Failed to switch version."));
     } finally {
       setUploading(false);
     }
   };
 
+  const applyTrim = async (percent: number) => {
+    setTrimPercent(percent);
+    if (!cutoutBlob || !rawFile) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const trimmed = await trimImageBottom(cutoutBlob, percent);
+      const pngFile = blobToFile(trimmed, rawFile.name, `trimmed-${percent}`);
+      const publicUrl = await uploadFragranceImage(pngFile);
+      onChange(publicUrl);
+    } catch (err) {
+      setError(errorMessage(err, "Failed to trim reflection."));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onChange("");
+    setRawFile(null);
+    setCutoutBlob(null);
+    setTrimPercent(0);
+    setShowTrimSlider(false);
+    setError(null);
+  };
+
   return (
-    <div className="w-28">
-      <label
-        className="relative flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-slate-300 transition-colors hover:border-accent"
-        style={!isPreviewable ? { backgroundColor: color } : undefined}
-      >
-        {isPreviewable ? (
-          <img src={value} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="flex flex-col items-center gap-1 text-white/90">
-            <Icon name="upload" className="h-5 w-5" />
-            <span className="text-xs font-medium">Upload</span>
-          </span>
-        )}
+    <div className="space-y-2">
+      {/* Upload Tile */}
+      <div className="w-36">
+        <label
+          className="group relative flex h-36 w-36 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 transition-all hover:border-accent hover:shadow-sm"
+          style={
+            isPreviewable
+              ? { backgroundColor: color }
+              : undefined
+          }
+        >
+          {isPreviewable ? (
+            <>
+              {/* Studio wash highlight */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(120% 78% at 50% 14%, rgba(255,255,255,0.22), transparent 60%)",
+                }}
+              />
+              <img
+                src={value}
+                alt=""
+                className="relative z-10 h-full w-full object-contain p-2 filter drop-shadow-[0_12px_20px_rgba(0,0,0,0.35)] transition-transform group-hover:scale-105"
+              />
+              <div className="absolute inset-0 z-20 flex items-center justify-center gap-1.5 bg-slate-900/60 opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="flex items-center gap-1 rounded-md bg-white/20 px-2 py-1 text-xs font-medium text-white backdrop-blur">
+                  <Icon name="upload" className="h-3.5 w-3.5" />
+                  Replace
+                </span>
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="rounded-md bg-rose-500/80 p-1 text-white hover:bg-rose-600"
+                  title="Remove image"
+                >
+                  <Icon name="trash" className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <span className="flex flex-col items-center gap-1.5 text-slate-400 group-hover:text-accent">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 group-hover:bg-accent/10">
+                <Icon name="upload" className="h-5 w-5" />
+              </div>
+              <span className="text-xs font-medium">Upload photo</span>
+            </span>
+          )}
 
-        {uploading && (
-          <span className="absolute inset-0 flex items-center justify-center bg-slate-900/50">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-          </span>
-        )}
+          {/* Uploading or AI processing overlay */}
+          {(uploading || processing) && (
+            <span className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/80 p-2 text-center text-white">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              <span className="mt-2 text-[11px] font-medium leading-tight">
+                {processing ? progress.message : "Saving image…"}
+              </span>
+              {processing && progress.percent !== undefined && (
+                <div className="mt-1.5 h-1 w-20 overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full bg-accent transition-all duration-300"
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                </div>
+              )}
+            </span>
+          )}
 
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={uploading || processing}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void processAndUpload(file);
+            }}
+          />
+        </label>
+      </div>
+
+      {/* Auto-remove BG Toggle */}
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600 hover:text-slate-900 select-none">
         <input
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          disabled={uploading}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void upload(file);
-          }}
+          type="checkbox"
+          checked={autoRemoveBg}
+          onChange={(e) => setAutoRemoveBg(e.target.checked)}
+          className="h-3.5 w-3.5 rounded border-slate-300 text-accent focus:ring-accent"
         />
+        <span className="flex items-center gap-1 font-medium">
+          <Icon name="sparkles" className="h-3.5 w-3.5 text-amber-500" />
+          Auto-remove background
+        </span>
       </label>
+
+      {/* Refinement controls once an image is uploaded and cutout is available */}
+      {isPreviewable && cutoutBlob && rawFile && (
+        <div className="w-56 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-slate-700">Image Version</span>
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+              <Icon name="sparkles" className="h-2.5 w-2.5" />
+              Cutout
+            </span>
+          </div>
+
+          {/* Mode switch */}
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-200/70 p-0.5">
+            <button
+              type="button"
+              onClick={() => void switchMode("cutout")}
+              className={`rounded-md py-1 text-center font-medium transition-all ${
+                activeMode === "cutout"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Cutout
+            </button>
+            <button
+              type="button"
+              onClick={() => void switchMode("original")}
+              className={`rounded-md py-1 text-center font-medium transition-all ${
+                activeMode === "original"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Original
+            </button>
+          </div>
+
+          {/* Reflection trimmer (useful when studio bottle shots have a tabletop reflection) */}
+          {activeMode === "cutout" && (
+            <div className="border-t border-slate-200/80 pt-1.5">
+              <button
+                type="button"
+                onClick={() => setShowTrimSlider(!showTrimSlider)}
+                className="flex w-full items-center justify-between text-slate-600 hover:text-slate-900"
+              >
+                <span>Trim floor reflection</span>
+                <span className="text-slate-400 font-mono text-[10px]">
+                  {trimPercent > 0 ? `-${trimPercent}%` : "0%"}
+                </span>
+              </button>
+
+              {showTrimSlider && (
+                <div className="mt-1.5 space-y-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={35}
+                    step={2}
+                    value={trimPercent}
+                    onChange={(e) => void applyTrim(Number(e.target.value))}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-300 accent-accent"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>Keep all</span>
+                    <span>Trim 35%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Storefront Card Preview Button */}
+          <button
+            type="button"
+            onClick={() => setShowCardModal(true)}
+            className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white py-1 font-medium text-slate-700 shadow-xs hover:bg-slate-100"
+          >
+            <Icon name="eye" className="h-3 w-3" />
+            Preview on storefront card
+          </button>
+        </div>
+      )}
+
+      {/* When image exists but not from local session, still allow Card Preview */}
+      {isPreviewable && !cutoutBlob && (
+        <button
+          type="button"
+          onClick={() => setShowCardModal(true)}
+          className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-accent"
+        >
+          <Icon name="eye" className="h-3.5 w-3.5" />
+          Preview on storefront card
+        </button>
+      )}
+
       {error && (
-        <p role="alert" className="mt-1.5 text-xs text-rose-600">
+        <p role="alert" className="text-xs text-rose-600">
           {error}
         </p>
+      )}
+
+      {/* Storefront Card Preview Modal */}
+      {showCardModal && (
+        <Modal
+          open={showCardModal}
+          onClose={() => setShowCardModal(false)}
+          title="Storefront Card Preview"
+          maxWidth="max-w-xs"
+        >
+          <div className="p-4">
+            <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[#faf6ee] shadow-xl">
+              {/* Colored top panel with bottle */}
+              <div
+                className="relative flex items-center justify-center"
+                style={{ backgroundColor: color }}
+              >
+                {/* Studio wash */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background:
+                      "radial-gradient(120% 78% at 50% 14%, rgba(255,255,255,0.22), transparent 62%)",
+                  }}
+                />
+                <span className="absolute top-3 left-3 z-20 rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase text-white backdrop-blur-sm">
+                  01
+                </span>
+                <div className="relative z-10 px-6 pt-8 pb-10">
+                  <div className="mx-auto aspect-[3/4] w-36 drop-shadow-[0_24px_30px_rgba(11,11,12,0.55)]">
+                    <img
+                      src={value}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card content */}
+              <div className="px-5 pb-5">
+                <div className="mt-2.5 mb-3 flex">
+                  <span
+                    className="inline-flex items-center rounded-full px-3.5 py-1 text-xs font-semibold text-white shadow-sm"
+                    style={{ backgroundColor: color }}
+                  >
+                    Rs. 3,600
+                  </span>
+                </div>
+                <h4 className="text-base font-semibold text-slate-900">
+                  {fragranceName || "Perfume Name"}
+                </h4>
+                <p className="text-[10px] font-medium uppercase text-slate-400">
+                  Parfum
+                </p>
+                <div className="mt-4 flex gap-2">
+                  <span className="flex-1 rounded-full border border-slate-300 py-1 text-center text-xs font-medium text-slate-700">
+                    30ML
+                  </span>
+                  <span
+                    className="flex-1 rounded-full border py-1 text-center text-xs font-semibold"
+                    style={{ borderColor: color, color }}
+                  >
+                    50ML
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-full py-2 text-xs font-semibold text-white shadow-sm"
+                  style={{ backgroundColor: color }}
+                >
+                  ADD TO BAG
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowCardModal(false)}
+              >
+                Close Preview
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

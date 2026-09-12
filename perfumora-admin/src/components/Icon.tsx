@@ -34,7 +34,8 @@ export type IconName =
   | "clock"
   | "x-circle"
   | "check-circle"
-  | "trending-up";
+  | "trending-up"
+  | "sparkles";
 
 // Path/element markup per icon, drawn on a 24×24 grid with round caps/joins.
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -163,6 +164,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="m3 17 6-6 4 4 8-8" />
       <path d="M17 7h4v4" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" />
+      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
     </>
   ),
 };
