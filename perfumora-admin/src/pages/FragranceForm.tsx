@@ -6,6 +6,8 @@ import { errorMessage } from "../lib/errors";
 import {
   removeImageBackground,
   trimImageBottom,
+  autocropTransparentPadding,
+  isImageAlreadyTransparent,
   blobToFile,
   type BgRemovalProgress,
 } from "../lib/bgRemoval";
@@ -423,22 +425,37 @@ function ImagePicker({
     }
 
     setProcessing(true);
-    setProgress({ message: "Removing background...", percent: 20 });
 
     try {
-      // Run client-side AI background removal
-      const processedBlob = await removeImageBackground(file, (p) => {
-        setProgress(p);
-      });
+      let processedBlob: Blob = file;
+      const alreadyTransparent = await isImageAlreadyTransparent(file);
 
-      setBaseCutoutBlob(processedBlob);
+      if (!alreadyTransparent) {
+        setProgress({ message: "Removing background...", percent: 20 });
+        processedBlob = await removeImageBackground(file, (p) => {
+          setProgress(p);
+        });
+      } else {
+        setProgress({ message: "Transparent image detected, verifying framing...", percent: 60 });
+      }
+
+      // Automatically crop empty transparent space from all 4 sides (preserves already-cropped images untouched)
+      setProgress({ message: "Auto-cropping empty padding...", percent: 90 });
+      let finalBlob = processedBlob;
+      try {
+        finalBlob = await autocropTransparentPadding(processedBlob, 0.02);
+      } catch (cropErr) {
+        console.warn("Autocrop fallback to uncropped:", cropErr);
+      }
+
+      setBaseCutoutBlob(finalBlob);
       setActiveMode("cutout");
       setTrimPercent(0);
 
-      // Upload the transparent PNG
+      // Upload the transparent cropped PNG
       setUploading(true);
       setProgress({ message: "Uploading transparent PNG...", percent: 95 });
-      const pngFile = blobToFile(processedBlob, file.name);
+      const pngFile = blobToFile(finalBlob, file.name, "cropped");
       const publicUrl = await uploadFragranceImage(pngFile);
       onChange(publicUrl);
     } catch (err) {
@@ -504,6 +521,31 @@ function ImagePicker({
       }
     } catch (err) {
       setError(errorMessage(err, "Failed to switch version."));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAutoCrop = async () => {
+    setUploading(true);
+    setError(null);
+    try {
+      const base = await getBaseBlob();
+      if (!base) {
+        setError("Unable to load image for auto-crop.");
+        return;
+      }
+      const croppedBlob = await autocropTransparentPadding(base, 0.02);
+      setBaseCutoutBlob(croppedBlob);
+      const nameSlug = fragranceName
+        ? fragranceName.toLowerCase().replace(/[^a-z0-9]/g, "-")
+        : "fragrance";
+      const filename = rawFile?.name || `${nameSlug}-cropped.png`;
+      const pngFile = blobToFile(croppedBlob, filename, "tight");
+      const publicUrl = await uploadFragranceImage(pngFile);
+      onChange(publicUrl);
+    } catch (err) {
+      setError(errorMessage(err, "Failed to auto-crop image padding."));
     } finally {
       setUploading(false);
     }
@@ -677,6 +719,20 @@ function ImagePicker({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Auto-crop empty padding button */}
+          {activeMode === "cutout" && (
+            <button
+              type="button"
+              disabled={uploading || processing}
+              onClick={() => void handleAutoCrop()}
+              title="Remove surrounding transparent padding so the bottle fills the card frame"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
+            >
+              <Icon name="sparkles" className="h-3.5 w-3.5 text-amber-500" />
+              Auto-crop empty space
+            </button>
           )}
 
           {/* Storefront Card Preview Button */}

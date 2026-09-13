@@ -354,6 +354,213 @@ export async function rotateImage(
 }
 
 /**
+ * Auto-crops all empty transparent padding from the top, bottom, left, and right
+ * of an image, tightly framing the physical subject/bottle with optional breathable margin.
+ *
+ * @param imageSource Blob | File | string
+ * @param paddingRatio Optional padding ratio around subject (default: 0.02, i.e. 2%)
+ */
+export async function autocropTransparentPadding(
+  imageSource: Blob | File | string,
+  paddingRatio = 0.02,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    let objectUrlToRevoke: string | null = null;
+
+    const cleanup = () => {
+      if (objectUrlToRevoke) {
+        URL.revokeObjectURL(objectUrlToRevoke);
+        objectUrlToRevoke = null;
+      }
+    };
+
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        if (w === 0 || h === 0) {
+          cleanup();
+          resolve(imageSource instanceof Blob ? imageSource : new Blob());
+          return;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) {
+          cleanup();
+          resolve(imageSource instanceof Blob ? imageSource : new Blob());
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, w, h);
+        const { data } = ctx.getImageData(0, 0, w, h);
+
+        // Alpha threshold: pixels with alpha > 15 count as visible subject
+        const ALPHA_THRESHOLD = 15;
+        let minX = w;
+        let maxX = -1;
+        let minY = h;
+        let maxY = -1;
+
+        for (let y = 0; y < h; y++) {
+          const rowOffset = y * w * 4;
+          for (let x = 0; x < w; x++) {
+            const alpha = data[rowOffset + x * 4 + 3];
+            if (alpha > ALPHA_THRESHOLD) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        // If no visible pixels found (empty or transparent image)
+        if (maxX === -1 || maxY === -1 || minX >= maxX || minY >= maxY) {
+          cleanup();
+          if (imageSource instanceof Blob) resolve(imageSource);
+          else canvas.toBlob((b) => resolve(b || new Blob()), "image/png");
+          return;
+        }
+
+        // Safeguard: If image is ALREADY tightly cropped (content spans within 4px of edges),
+        // return the original source untouched without re-compression
+        const isAlreadyCropped =
+          minX <= 4 &&
+          minY <= 4 &&
+          maxX >= w - 5 &&
+          maxY >= h - 5;
+
+        if (isAlreadyCropped) {
+          cleanup();
+          if (imageSource instanceof Blob) resolve(imageSource);
+          else canvas.toBlob((b) => resolve(b || new Blob()), "image/png", 1.0);
+          return;
+        }
+
+        const subjectW = maxX - minX + 1;
+        const subjectH = maxY - minY + 1;
+
+        // Apply a small breathable cushion (e.g. 2% padding)
+        const padX = Math.round(subjectW * Math.max(0, paddingRatio));
+        const padY = Math.round(subjectH * Math.max(0, paddingRatio));
+
+        const cropX = Math.max(0, minX - padX);
+        const cropY = Math.max(0, minY - padY);
+        const cropW = Math.min(w - cropX, subjectW + padX * 2);
+        const cropH = Math.min(h - cropY, subjectH + padY * 2);
+
+        // Create the cropped canvas
+        const cropCanvas = document.createElement("canvas");
+        cropCanvas.width = cropW;
+        cropCanvas.height = cropH;
+        const cropCtx = cropCanvas.getContext("2d");
+        if (!cropCtx) {
+          cleanup();
+          if (imageSource instanceof Blob) resolve(imageSource);
+          else canvas.toBlob((b) => resolve(b || new Blob()), "image/png");
+          return;
+        }
+
+        cropCtx.drawImage(
+          canvas,
+          cropX,
+          cropY,
+          cropW,
+          cropH,
+          0,
+          0,
+          cropW,
+          cropH,
+        );
+
+        cropCanvas.toBlob(
+          (resultBlob) => {
+            cleanup();
+            if (resultBlob) resolve(resultBlob);
+            else if (imageSource instanceof Blob) resolve(imageSource);
+            else resolve(new Blob());
+          },
+          "image/png",
+          1.0,
+        );
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+
+    img.onerror = async () => {
+      if (typeof imageSource === "string" && imageSource.startsWith("http")) {
+        try {
+          const res = await fetch(imageSource);
+          const b = await res.blob();
+          objectUrlToRevoke = URL.createObjectURL(b);
+          img.src = objectUrlToRevoke;
+          return;
+        } catch (fetchErr) {
+          cleanup();
+          reject(fetchErr);
+          return;
+        }
+      }
+      cleanup();
+      reject(new Error("Failed to load image for autocrop."));
+    };
+
+    if (typeof imageSource === "string") {
+      img.src = imageSource;
+    } else {
+      objectUrlToRevoke = URL.createObjectURL(imageSource);
+      img.src = objectUrlToRevoke;
+    }
+  });
+}
+
+/**
+ * Checks whether an image file is already a transparent PNG/WebP with cutout content.
+ */
+export async function isImageAlreadyTransparent(file: File | Blob): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (file.type !== "image/png" && file.type !== "image/webp") {
+      return resolve(false);
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 60;
+        canvas.height = 60;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return resolve(false);
+        ctx.drawImage(img, 0, 0, 60, 60);
+        const { data } = ctx.getImageData(0, 0, 60, 60);
+        let transparentCount = 0;
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] < 25) transparentCount++;
+        }
+        // If more than 15% of pixels are transparent, it is already a transparent cutout
+        resolve(transparentCount > 60 * 60 * 0.15);
+      } catch {
+        resolve(false);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(false);
+    };
+    img.src = url;
+  });
+}
+
+/**
  * Converts a Blob to a File with a sanitized PNG filename ready for Supabase storage upload.
  */
 export function blobToFile(
