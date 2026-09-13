@@ -28,6 +28,7 @@ interface FragranceRow {
   name: string;
   color: string;
   image_url: string | null;
+  concentration?: string | null;
   fragrance_sizes: SizeRow[];
 }
 
@@ -61,6 +62,7 @@ function toVariant(row: FragranceRow): Variant {
     name: row.name,
     hex: row.color,
     imageUrl: row.image_url ?? null,
+    concentration: row.concentration ?? "Eau de Parfum",
     // Derived, not stored: the database holds one colour per fragrance and every
     // other colour on the page — the readable foregrounds, the glow, the 3D
     // juice, this label token — is computed from it in `variants.ts`.
@@ -70,7 +72,10 @@ function toVariant(row: FragranceRow): Variant {
 }
 
 // Nested select: one round trip brings each fragrance and its size rows.
-const FRAGRANCE_SELECT = "id, name, color, image_url, fragrance_sizes ( size, price, stock )";
+const FRAGRANCE_SELECT_WITH_CONCENTRATION =
+  "id, name, color, image_url, concentration, fragrance_sizes ( size, price, stock )";
+const FRAGRANCE_SELECT_LEGACY =
+  "id, name, color, image_url, fragrance_sizes ( size, price, stock )";
 
 /**
  * Every fragrance the shop currently sells, in the order the catalogue was built.
@@ -89,12 +94,27 @@ const FRAGRANCE_SELECT = "id, name, color, image_url, fragrance_sizes ( size, pr
  * express intent at the call site, and it costs nothing to say it out loud.
  */
 export const getCatalogue = cache(async (): Promise<Variant[]> => {
-  const { data, error } = await supabase
+  let res: { data: any; error: any } = await supabase
     .from("fragrances")
-    .select(FRAGRANCE_SELECT)
+    .select(FRAGRANCE_SELECT_WITH_CONCENTRATION)
     .eq("active", true)
     .order("created_at");
 
+  // Fallback gracefully if concentration column doesn't exist yet in Supabase
+  if (
+    res.error &&
+    (res.error.code === "PGRST202" ||
+      res.error.code === "42703" ||
+      res.error.message?.includes("concentration"))
+  ) {
+    res = await supabase
+      .from("fragrances")
+      .select(FRAGRANCE_SELECT_LEGACY)
+      .eq("active", true)
+      .order("created_at");
+  }
+
+  const { data, error } = res;
   if (error) throw new Error(`Could not load the catalogue: ${error.message}`);
 
   // A fragrance with no size rows has no price and cannot be bought — it is the

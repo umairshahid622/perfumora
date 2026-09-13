@@ -44,6 +44,8 @@ export interface Variant {
   contrast: "ink" | "paper";
   /** Optional public URL to transparent bottle shot (stored in Supabase Storage). */
   imageUrl?: string | null;
+  /** Concentration tier (e.g. Eau de Cologne, Eau de Toilette, Eau de Parfum, Extrait de Parfum). */
+  concentration?: string;
   /** Price + stock per size sold. Never empty: `getCatalogue` drops fragrances
    *  with no size rows, since they have no price and cannot be bought. */
   sizes: SizeMap;

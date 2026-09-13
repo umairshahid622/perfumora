@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
-import type { Fragrance, SizeKey, SizeMap, SizeVariant } from "../lib/types";
-import { SIZE_KEYS, offeredSizes } from "../lib/types";
+import type { Fragrance, SizeKey, SizeMap, SizeVariant, FragranceConcentration } from "../lib/types";
+import { SIZE_KEYS, offeredSizes, FRAGRANCE_CONCENTRATIONS } from "../lib/types";
 import { uploadFragranceImage } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import {
@@ -17,7 +17,7 @@ import {
   type ColorPreset,
 } from "../lib/colorExtractor";
 import { Button } from "../components/Button";
-import { TextField, TextAreaField } from "../components/Field";
+import { TextField, TextAreaField, SelectField } from "../components/Field";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 
@@ -41,12 +41,17 @@ const emptyDraft = (): Fragrance => ({
   imageUrl: "",
   color: "#8c6a4a",
   description: "",
+  concentration: "Eau de Parfum",
   active: true,
   sizes: { "30ml": { ...NEW_VARIANT }, "50ml": { ...NEW_VARIANT } },
 });
 
 export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
-  const [draft, setDraft] = useState<Fragrance>(initial ?? emptyDraft());
+  const [draft, setDraft] = useState<Fragrance>(() => ({
+    ...emptyDraft(),
+    ...(initial ?? {}),
+    concentration: initial?.concentration || "Eau de Parfum",
+  }));
 
   // Dynamic AI color presets extracted from the perfume bottle image
   const [aiPresets, setAiPresets] = useState<ColorPreset[]>(getDefaultPresets());
@@ -138,14 +143,33 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
           />
         </div>
         <div className="flex-1 space-y-4">
-          <TextField
-            id="name"
-            label="Name"
-            placeholder="e.g. Midnight Oud"
-            required
-            value={draft.name}
-            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <TextField
+              id="name"
+              label="Name"
+              placeholder="e.g. Midnight Oud"
+              required
+              value={draft.name}
+              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            />
+            <SelectField
+              id="concentration"
+              label="Concentration"
+              value={draft.concentration || "Eau de Parfum"}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  concentration: e.target.value as FragranceConcentration,
+                }))
+              }
+            >
+              {FRAGRANCE_CONCENTRATIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </SelectField>
+          </div>
           <div>
             <label
               htmlFor="color"

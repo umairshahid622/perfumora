@@ -84,14 +84,17 @@ end $$;
 -- ---------------------------------------------------------------------------
 
 create table if not exists fragrances (
-  id          text        primary key,
-  name        text        not null,
-  image_url   text,
-  color       text        not null default '#8c6a4a',
-  description text        not null default '',
-  active      boolean     not null default true,
-  created_at  timestamptz not null default now()
+  id            text        primary key,
+  name          text        not null,
+  image_url     text,
+  color         text        not null default '#8c6a4a',
+  description   text        not null default '',
+  concentration text        not null default 'Eau de Parfum',
+  active        boolean     not null default true,
+  created_at    timestamptz not null default now()
 );
+
+alter table fragrances add column if not exists concentration text not null default 'Eau de Parfum';
 
 -- ---------------------------------------------------------------------------
 -- fragrance_sizes — price + stock per size.

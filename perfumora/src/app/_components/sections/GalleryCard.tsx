@@ -129,7 +129,7 @@ export function GalleryCard({
                 {variant.name}
               </h3>
               <span className="text-muted-on-light text-micro font-medium uppercase">
-                Parfum
+                {variant.concentration ?? "Eau de Parfum"}
               </span>
             </div>
 

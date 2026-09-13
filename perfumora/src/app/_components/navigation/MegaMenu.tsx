@@ -189,7 +189,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
                 {displayVariant.name}
               </p>
               <span className="text-micro text-muted-on-dark mt-2 block font-medium uppercase">
-                {String(displayIndex + 1).padStart(2, "0")} / Parfum
+                {String(displayIndex + 1).padStart(2, "0")} / {displayVariant.concentration ?? "Eau de Parfum"}
               </span>
             </div>
           </div>
@@ -227,7 +227,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
                       {variant.name}
                     </span>
                     <span className="text-micro text-muted-on-dark font-medium uppercase">
-                      {String(i + 1).padStart(2, "0")} / Parfum
+                      {String(i + 1).padStart(2, "0")} / {variant.concentration ?? "Eau de Parfum"}
                     </span>
                   </span>
                 </button>

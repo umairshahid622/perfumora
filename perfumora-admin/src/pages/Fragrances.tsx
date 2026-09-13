@@ -183,7 +183,7 @@ export function Fragrances() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editing ? "Edit fragrance" : "Add fragrance"}
-        maxWidth="max-w-xl"
+        maxWidth="max-w-2xl"
       >
         <FragranceForm
           initial={editing ?? undefined}
@@ -282,7 +282,14 @@ function FragranceCard({
 
       {/* Body */}
       <div className="flex flex-1 flex-col p-4">
-        <h3 className="font-semibold text-slate-900">{frag.name}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-slate-900">{frag.name}</h3>
+          {frag.concentration && (
+            <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-slate-600 border border-slate-200">
+              {frag.concentration}
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
           {frag.description}
         </p>

@@ -41,6 +41,19 @@ export function offeredSizes(sizes: SizeMap): { size: SizeKey; variant: SizeVari
   });
 }
 
+export type FragranceConcentration =
+  | "Eau de Cologne"
+  | "Eau de Toilette"
+  | "Eau de Parfum"
+  | "Extrait de Parfum";
+
+export const FRAGRANCE_CONCENTRATIONS: readonly FragranceConcentration[] = [
+  "Eau de Cologne",
+  "Eau de Toilette",
+  "Eau de Parfum",
+  "Extrait de Parfum",
+];
+
 export interface Fragrance {
   id: string;
   name: string;
@@ -49,6 +62,8 @@ export interface Fragrance {
   /** Hex used as the fragrance's UI accent (card border / swatch). */
   color: string;
   description: string;
+  /** Concentration tier (e.g. Eau de Parfum, Extrait de Parfum). */
+  concentration: FragranceConcentration;
   /** Hidden from the storefront when false, without deleting the record. */
   active: boolean;
   /** At least one size — a fragrance with none is unbuyable. See SizeMap. */

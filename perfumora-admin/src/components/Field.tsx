@@ -68,7 +68,11 @@ export function SelectField({ label, id, className, children, ...props }: Select
   return (
     <div>
       {label && <Label htmlFor={id}>{label}</Label>}
-      <select id={id} className={cn(fieldBase, "h-10 pr-8", className)} {...props}>
+      <select
+        id={id}
+        className={cn(fieldBase, "h-10 pl-2.5 pr-7 text-xs sm:text-sm", className)}
+        {...props}
+      >
         {children}
       </select>
     </div>

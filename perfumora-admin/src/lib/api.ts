@@ -26,6 +26,7 @@ interface FragranceRow {
   image_url: string | null;
   color: string;
   description: string;
+  concentration?: string | null;
   active: boolean;
   fragrance_sizes: SizeRow[];
 }
@@ -81,6 +82,7 @@ function toFragrance(row: FragranceRow): Fragrance {
     imageUrl: row.image_url ?? "",
     color: row.color,
     description: row.description,
+    concentration: (row.concentration as any) || "Eau de Parfum",
     active: row.active,
     sizes: toSizes(row.fragrance_sizes ?? []),
   };
@@ -120,18 +122,33 @@ function toOrder(row: OrderRow): Order {
 /* ----------------------------- fragrances ------------------------------- */
 
 // Nested select: one round trip brings each fragrance and its size rows.
+const FRAGRANCE_SELECT_WITH_CONCENTRATION =
+  "id, name, image_url, color, description, concentration, active, fragrance_sizes ( size, price, stock )";
 const FRAGRANCE_SELECT =
   "id, name, image_url, color, description, active, fragrance_sizes ( size, price, stock )";
 
 export async function fetchFragrances(): Promise<Fragrance[]> {
-  const { data, error } = await supabase
+  let res: { data: any; error: any } = await supabase
     .from("fragrances")
-    .select(FRAGRANCE_SELECT)
+    .select(FRAGRANCE_SELECT_WITH_CONCENTRATION)
     .order("name");
 
-  if (error) throw new Error(`Could not load fragrances: ${error.message}`);
+  // If concentration column doesn't exist yet in the database, fall back gracefully
+  if (
+    res.error &&
+    (res.error.code === "PGRST202" ||
+      res.error.code === "42703" ||
+      res.error.message?.includes("concentration"))
+  ) {
+    res = await supabase
+      .from("fragrances")
+      .select(FRAGRANCE_SELECT)
+      .order("name");
+  }
+
+  if (res.error) throw new Error(`Could not load fragrances: ${res.error.message}`);
   // The client has no generated Database type, so rows arrive untyped.
-  return ((data ?? []) as unknown as FragranceRow[]).map(toFragrance);
+  return ((res.data ?? []) as unknown as FragranceRow[]).map(toFragrance);
 }
 
 /**
@@ -155,14 +172,26 @@ export async function upsertFragrance(fragrance: Fragrance): Promise<void> {
     throw new Error(`${fragrance.name || "This fragrance"} needs at least one size.`);
   }
 
-  const { error: fragranceError } = await supabase.from("fragrances").upsert({
+  const fragrancePayload: Record<string, unknown> = {
     id: fragrance.id,
     name: fragrance.name,
     image_url: fragrance.imageUrl || null,
     color: fragrance.color,
     description: fragrance.description,
+    concentration: fragrance.concentration || "Eau de Parfum",
     active: fragrance.active,
-  });
+  };
+
+  let { error: fragranceError } = await supabase
+    .from("fragrances")
+    .upsert(fragrancePayload);
+
+  // If Postgres doesn't have the concentration column yet, retry without it
+  if (fragranceError && fragranceError.message?.includes("concentration")) {
+    delete fragrancePayload.concentration;
+    const retry = await supabase.from("fragrances").upsert(fragrancePayload);
+    fragranceError = retry.error;
+  }
 
   if (fragranceError) {
     throw new Error(`Could not save ${fragrance.name}: ${fragranceError.message}`);
