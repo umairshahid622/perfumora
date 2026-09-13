@@ -1,10 +1,15 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLoader, useThree, type ThreeElements } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { Box3, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
 import type { BottleRefs } from "./useBottleRefs";
+import {
+  useLiquidPhysics,
+  createLiquidUniforms,
+  type LiquidUniforms,
+} from "./useLiquidPhysics";
 
 /** The supplied product model, served from `public/`. */
 const MODEL_URL = "/perfume_bottle.glb";
@@ -158,6 +163,76 @@ function applyGlassEdge(
 }
 
 /**
+ * Injects slosh displacement and surface micro-waves into the liquid mesh vertex shader,
+ * while maintaining the Fresnel edge rim in the fragment shader.
+ */
+function applyLiquidSloshShader(
+  material: MeshPhysicalMaterial,
+  uniforms: LiquidUniforms,
+): void {
+  material.customProgramCacheKey = () => "liquid_slosh_shader_v1";
+  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    // Bind uniforms to shader
+    shader.uniforms.uSlosh = uniforms.uSlosh;
+    shader.uniforms.uWaveTime = uniforms.uWaveTime;
+    shader.uniforms.uWaveIntensity = uniforms.uWaveIntensity;
+
+    // 1. Declare uniforms in vertex shader
+    shader.vertexShader =
+      `uniform vec2 uSlosh;\nuniform float uWaveTime;\nuniform float uWaveIntensity;\n` +
+      shader.vertexShader;
+
+    // 2. Displace vertices in vertex shader
+    // Meniscus is at y = 1.0, base is at y = -1.0.
+    // hFactor ensures the base stays firmly anchored at the bottom of the flacon
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>
+  {
+    // Height factor: 0 at base (y <= -0.2), smoothly transitions to 1.0 at meniscus (y = 1.0)
+    float hFactor = smoothstep(-0.2, 1.0, position.y);
+
+    // Counter-tilt displacement: (x * slosh.x + z * slosh.y)
+    float sloshTilt = clamp((position.x * uSlosh.x + position.z * uSlosh.y) * hFactor, -0.22, 0.22);
+
+    // Micro-surface ripples: only on upper meniscus (y > 0.8)
+    float ripple = 0.0;
+    if (position.y > 0.8) {
+      ripple = sin(position.x * 5.0 + uWaveTime * 7.0) * cos(position.z * 5.0 + uWaveTime * 6.0) * uWaveIntensity;
+    }
+
+    transformed.y += sloshTilt + ripple;
+  }`,
+    );
+
+    // 3. Normal adjustment for accurate specular reflections on sloshing liquid
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <defaultnormal_vertex>",
+      `#include <defaultnormal_vertex>
+  if (position.y > 0.7) {
+    transformedNormal = normalize(vec3(
+      transformedNormal.x - uSlosh.x * 0.7,
+      transformedNormal.y,
+      transformedNormal.z - uSlosh.y * 0.7
+    ));
+  }`,
+    );
+
+    // 4. Fragment shader Fresnel edge
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <dithering_fragment>",
+      `#include <dithering_fragment>
+  {
+    float edge = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), ${GLASS_EDGE.power.toFixed(1)});
+    gl_FragColor.a = clamp(gl_FragColor.a + edge * ${GLASS_EDGE.alpha.toFixed(2)}, 0.0, 1.0);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${LIQUID_EDGE_COLOR}), edge * ${GLASS_EDGE.tint.toFixed(2)});
+  }`,
+    );
+  };
+  material.needsUpdate = true;
+}
+
+/**
  * The glTF models the fragrance narrower than the glass around it: both are
  * unit-radius lathes carrying their own scale — 1.0671 for the fragrance against
  * 1.2030 for the glass — so 11.3% of the bottle's radius reads as an air gap.
@@ -213,6 +288,10 @@ export function BottleGltf({
   // render never commits, so this captures whichever variant is live when the
   // glTF actually resolves.
   const [initialLiquidColor] = useState(liquidColor);
+  const liquidUniformsRef = useRef<LiquidUniforms>(createLiquidUniforms());
+
+  // Real-time liquid slosh physics simulation loop
+  useLiquidPhysics(refs, liquidUniformsRef);
 
   /**
    * Uniform scale to `FRAMED_HEIGHT`, plus the offset that puts the model's
@@ -268,7 +347,7 @@ export function BottleGltf({
     // Apply Fresnel edge contours
     applyGlassEdge(glass.material as MeshPhysicalMaterial, GLASS_EDGE_COLOR, GLASS_EDGE);
     applyGlassEdge(capGlass.material as MeshPhysicalMaterial, CAP_EDGE_COLOR, CAP_GLASS_EDGE);
-    applyGlassEdge(liquid.material as MeshPhysicalMaterial, LIQUID_EDGE_COLOR, GLASS_EDGE);
+    applyLiquidSloshShader(liquid.material as MeshPhysicalMaterial, liquidUniformsRef.current);
 
     const tube = dipTube.material as MeshPhysicalMaterial;
     tube.transmission = 0;
