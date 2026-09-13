@@ -6,9 +6,9 @@ import { SECTION_IDS } from "../../_lib/sections";
 import { ContactForm } from "./ContactForm";
 
 /**
- * Contact (§4.7): editorial intro beside the UI-only enquiry form. Contact
- * details use the reserved `example` domain so they can't be mistaken for a
- * real, brand-approved address (§0). The form itself sends nothing (§1).
+ * Contact (§4.7): editorial intro beside the enquiry form. Contact
+ * details display atelier appointment info, and the form dispatches
+ * real client inquiries to the atelier via Resend.
  */
 export function Contact() {
   return (
