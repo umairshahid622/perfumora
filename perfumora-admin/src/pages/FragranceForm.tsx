@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import type { Fragrance, SizeKey, SizeMap, SizeVariant } from "../lib/types";
 import { SIZE_KEYS, offeredSizes } from "../lib/types";
 import { uploadFragranceImage } from "../lib/api";
@@ -9,6 +9,11 @@ import {
   blobToFile,
   type BgRemovalProgress,
 } from "../lib/bgRemoval";
+import {
+  extractColorPresetsFromImage,
+  getDefaultPresets,
+  type ColorPreset,
+} from "../lib/colorExtractor";
 import { Button } from "../components/Button";
 import { TextField, TextAreaField } from "../components/Field";
 import { Icon } from "../components/Icon";
@@ -40,6 +45,40 @@ const emptyDraft = (): Fragrance => ({
 
 export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
   const [draft, setDraft] = useState<Fragrance>(initial ?? emptyDraft());
+
+  // Dynamic AI color presets extracted from the perfume bottle image
+  const [aiPresets, setAiPresets] = useState<ColorPreset[]>(getDefaultPresets());
+  const [extractingPresets, setExtractingPresets] = useState(false);
+
+  // Automatically extract 5 custom presets from the fragrance image
+  useEffect(() => {
+    let active = true;
+    if (!draft.imageUrl) {
+      setAiPresets(getDefaultPresets());
+      return;
+    }
+
+    setExtractingPresets(true);
+    extractColorPresetsFromImage(draft.imageUrl)
+      .then((presets) => {
+        if (!active || !presets || presets.length === 0) return;
+        setAiPresets(presets);
+        // If adding a new fragrance and color is default/unset, auto-select Signature Liquid
+        if (!initial && draft.color === "#8c6a4a" && presets[0]) {
+          setDraft((d) => ({ ...d, color: presets[0].hex }));
+        }
+      })
+      .catch((err) => {
+        console.warn("AI color extraction failed:", err);
+      })
+      .finally(() => {
+        if (active) setExtractingPresets(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [draft.imageUrl, initial]);
 
   // Price/stock of sizes that have been switched off, so switching one back on
   // doesn't silently discard what was already typed into it.
@@ -130,6 +169,83 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
                 }
                 className="font-mono"
               />
+              {typeof window !== "undefined" && "EyeDropper" in window && (
+                <button
+                  type="button"
+                  title="Sample color directly from screen or bottle image"
+                  onClick={async () => {
+                    try {
+                      const eyeDropper = new (window as any).EyeDropper();
+                      const res = await eyeDropper.open();
+                      if (res?.sRGBHex) {
+                        setDraft((d) => ({ ...d, color: res.sRGBHex }));
+                      }
+                    } catch {
+                      // user cancelled eyedropper
+                    }
+                  }}
+                  className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+                >
+                  <Icon name="droplet" className="h-3.5 w-3.5 text-accent" />
+                  Eyedropper
+                </button>
+              )}
+            </div>
+            {/* Dynamic AI Color Presets extracted from bottle */}
+            <div className="mt-2.5 rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                  <Icon name="sparkles" className="h-3 w-3 text-amber-500" />
+                  AI Presets ({aiPresets.length})
+                  {extractingPresets && (
+                    <span className="text-[10px] font-normal text-slate-400 animate-pulse">
+                      · Extracting from bottle...
+                    </span>
+                  )}
+                </span>
+                {draft.imageUrl && (
+                  <button
+                    type="button"
+                    title="Rescan image to regenerate color presets"
+                    onClick={() => {
+                      setExtractingPresets(true);
+                      extractColorPresetsFromImage(draft.imageUrl)
+                        .then((presets) => setAiPresets(presets))
+                        .finally(() => setExtractingPresets(false));
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-slate-400 transition hover:text-slate-700"
+                  >
+                    <span>↻</span> Rescan
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {aiPresets.map((swatch, idx) => {
+                  const isSelected = draft.color.toLowerCase() === swatch.hex.toLowerCase();
+                  return (
+                    <button
+                      key={`${swatch.hex}-${idx}`}
+                      type="button"
+                      title={`${swatch.name} (${swatch.hex}) — ${swatch.description}`}
+                      onClick={() => setDraft((d) => ({ ...d, color: swatch.hex }))}
+                      className={`group relative flex items-center gap-1.5 rounded-md border px-2 py-1 transition-all ${
+                        isSelected
+                          ? "border-accent bg-white shadow-sm ring-2 ring-accent/30"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span
+                        className="h-3.5 w-3.5 rounded-full border border-black/10 shrink-0 shadow-inner"
+                        style={{ backgroundColor: swatch.hex }}
+                      />
+                      <span className="text-[11px] font-medium text-slate-700">
+                        {swatch.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -266,13 +382,28 @@ function ImagePicker({
 
   // In-memory references to enable toggling between Cutout and Original
   const [rawFile, setRawFile] = useState<File | null>(null);
-  const [cutoutBlob, setCutoutBlob] = useState<Blob | null>(null);
+  const [baseCutoutBlob, setBaseCutoutBlob] = useState<Blob | null>(null);
   const [activeMode, setActiveMode] = useState<"cutout" | "original">("cutout");
   const [trimPercent, setTrimPercent] = useState(0);
   const [showTrimSlider, setShowTrimSlider] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
 
   const isPreviewable = value.startsWith("http");
+
+  // Helper to lazily fetch base blob if user is editing an existing fragrance
+  const getBaseBlob = async (): Promise<Blob | null> => {
+    if (baseCutoutBlob) return baseCutoutBlob;
+    if (!value || !value.startsWith("http")) return null;
+    try {
+      const res = await fetch(value);
+      const b = await res.blob();
+      setBaseCutoutBlob(b);
+      return b;
+    } catch (err) {
+      console.warn("Could not fetch image blob:", err);
+      return null;
+    }
+  };
 
   const processAndUpload = async (file: File) => {
     setError(null);
@@ -292,19 +423,19 @@ function ImagePicker({
     }
 
     setProcessing(true);
-    setProgress({ message: "Starting AI cutout...", percent: 10 });
+    setProgress({ message: "Removing background...", percent: 20 });
 
     try {
-      // 1. Run client-side AI background removal
+      // Run client-side AI background removal
       const processedBlob = await removeImageBackground(file, (p) => {
         setProgress(p);
       });
 
-      setCutoutBlob(processedBlob);
+      setBaseCutoutBlob(processedBlob);
       setActiveMode("cutout");
       setTrimPercent(0);
 
-      // 2. Upload the transparent PNG
+      // Upload the transparent PNG
       setUploading(true);
       setProgress({ message: "Uploading transparent PNG...", percent: 95 });
       const pngFile = blobToFile(processedBlob, file.name);
@@ -326,6 +457,39 @@ function ImagePicker({
     }
   };
 
+  const applyTrim = async (trim: number) => {
+    setTrimPercent(trim);
+
+    setUploading(true);
+    setError(null);
+    try {
+      const base = await getBaseBlob();
+      if (!base) {
+        setError("Unable to load image for trimming.");
+        return;
+      }
+      let result = base;
+      if (trim > 0) {
+        result = await trimImageBottom(result, trim);
+      }
+      const nameSlug = fragranceName
+        ? fragranceName.toLowerCase().replace(/[^a-z0-9]/g, "-")
+        : "fragrance";
+      const filename = rawFile?.name || `${nameSlug}.png`;
+      const pngFile = blobToFile(
+        result,
+        filename,
+        `trimmed-${trim}`,
+      );
+      const publicUrl = await uploadFragranceImage(pngFile);
+      onChange(publicUrl);
+    } catch (err) {
+      setError(errorMessage(err, "Failed to apply image trim."));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const switchMode = async (mode: "cutout" | "original") => {
     if (mode === activeMode || !rawFile) return;
     setActiveMode(mode);
@@ -335,34 +499,11 @@ function ImagePicker({
       if (mode === "original") {
         const publicUrl = await uploadFragranceImage(rawFile);
         onChange(publicUrl);
-      } else if (cutoutBlob) {
-        const toUpload =
-          trimPercent > 0
-            ? await trimImageBottom(cutoutBlob, trimPercent)
-            : cutoutBlob;
-        const pngFile = blobToFile(toUpload, rawFile.name);
-        const publicUrl = await uploadFragranceImage(pngFile);
-        onChange(publicUrl);
+      } else {
+        await applyTrim(trimPercent);
       }
     } catch (err) {
       setError(errorMessage(err, "Failed to switch version."));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const applyTrim = async (percent: number) => {
-    setTrimPercent(percent);
-    if (!cutoutBlob || !rawFile) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const trimmed = await trimImageBottom(cutoutBlob, percent);
-      const pngFile = blobToFile(trimmed, rawFile.name, `trimmed-${percent}`);
-      const publicUrl = await uploadFragranceImage(pngFile);
-      onChange(publicUrl);
-    } catch (err) {
-      setError(errorMessage(err, "Failed to trim reflection."));
     } finally {
       setUploading(false);
     }
@@ -373,7 +514,7 @@ function ImagePicker({
     e.stopPropagation();
     onChange("");
     setRawFile(null);
-    setCutoutBlob(null);
+    setBaseCutoutBlob(null);
     setTrimPercent(0);
     setShowTrimSlider(false);
     setError(null);
@@ -476,59 +617,54 @@ function ImagePicker({
         </span>
       </label>
 
-      {/* Refinement controls once an image is uploaded and cutout is available */}
-      {isPreviewable && cutoutBlob && rawFile && (
-        <div className="w-56 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-slate-700">Image Version</span>
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-              <Icon name="sparkles" className="h-2.5 w-2.5" />
-              Cutout
-            </span>
-          </div>
+      {/* Mode switch between Cutout and Original (when raw file is present) */}
+      {rawFile && (
+        <div className="w-48 grid grid-cols-2 gap-1 rounded-lg bg-slate-200/70 p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => void switchMode("cutout")}
+            className={`rounded-md py-1 text-center font-medium transition-all ${
+              activeMode === "cutout"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Cutout
+          </button>
+          <button
+            type="button"
+            onClick={() => void switchMode("original")}
+            className={`rounded-md py-1 text-center font-medium transition-all ${
+              activeMode === "original"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Original
+          </button>
+        </div>
+      )}
 
-          {/* Mode switch */}
-          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-200/70 p-0.5">
-            <button
-              type="button"
-              onClick={() => void switchMode("cutout")}
-              className={`rounded-md py-1 text-center font-medium transition-all ${
-                activeMode === "cutout"
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Cutout
-            </button>
-            <button
-              type="button"
-              onClick={() => void switchMode("original")}
-              className={`rounded-md py-1 text-center font-medium transition-all ${
-                activeMode === "original"
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Original
-            </button>
-          </div>
-
-          {/* Reflection trimmer (useful when studio bottle shots have a tabletop reflection) */}
+      {/* Refinement controls once an image is available */}
+      {isPreviewable && (
+        <div className="w-48 space-y-2 pt-0.5 text-xs">
+          {/* Floor reflection trimmer toggle */}
           {activeMode === "cutout" && (
-            <div className="border-t border-slate-200/80 pt-1.5">
+            <div>
               <button
                 type="button"
                 onClick={() => setShowTrimSlider(!showTrimSlider)}
-                className="flex w-full items-center justify-between text-slate-600 hover:text-slate-900"
+                className="text-[11px] text-slate-500 hover:text-slate-800 transition-colors"
               >
-                <span>Trim floor reflection</span>
-                <span className="text-slate-400 font-mono text-[10px]">
-                  {trimPercent > 0 ? `-${trimPercent}%` : "0%"}
-                </span>
+                {showTrimSlider ? "Hide floor trim" : "Trim floor reflection"} {trimPercent > 0 ? `(-${trimPercent}%)` : ""}
               </button>
 
               {showTrimSlider && (
-                <div className="mt-1.5 space-y-1">
+                <div className="mt-1 space-y-1 rounded-lg bg-slate-50 p-2 border border-slate-200">
+                  <div className="flex justify-between text-[10px] text-slate-500">
+                    <span>Bottom trim</span>
+                    <span className="font-mono font-medium">{trimPercent}%</span>
+                  </div>
                   <input
                     type="range"
                     min={0}
@@ -536,12 +672,8 @@ function ImagePicker({
                     step={2}
                     value={trimPercent}
                     onChange={(e) => void applyTrim(Number(e.target.value))}
-                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-300 accent-accent"
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-accent"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>Keep all</span>
-                    <span>Trim 35%</span>
-                  </div>
                 </div>
               )}
             </div>
@@ -551,24 +683,12 @@ function ImagePicker({
           <button
             type="button"
             onClick={() => setShowCardModal(true)}
-            className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white py-1 font-medium text-slate-700 shadow-xs hover:bg-slate-100"
+            className="flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-100 transition-colors"
           >
-            <Icon name="eye" className="h-3 w-3" />
+            <Icon name="eye" className="h-3.5 w-3.5 text-slate-500" />
             Preview on storefront card
           </button>
         </div>
-      )}
-
-      {/* When image exists but not from local session, still allow Card Preview */}
-      {isPreviewable && !cutoutBlob && (
-        <button
-          type="button"
-          onClick={() => setShowCardModal(true)}
-          className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-accent"
-        >
-          <Icon name="eye" className="h-3.5 w-3.5" />
-          Preview on storefront card
-        </button>
       )}
 
       {error && (
