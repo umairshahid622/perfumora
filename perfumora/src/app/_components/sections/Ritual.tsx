@@ -212,10 +212,10 @@ export function Ritual() {
       tone="light"
       overlay
       full
-      className="bg-transparent pt-14 md:pt-20 pb-4 md:pb-12 h-screen max-h-screen md:h-full md:min-h-full"
+      className="bg-transparent pt-14 md:pt-20 pb-6 md:pb-12 h-screen max-h-screen md:h-full md:min-h-full"
     >
       <Container className="relative z-20 flex h-full flex-1 flex-col justify-between">
-        <div className="flex h-full flex-1 flex-col justify-between pb-3 md:pb-0">
+        <div className="flex h-full flex-1 flex-col justify-between pb-4 md:pb-0">
           {/* Top-left heading */}
           <div className="flex max-w-xl flex-col gap-0.5 sm:gap-1 md:gap-2 shrink-0">
             <Eyebrow>The Ritual</Eyebrow>

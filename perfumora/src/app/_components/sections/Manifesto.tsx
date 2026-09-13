@@ -25,17 +25,17 @@ export function Manifesto() {
       full
       className="bg-transparent pt-16 md:pt-20 pb-8 md:pb-12"
     >
-      <Container className="flex flex-1 flex-col justify-center">
+      <Container className="flex flex-1 flex-col justify-end pb-8 sm:pb-12 md:justify-center md:pb-0">
         <div className="flex max-w-md flex-col md:ml-[calc(3rem+4vw)] md:max-w-[min(28rem,38vw)]">
           <Eyebrow>Manifesto</Eyebrow>
 
-          <h2 className="font-display text-section mt-4 max-w-[14ch] text-balance font-semibold uppercase md:mt-6">
+          <h2 className="font-display text-xl sm:text-2xl md:text-section mt-2 sm:mt-4 max-w-[14ch] text-balance font-semibold uppercase md:mt-6">
             First, the ritual.
           </h2>
 
-          <div className="border-hairline-on-light mt-4 border-t md:mt-8" />
+          <div className="border-hairline-on-light mt-3 sm:mt-4 border-t md:mt-8" />
 
-          <div className="mt-4 flex flex-col gap-4 text-body text-muted-on-light md:mt-6 md:gap-5">
+          <div className="mt-3 sm:mt-4 flex flex-col gap-2.5 sm:gap-4 text-xs sm:text-sm md:text-body text-muted-on-light md:mt-6 md:gap-5">
             {PARAGRAPHS.map((text, i) => (
               <p key={i} className="leading-relaxed">
                 {text}

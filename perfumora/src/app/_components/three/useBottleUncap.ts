@@ -19,7 +19,7 @@ gsap.registerPlugin(ScrollTrigger);
  * takes its lower rim clear of the pump head it was covering with air to spare;
  * the button's dip is a click, not a stroke.
  */
-const LIFT = 1.22;
+const LIFT = 1.25;
 const PRESS = 0.08;
 
 const UNCAP_DURATION = 0.45;
@@ -175,8 +175,8 @@ export function useBottleUncap(
           const isScrollingDown = self.direction > 0;
           const isScrollingUp = self.direction < 0;
 
-          // Zone 1: Upward Reset Zone (< 2.0 screens into Manifesto / Hero)
-          if (currentScreen < 2.0) {
+          // Zone 1: Upward Reset Zone (< 2.5 screens into Manifesto / Hero)
+          if (currentScreen < 2.5) {
             if (hasUncapped) {
               hasUncapped = false;
               if (activeSprayTl) activeSprayTl.kill();
@@ -192,8 +192,8 @@ export function useBottleUncap(
             return;
           }
 
-          // Zone 2: Uncap & Mist Spray Trigger (>= 2.4 screens on downward scroll)
-          if (currentScreen >= 2.4 && !hasUncapped && isScrollingDown) {
+          // Zone 2: Uncap & Mist Spray Trigger (>= 3.0 screens when bottle has drifted to Ritual)
+          if (currentScreen >= 3.0 && !hasUncapped && isScrollingDown) {
             hasUncapped = true;
 
             // 1. Gentle momentum dampening during mist theatre

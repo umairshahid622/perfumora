@@ -54,9 +54,9 @@ const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
  * X and Y rotation are left at the identity pose, so they are not stated: the bottle
  * faces the camera dead centre and only the variant-change spin below turns it.
  */
-const REST = { y: 0.0, scale: 0.78 };
-const REST_TABLET = { y: 0.0, scale: 0.72 };
-const REST_COMPACT = { y: 0.0, scale: 0.62 };
+const REST = { y: 0.0, scale: 0.52 };
+const REST_TABLET = { y: 0.0, scale: 0.48 };
+const REST_COMPACT = { y: 0.0, scale: 0.42 };
 
 export interface BottleSceneProps {
   /** Variant colour for the fragrance; defaults to the live `--accent` token. */

@@ -93,7 +93,7 @@ export function OpeningStage() {
   const manifestoPanel = useRef<HTMLDivElement>(null);
   const ritualPanel = useRef<HTMLDivElement>(null);
   const productBarWrap = useRef<HTMLDivElement>(null);
-  const counterWrap = useRef<HTMLDivElement>(null);
+  const stageControlsWrap = useRef<HTMLDivElement>(null);
 
   useGSAP(
     () => {
@@ -101,91 +101,120 @@ export function OpeningStage() {
       const manifestoPanelEl = manifestoPanel.current;
       const ritualPanelEl = ritualPanel.current;
       const barEl = productBarWrap.current;
-      const counterEl = counterWrap.current;
+      const controlsEl = stageControlsWrap.current;
       if (!stageEl || !manifestoPanelEl || !ritualPanelEl) {
         return;
       }
 
-      // How far a panel travels to arrive: 80px, which is the Manifesto copy's own
-      // indent, so a block slides in by exactly the distance it is inset by.
-      const slide = prefersReducedMotion() ? 0 : -80;
+      const mm = gsap.matchMedia();
 
-      // Both dissolves' start state belongs to GSAP rather than to a class.
-      gsap.set([manifestoPanelEl, ritualPanelEl], {
-        autoAlpha: 0,
-        x: slide,
-      });
-
-      // The watermark's presence and the vessel's drift, as unitless progress on the
-      // stage element. GSAP writes the number below; CSS owns what the number means.
-      gsap.set(stageEl, {
-        "--name-presence": 1,
-        "--vessel-drift": 0,
-      });
-
-      const isMobile = window.innerWidth < 768;
-
-      if (barEl) {
-        gsap.set(barEl, { autoAlpha: 1 });
-      }
-      if (counterEl) {
-        gsap.set(counterEl, { autoAlpha: 1 });
-      }
-
-      // Both changeovers on one timeline and one trigger over the stage's opening beats.
-      // Direct scrub (0.5) ensures responsive, smooth bidirectional scrubbing with Lenis.
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: stageEl,
-          start: "top top",
-          end: () => `+=${window.innerHeight * 5}`,
-          scrub: 0.5,
-          fastScrollEnd: true,
-          preventOverlaps: true,
+      mm.add(
+        {
+          isMobile: "(max-width: 767px)",
+          isDesktop: "(min-width: 768px)",
         },
-      });
+        (context) => {
+          const { isMobile } = context.conditions as {
+            isMobile: boolean;
+            isDesktop: boolean;
+          };
 
-      const beat = { ease: "power1.inOut", duration: 1.0 };
+          const slide = prefersReducedMotion() ? 0 : -80;
 
-      tl
-        // 0.0 → 1.0: Hero name leaves, Manifesto slides in and fades up to full opacity, vessel steps right.
-        .to(manifestoPanelEl, { autoAlpha: 1, x: 0, ...beat }, 0)
-        .to(
-          stageEl,
-          { "--name-presence": 0, ease: "power1.inOut", duration: 0.5 },
-          0.1,
-        )
-        .to(stageEl, { "--vessel-drift": 1, ...beat }, 0)
+          // Both dissolves' start state belongs to GSAP rather than to a class.
+          gsap.set([manifestoPanelEl, ritualPanelEl], {
+            autoAlpha: 0,
+            x: slide,
+          });
 
-        // 1.0 → 2.0: MANIFESTO READING WINDOW (held still at 100% opacity for 1 full screen)
+          // The watermark's presence and the vessel's drift, as unitless progress on the
+          // stage element. GSAP writes the number below; CSS owns what the number means.
+          gsap.set(stageEl, {
+            "--name-presence": 1,
+            "--vessel-x": 0,
+            "--vessel-y": 0,
+          });
 
-        // 2.0 → 3.0: Manifesto smoothly fades out to the left and bottle returns to center.
-        .to(
-          manifestoPanelEl,
-          { autoAlpha: 0, x: slide, ...beat },
-          2.0,
-        )
-        .to(stageEl, { "--vessel-drift": 0, ...beat }, 2.0)
+          if (controlsEl) {
+            gsap.set(controlsEl, { autoAlpha: 1 });
+          }
+          if (barEl) {
+            gsap.set(barEl, { autoAlpha: 1 });
+          }
 
-        // 2.0 → 3.0: Ritual arrives cleanly right as you transition into the Ritual section!
-        .to(
-          ritualPanelEl,
-          { autoAlpha: 1, x: 0, ...beat },
-          2.0,
-        )
+          // Direct scrub (0.5) ensures responsive, smooth bidirectional scrubbing with Lenis.
+          const tl = gsap.timeline({
+            scrollTrigger: {
+              trigger: stageEl,
+              start: "top top",
+              end: () => `+=${window.innerHeight * 5}`,
+              scrub: 0.5,
+              fastScrollEnd: true,
+              preventOverlaps: true,
+            },
+          });
 
-        // 3.0 → 5.0: RITUAL EXTENDED RUNWAY (2 full screens of buffer for unhurried theatre & reading!)
-        .set({}, {}, 5.0);
+          const beat = { ease: "power1.inOut", duration: 1.0 };
+          const quickFade = { ease: "power1.inOut", duration: 0.5 };
 
-      // On mobile viewports (<768px), smoothly fade out the Product Bar & Counter during the Manifesto -> Ritual transition (2.0 -> 3.0) so it doesn't collide with the Ritual 3-step card!
-      if (barEl && isMobile) {
-        tl.to(barEl, { autoAlpha: 0, ...beat }, 2.0);
-      }
-      if (counterEl && isMobile) {
-        tl.to(counterEl, { autoAlpha: 0, ...beat }, 2.0);
-      }
+          tl
+            // 0.0 → 1.0: Hero name leaves, Manifesto slides in and fades up to full opacity.
+            .to(manifestoPanelEl, { autoAlpha: 1, x: 0, ...beat }, 0)
+            .to(
+              stageEl,
+              { "--name-presence": 0, ...quickFade },
+              0.1,
+            );
 
-      ScrollTrigger.refresh();
+          // Hero controls (arrows + position counter) fade out smoothly as you leave Hero
+          if (controlsEl) {
+            tl.to(controlsEl, { autoAlpha: 0, ...quickFade }, 0.1);
+          }
+
+          // On mobile viewports, smoothly fade out the Product Bar as you leave Hero (0.1 -> 0.6)
+          // so that Manifesto and Ritual have 100% clean vertical space without collisions!
+          if (barEl && isMobile) {
+            tl.to(barEl, { autoAlpha: 0, ...quickFade }, 0.1);
+          }
+
+          // In Manifesto:
+          // Mobile: bottle drifts up to the top half to let Manifesto text sit cleanly below it.
+          // Desktop: bottle drifts 21vw to the right to frame Manifesto text on the left.
+          if (isMobile) {
+            tl.to(stageEl, { "--vessel-y": -20, ...beat }, 0);
+          } else {
+            tl.to(stageEl, { "--vessel-x": 21, "--vessel-y": 0, ...beat }, 0);
+          }
+
+          // 1.0 → 2.0: MANIFESTO READING WINDOW (held still at 100% opacity for 1 full screen)
+
+          // 2.0 → 2.4: Manifesto smoothly fades out completely to the left
+          tl.to(
+            manifestoPanelEl,
+            { autoAlpha: 0, x: slide, duration: 0.4, ease: "power1.inOut" },
+            2.0,
+          );
+
+          // 2.0 → 2.9: Bottle drifts to Ritual position (desktop & mobile)
+          tl.to(
+            stageEl,
+            { "--vessel-x": 0, "--vessel-y": 4, duration: 0.9, ease: "power1.inOut" },
+            2.0,
+          );
+
+          // 2.5 → 2.9: Ritual header arrives cleanly right after Manifesto has left and bottle arrives!
+          tl.to(
+            ritualPanelEl,
+            { autoAlpha: 1, x: 0, duration: 0.4, ease: "power1.inOut" },
+            2.5,
+          );
+
+          // 3.0 → 5.0: RITUAL EXTENDED RUNWAY (2 full screens of buffer for unhurried theatre & reading!)
+          tl.set({}, {}, 5.0);
+
+          ScrollTrigger.refresh();
+        },
+      );
     },
     { scope: stage },
   );
@@ -225,20 +254,26 @@ export function OpeningStage() {
         </div>
 
         {/* Layer 4: Persistent 3D Bottle */}
-        <div className="pointer-events-none absolute inset-0 z-30 md:translate-x-[calc(var(--vessel-drift,0)*21vw)]">
+        <div
+          className="pointer-events-none absolute inset-0 z-30"
+          style={{
+            transform:
+              "translate3d(calc(var(--vessel-x, 0) * 1vw), calc(var(--vessel-y, 0) * 1vh), 0)",
+          }}
+        >
           <PersistentBottle />
         </div>
 
         {/* Layer 5: Persistent Stage Controls: Variant Arrows & Position Counter */}
-        <div className="pointer-events-none absolute inset-0 z-35 md:z-55 pt-[4.75rem] pb-20 md:pb-24">
+        <div
+          ref={stageControlsWrap}
+          className="pointer-events-none absolute inset-0 z-35 md:z-55 pt-[4.75rem] pb-20 md:pb-24"
+        >
           <Container className="relative flex h-full flex-1 flex-col">
             <div className="relative flex flex-1 items-center justify-center py-0 md:py-1">
               <div className="relative z-10 flex h-[48vh] sm:h-[54vh] md:h-[65vh] max-h-[580px] w-full max-w-[320px] sm:max-w-[420px] md:max-w-[520px] flex-col items-center justify-center">
                 <div aria-hidden="true" className="h-full w-full" />
-                <div
-                  ref={counterWrap}
-                  className="absolute -bottom-2 md:bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-auto"
-                >
+                <div className="absolute -bottom-2 md:bottom-0 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
                   <PositionCounter />
                 </div>
               </div>
