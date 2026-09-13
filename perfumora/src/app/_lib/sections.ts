@@ -4,7 +4,6 @@ export const SECTION_IDS = {
   hero: "hero",
   manifesto: "manifesto",
   ritual: "ritual",
-  craft: "craft",
   gallery: "gallery",
   cta: "cta",
   contact: "contact",

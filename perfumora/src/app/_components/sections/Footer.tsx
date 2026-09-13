@@ -9,7 +9,6 @@ const LINKS: ReadonlyArray<{ label: string; to: SectionId }> = [
   { label: "The Collection", to: SECTION_IDS.hero },
   { label: "Manifesto", to: SECTION_IDS.manifesto },
   { label: "The Ritual", to: SECTION_IDS.ritual },
-  { label: "Craft", to: SECTION_IDS.craft },
   { label: "Gallery", to: SECTION_IDS.gallery },
   { label: "Contact", to: SECTION_IDS.contact },
 ];

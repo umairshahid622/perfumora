@@ -1,5 +1,4 @@
 import { Contact } from "./_components/sections/Contact";
-import { Craft } from "./_components/sections/Craft";
 import { Cta } from "./_components/sections/Cta";
 import { Footer } from "./_components/sections/Footer";
 import { Gallery } from "./_components/sections/Gallery";
@@ -16,15 +15,13 @@ import { OpeningStage } from "./_components/sections/OpeningStage";
  * The first three beats are one unit. `OpeningStage` holds the Hero, the Manifesto and
  * the Ritual all on screen at once and dissolves between them, and it owns the 3D bottle
  * for the same reason: the bottle stands still through all three and then leaves with
- * them, which only works if it lives inside the stage that releases them. From the Craft
- * down this is an ordinary stack of sections with no bottle in it.
+ * them, which only works if it lives inside the stage that releases them.
  */
 export default function Home() {
   return (
     <>
       <main>
         <OpeningStage />
-        <Craft />
         <Gallery />
         <Cta />
         <Contact />

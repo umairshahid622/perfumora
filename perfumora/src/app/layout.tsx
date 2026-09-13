@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { getCatalogue } from "./_lib/catalogue";
 import { khand, switzer } from "./_lib/fonts";
+import { readableAccent, accentGlow, readableAccentOnDark } from "./_lib/variants";
 import { AppLoader } from "./_components/ui/AppLoader";
 import { Navigation } from "./_components/navigation/Navigation";
 import { AppProviders } from "./_components/providers/AppProviders";
@@ -27,6 +28,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // Server-side, so the Supabase credentials never reach the browser and the
   // fragrance list is in the first HTML rather than arriving after a spinner.
   const variants = await getCatalogue();
+  const initialVariant = variants[0];
+  const initialAccent = initialVariant ? readableAccent(initialVariant.hex) : "#ae6c30";
+  const initialGlow = initialVariant ? accentGlow(initialVariant.hex) : "rgba(184, 115, 51, 0.3)";
+  const initialOnDark = initialVariant ? readableAccentOnDark(initialVariant.hex) : "#b87333";
 
   return (
     // Browser extensions (password managers, QuillBot, ColorZilla, …) inject
@@ -38,6 +43,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${khand.variable} ${switzer.variable} h-full antialiased`}
+      style={{
+        "--accent": initialAccent,
+        "--accent-contrast": "var(--paper)",
+        "--accent-glow": initialGlow,
+        "--accent-on-light": initialAccent,
+        "--accent-on-dark": initialOnDark,
+      } as React.CSSProperties}
       suppressHydrationWarning
     >
       <body

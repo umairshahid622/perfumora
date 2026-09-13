@@ -88,15 +88,14 @@ export function ScentProvider({
   const prev = useCallback(() => go(index - 1, -1), [go, index]);
 
   useEffect(() => {
+    if (!variant) return;
     const root = document.documentElement;
-    root.style.setProperty("--accent", variant.hex);
-    root.style.setProperty(
-      "--accent-contrast",
-      variant.contrast === "ink" ? "var(--ink)" : "var(--paper)",
-    );
+    const accent = readableAccent(variant.hex);
+    root.style.setProperty("--accent", accent);
+    root.style.setProperty("--accent-contrast", "var(--paper)");
     root.style.setProperty("--accent-glow", accentGlow(variant.hex));
     // Legible-on-parchment accent for text/borders; fills + glow keep the true hex.
-    root.style.setProperty("--accent-on-light", readableAccent(variant.hex));
+    root.style.setProperty("--accent-on-light", accent);
     // The same foreground over the near-black sections, where the on-light form is
     // the dimmest thing in a row of paper-white text.
     root.style.setProperty("--accent-on-dark", readableAccentOnDark(variant.hex));
