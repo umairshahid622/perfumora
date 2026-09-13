@@ -5,9 +5,9 @@ import { CanvasTexture, Vector3 } from "three";
 import type { BottleRefs } from "./useBottleRefs";
 
 /**
- * Where the plume starts, right at the pump's nozzle orifice on the collar.
+ * Where the plume starts, right at the pump's nozzle orifice.
  */
-const NOZZLE: [number, number, number] = [0.15, 0.985, 0.02];
+const NOZZLE: [number, number, number] = [0.15, 1.043, 0.02];
 
 /**
  * The cone the mist is scattered through:
