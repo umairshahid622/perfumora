@@ -5,7 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { NeutralToneMapping, Color, Box3, Vector3, type Object3D } from "three";
+import { AgXToneMapping, ACESFilmicToneMapping, Color, Box3, Vector3, type Object3D } from "three";
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
@@ -140,14 +140,6 @@ export default function BottleScene({
   const juice = juiceColor(accent);
   const firstRun = useRef(true);
 
-  // Guarantee liquid material holds the exact calibrated studio color once loaded
-  useEffect(() => {
-    if (ready && refs.liquidMaterial.current) {
-      refs.liquidMaterial.current.color.set(juice);
-    }
-  }, [ready, juice, refs]);
-
-  // Portrait viewports rest higher and smaller — see `REST_COMPACT`.
   const rest = isCompact ? REST_COMPACT : isTablet ? REST_TABLET : REST;
 
   /**
@@ -164,14 +156,15 @@ export default function BottleScene({
     () => {
       const root = refs.root.current;
       const material = refs.liquidMaterial.current;
-      const snap = firstRun.current || prefersReducedMotion();
-      firstRun.current = false;
+      if (!root || !ready) return;
 
-      // `root` is null until the glTF resolves inside <Suspense> below, and the
-      // first paint is not a change worth marking. Either way the colour still
-      // has to be right, so it lands without the journey — that is also what
-      // reduced motion should get.
-      if (snap || !root) {
+      if (firstRun.current) {
+        firstRun.current = false;
+        material?.color.set(juice);
+        return;
+      }
+
+      if (prefersReducedMotion()) {
         material?.color.set(juice);
         return;
       }
@@ -215,7 +208,7 @@ export default function BottleScene({
     },
     // Deliberately keyed on the index alone: `spinDirection` changing on its own
     // (a dot jump that lands on the current variant) is not a change to mark.
-    { dependencies: [variantIndex] },
+    { dependencies: [variantIndex, ready] },
   );
 
   // Ambient idle drift (§6.3 #9), on the assembly root — wired, but off. It used to
@@ -301,21 +294,32 @@ export default function BottleScene({
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
         camera={{ position: [0, 0, 7.2], fov: 24, near: 0.1, far: 40 }}
         onCreated={({ gl }) => {
-          gl.toneMapping = NeutralToneMapping;
+          gl.toneMapping = AgXToneMapping;
           gl.toneMappingExposure = 1.05;
         }}
       >
         <StudioEnvironment />
 
         {/* Balanced studio ambient fill */}
-        <ambientLight intensity={0.35} color="#ffffff" />
+        <ambientLight intensity={0.4} color="#ffffff" />
 
-        {/* Key light, front-right, gives the cap and glass shoulder their crisp gleam */}
-        <directionalLight position={[2.8, 3.4, 4]} intensity={1.6} />
-        {/* Fill light, front-left, defines the left flank softbox reflection */}
-        <directionalLight position={[-3.2, 1.8, 2.6]} intensity={0.65} />
-        {/* Rim / backlight, behind, illuminates internal liquid reflections and crystal bevels */}
-        <directionalLight position={[0, 1.4, -4]} intensity={1.4} />
+        {/* Studio_FrontSoftbox (front-facing softbox reflections across bottle, liquid meniscus & shoulder) */}
+        <directionalLight position={[0.5, 1.8, 6.0]} intensity={2.6} color="#ffffff" />
+
+        {/* Studio_BottomBounce (creates luminous crescent highlight on curved bottom bowl of liquid) */}
+        <directionalLight position={[0, -2.0, 4.0]} intensity={1.6} color="#ffffff" />
+
+        {/* Studio_KeyLight (from Blender: 850W, warm #fffaf2, front-right softbox) */}
+        <directionalLight position={[3.8, 2.4, 4.8]} intensity={2.0} color="#fffaf2" />
+
+        {/* Studio_FillLight (from Blender: 550W, #ffffff, front-left softbox) */}
+        <directionalLight position={[-3.8, 1.4, 4.8]} intensity={1.3} color="#ffffff" />
+
+        {/* Studio_RimLight (from Blender: 700W, cool #f2faff, back-left rim light through glass & liquid) */}
+        <directionalLight position={[-3.8, 2.4, -3.5]} intensity={1.8} color="#f2faff" />
+
+        {/* Studio_TopLight (from Blender: 500W, #ffffff, overhead down onto cap, button & shoulder) */}
+        <directionalLight position={[0, 5.5, 1.0]} intensity={1.4} color="#ffffff" />
 
         {/* The resting pose, set once as plain props — there is no longer a timeline
             writing this group, so React owns the transform outright and no ref is

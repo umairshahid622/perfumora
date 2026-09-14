@@ -165,26 +165,9 @@ function paleFactor(hex: string): number {
   return clamp01((lum - LIQUID_LUM_DENSE) / (LIQUID_LUM_CLEAR - LIQUID_LUM_DENSE));
 }
 
-/** Colour for the 3D liquid: transforms desaturated or pale database hexes into
- *  rich, luminous jewel-tone perfume essence matching real studio photography. */
+/** Colour for the 3D liquid: returns the authentic fragrance hex. */
 export function juiceColor(hex: string): string {
-  const lower = hex.toLowerCase();
-  // Calibrated luxury studio hues for catalogue flagships
-  if (lower === "#e5aab2" || lower === "#9a7177") return "#c02560"; // Vibrant luxury jewel rose matching studio reference
-  if (lower === "#b7bb81" || lower === "#888c4c" || lower === "#808343") return "#9ba632"; // Luminous golden olive essence
-
-  const lum = relativeLuminance(hex);
-  // Rich saturation enhancer for any additional custom fragrances
-  const s = lum > LIQUID_LUM_DENSE ? 1 + paleFactor(hex) * (LIQUID_TINT_BOOST - 1) : 1.5;
-  if (s === 1) return hex;
-  const n = hex.replace("#", "");
-  const ch = [0, 1, 2].map((i) => parseInt(n.slice(i * 2, i * 2 + 2), 16));
-  const mean = (ch[0] + ch[1] + ch[2]) / 3;
-  const push = (c: number) =>
-    Math.round(clamp01((mean + (c - mean) * s) / 255) * 255)
-      .toString(16)
-      .padStart(2, "0");
-  return `#${push(ch[0])}${push(ch[1])}${push(ch[2])}`;
+  return hex;
 }
 
 export function formatPrice(amount: number): string {

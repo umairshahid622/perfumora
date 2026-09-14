@@ -26,7 +26,7 @@ const SOFTBOXES = [
  * a prefiltered radiance map. This is what the glass actually reflects — the
  * canvas itself is transparent, so there is no visible background.
  */
-export function StudioEnvironment({ intensity = 1.15 }: StudioEnvironmentProps) {
+export function StudioEnvironment({ intensity = 1.8 }: StudioEnvironmentProps) {
   const gl = useThree((state) => state.gl);
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
@@ -64,48 +64,59 @@ function paintStudioEquirect(): CanvasTexture | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  // Studio backdrop: soft luxury gradient
+  // Studio backdrop: neutral studio dark cyclorama gradient (as seen in Blender / gltf-viewer)
+  // This allows transmissive glass to refract transparent depth instead of solid milky white.
   const base = ctx.createLinearGradient(0, 0, 0, height);
-  base.addColorStop(0, "#ffffff");
-  base.addColorStop(0.35, "#f6f3ee");
-  base.addColorStop(0.70, "#eae5dc");
-  base.addColorStop(1, "#dfd8cd");
+  base.addColorStop(0, "#1c1c1f"); // Top / ceiling
+  base.addColorStop(0.35, "#2a2a2d"); // Upper wall
+  base.addColorStop(0.65, "#333338"); // Eye level horizon
+  base.addColorStop(1, "#18181a"); // Floor
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, width, height);
 
-  // Softboxes: bright vertical strips with soft horizontal falloff for crisp crystalline catchlights
-  const studioSoftboxes = [
-    { center: 0.20, width: 0.08, intensity: 1.2 },
-    { center: 0.72, width: 0.07, intensity: 1.6 },
-    { center: 0.46, width: 0.14, intensity: 0.85 },
-  ];
-  for (const box of studioSoftboxes) {
-    const x0 = (box.center - box.width) * width;
-    const x1 = (box.center + box.width) * width;
-    const band = ctx.createLinearGradient(x0, 0, x1, 0);
-    band.addColorStop(0, "rgba(255,255,255,0)");
-    band.addColorStop(0.5, `rgba(255,255,255,${box.intensity})`);
-    band.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = band;
-    ctx.fillRect(x0, 0, x1 - x0, height * 0.92);
-  }
+  // Softbox panels matching Blender studio lights:
+  // 1. Key Softbox (front-right: azimuth ~ 0.22, wide vertical strip softbox)
+  const keyX0 = 0.16 * width;
+  const keyX1 = 0.28 * width;
+  const keyGrad = ctx.createLinearGradient(keyX0, 0, keyX1, 0);
+  keyGrad.addColorStop(0, "rgba(255,250,242,0)");
+  keyGrad.addColorStop(0.2, "rgba(255,250,242,0.95)");
+  keyGrad.addColorStop(0.8, "rgba(255,250,242,0.95)");
+  keyGrad.addColorStop(1, "rgba(255,250,242,0)");
+  ctx.fillStyle = keyGrad;
+  ctx.fillRect(keyX0, height * 0.1, keyX1 - keyX0, height * 0.75);
 
-  // Subtle studio flags (negative fill) on the far flanks:
-  // Creates the crisp, delicate reflection contrast seen in professional perfume photography
-  const studioFlags = [
-    { center: 0.02, width: 0.03, intensity: 0.25 },
-    { center: 0.90, width: 0.03, intensity: 0.22 },
-  ];
-  for (const flag of studioFlags) {
-    const x0 = (flag.center - flag.width) * width;
-    const x1 = (flag.center + flag.width) * width;
-    const band = ctx.createLinearGradient(x0, 0, x1, 0);
-    band.addColorStop(0, "rgba(80,75,70,0)");
-    band.addColorStop(0.5, `rgba(80,75,70,${flag.intensity})`);
-    band.addColorStop(1, "rgba(80,75,70,0)");
-    ctx.fillStyle = band;
-    ctx.fillRect(x0, 0, x1 - x0, height * 0.88);
-  }
+  // 2. Fill Softbox (front-left: azimuth ~ 0.76)
+  const fillX0 = 0.70 * width;
+  const fillX1 = 0.82 * width;
+  const fillGrad = ctx.createLinearGradient(fillX0, 0, fillX1, 0);
+  fillGrad.addColorStop(0, "rgba(255,255,255,0)");
+  fillGrad.addColorStop(0.2, "rgba(255,255,255,0.75)");
+  fillGrad.addColorStop(0.8, "rgba(255,255,255,0.75)");
+  fillGrad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = fillGrad;
+  ctx.fillRect(fillX0, height * 0.15, fillX1 - fillX0, height * 0.65);
+
+  // 3. Rim / Backlight Softbox (back-left: azimuth ~ 0.60)
+  const rimX0 = 0.55 * width;
+  const rimX1 = 0.65 * width;
+  const rimGrad = ctx.createLinearGradient(rimX0, 0, rimX1, 0);
+  rimGrad.addColorStop(0, "rgba(242,250,255,0)");
+  rimGrad.addColorStop(0.5, "rgba(242,250,255,0.85)");
+  rimGrad.addColorStop(1, "rgba(242,250,255,0)");
+  ctx.fillStyle = rimGrad;
+  ctx.fillRect(rimX0, height * 0.15, rimX1 - rimX0, height * 0.6);
+
+  // 4. Overhead Top Softbox (centered at zenith)
+  const topGrad = ctx.createRadialGradient(
+    width * 0.5, 0, 10,
+    width * 0.5, 0, height * 0.35
+  );
+  topGrad.addColorStop(0, "rgba(255,255,255,0.9)");
+  topGrad.addColorStop(0.6, "rgba(255,255,255,0.4)");
+  topGrad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, width, height * 0.35);
 
 
 
