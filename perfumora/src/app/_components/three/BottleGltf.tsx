@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLoader, useThree, type ThreeElements } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Box3, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
+import { Box3, Color, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
 import type { BottleRefs } from "./useBottleRefs";
 import {
   useLiquidPhysics,
@@ -69,93 +69,67 @@ const RENDER_ORDER = { liquid: 0, dipTube: 1, glass: 2 } as const;
 const GLASS_MATERIAL = {
   transmission: 0,
   transparent: true,
-  opacity: 0.20,
-  roughness: 0.015,
+  opacity: 0.06,
+  roughness: 0.0,
   metalness: 0,
   clearcoat: 1,
-  clearcoatRoughness: 0.015,
-  envMapIntensity: 1.8,
+  clearcoatRoughness: 0.005,
+  envMapIntensity: 3.5,
+  ior: 1.52,
   depthWrite: false,
 } as const;
 
 /**
  * Dedicated high-definition glass material for the transparent cap outer piece / sleeve (`capOutside`).
- * Gives the cap's crystal/acrylic outer sleeve distinct clarity, realistic refraction feel,
- * and high specular presence so it is clearly visible and luxurious.
+ * Gives the cap's crystal outer sleeve pristine clarity, crisp specular presence, and luminous highlights.
  */
 const CAP_GLASS_MATERIAL = {
   transmission: 0,
   transparent: true,
-  opacity: 0.38,
-  roughness: 0.005,
+  opacity: 0.22,
+  roughness: 0.0,
   metalness: 0.01,
   clearcoat: 1,
   clearcoatRoughness: 0.005,
-  envMapIntensity: 2.6,
+  envMapIntensity: 3.6,
   ior: 1.54,
   depthWrite: false,
 } as const;
 
 /**
- * Clear glass reads on a light page through its *edges*, not its body: the
- * silhouette catches a Fresnel rim at grazing angles while the surface facing the
- * camera stays nearly clear.
- */
-const GLASS_EDGE = { power: 2.0, alpha: 0.32, tint: 0.32 } as const;
-
-/** Dedicated pronounced Fresnel edge for the cap transparent casing */
-const CAP_GLASS_EDGE = { power: 1.6, alpha: 0.60, tint: 0.48 } as const;
-
-/** The contour the rim darkens toward, as sRGB channels — warm, to sit with the
- *  parchment. Read in output space: the patch runs after tone-mapping and the
- *  colour-space conversion, so this is a plain sRGB value, not linear. */
-const GLASS_EDGE_COLOR = "0.16, 0.14, 0.12";
-
-/**
- * The cap sleeve's Fresnel rim tints toward this richer contour so `capOutside`
- * reads as defined, premium bevelled glass on its silhouette with crisp definition.
- */
-const CAP_EDGE_COLOR = "0.22, 0.19, 0.17";
-
-/**
- * The fragrance's own Fresnel rim tints toward this neutral-cool contour. Every
- * juice renders at one translucent opacity (`LIQUID_OPACITY`) so it reads as clear
- * liquid rather than thick paint — but a translucent body has no visible edge, so
- * on its own it reads as an *empty* bottle. This rim draws
- * the fragrance's silhouette and meniscus — the same edge-lit trick that makes the
- * clear glass legible — so the juice reads as a liquid volume catching light. Kept
- * neutral rather than warm/cool so it defines the edge of the golds and the
- * near-clears alike. Output-space sRGB channels like the two above; ≈ #6b7079.
- */
-const LIQUID_EDGE_COLOR = "0.42, 0.44, 0.48";
-
-/**
- * Every juice renders at this one opacity — the material is otherwise identical
- * across variants (same rim, roughness, gloss, IOR), so hue is all that changes
- * from one fragrance to the next. Translucent enough that a saturated juice reads
- * as liquid rather than thick dark paint, opaque enough that a pale one keeps a
- * visible body: the single knob for how full / how heavy the fragrance looks.
- */
-const LIQUID_OPACITY = 0.5;
-
-/**
- * Injects the rim above into a material's compiled fragment shader. It hooks the
- * final chunk — by then `gl_FragColor` is fully lit, tone-mapped and in output
- * space — and rewrites its alpha and colour from a Fresnel term.
+ * Clean crystal glass edge shader:
+ * Injects bright specular Fresnel reflections along bevels, rims, and contours,
+ * coupled with subtle optical refraction depth so the flacon reads as heavy,
+ * weighted, authentic crystal glass rather than a flat transparent sheet.
  */
 function applyGlassEdge(
   material: MeshPhysicalMaterial,
-  edgeColor: string = GLASS_EDGE_COLOR,
-  edgeConfig: { power: number; alpha: number; tint: number } = GLASS_EDGE,
+  glintStrength: number = 0.85,
+  alphaGlint: number = 0.70,
+  edgeContourStrength: number = 0.20,
+  cacheKey: string = "glass_edge_crystal_v5",
 ): void {
+  material.customProgramCacheKey = () => cacheKey;
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
   {
-    float edge = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), ${edgeConfig.power.toFixed(1)});
-    gl_FragColor.a = clamp(gl_FragColor.a + edge * ${edgeConfig.alpha.toFixed(2)}, 0.0, 1.0);
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${edgeColor}), edge * ${edgeConfig.tint.toFixed(2)});
+    float cosTheta = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+    float fresnel = pow(1.0 - cosTheta, 2.5);
+
+    // 1. Crystalline specular glint catching studio softbox lighting along bevels and vertical sides
+    float glint = pow(fresnel, 1.8) * ${glintStrength.toFixed(2)};
+    gl_FragColor.rgb += vec3(glint);
+
+    // 2. Optical refraction contour: subtle luxury glass edge definition (NOT black paint)
+    // Delicate neutral glass tone that gives physical weight to bevels and flacon perimeter
+    vec3 glassEdgeTone = vec3(0.34, 0.31, 0.28);
+    float contour = pow(fresnel, 4.0) * ${edgeContourStrength.toFixed(2)};
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, glassEdgeTone, contour);
+
+    // 3. Physical Fresnel alpha: crystal-clear center (base opacity 0.06), solid specular reflection at edges
+    gl_FragColor.a = clamp(gl_FragColor.a + fresnel * ${alphaGlint.toFixed(2)}, 0.0, 0.90);
   }`,
     );
   };
@@ -164,13 +138,14 @@ function applyGlassEdge(
 
 /**
  * Injects slosh displacement and surface micro-waves into the liquid mesh vertex shader,
- * while maintaining the Fresnel edge rim in the fragment shader.
+ * while providing authentic liquid translucency, Beer-Lambert depth darkening at silhouettes,
+ * and delicate surface specular highlights without muddy gray tints.
  */
 function applyLiquidSloshShader(
   material: MeshPhysicalMaterial,
   uniforms: LiquidUniforms,
 ): void {
-  material.customProgramCacheKey = () => "liquid_slosh_shader_v1";
+  material.customProgramCacheKey = () => "liquid_slosh_shader_v26";
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     // Bind uniforms to shader
     shader.uniforms.uSlosh = uniforms.uSlosh;
@@ -183,25 +158,22 @@ function applyLiquidSloshShader(
       shader.vertexShader;
 
     // 2. Displace vertices in vertex shader
-    // Meniscus is at y = 1.0, base is at y = -1.0.
-    // hFactor ensures the base stays firmly anchored at the bottom of the flacon
     shader.vertexShader = shader.vertexShader.replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
   {
-    // Height factor: 0 at base (y <= -0.2), smoothly transitions to 1.0 at meniscus (y = 1.0)
-    float hFactor = smoothstep(-0.2, 1.0, position.y);
-
-    // Counter-tilt displacement: (x * slosh.x + z * slosh.y)
-    float sloshTilt = clamp((position.x * uSlosh.x + position.z * uSlosh.y) * hFactor, -0.22, 0.22);
-
-    // Micro-surface ripples: only on upper meniscus (y > 0.8)
-    float ripple = 0.0;
-    if (position.y > 0.8) {
-      ripple = sin(position.x * 5.0 + uWaveTime * 7.0) * cos(position.z * 5.0 + uWaveTime * 6.0) * uWaveIntensity;
+    // Adjusted fill level: keeping bottom bowl (y <= -0.45) anchored while setting a balanced fill level
+    if (position.y > -0.45) {
+      float fillT = (position.y - (-0.45)) / 1.45;
+      transformed.y += fillT * 0.22;
     }
 
-    transformed.y += sloshTilt + ripple;
+    // Slosh counter-tilt displacement: 0 at curved bottom bowl, transitions to full at upper meniscus
+    float hFactor = smoothstep(-0.2, 1.15, transformed.y);
+    float sloshTilt = clamp((position.x * uSlosh.x + position.z * uSlosh.y) * hFactor, -0.22, 0.22);
+
+    // Silky-smooth counter-tilt fluid motion without high-frequency vertex shivering or vibration
+    transformed.y += sloshTilt;
   }`,
     );
 
@@ -209,23 +181,31 @@ function applyLiquidSloshShader(
     shader.vertexShader = shader.vertexShader.replace(
       "#include <defaultnormal_vertex>",
       `#include <defaultnormal_vertex>
-  if (position.y > 0.7) {
+  {
+    float normFactor = smoothstep(0.4, 0.9, position.y);
     transformedNormal = normalize(vec3(
-      transformedNormal.x - uSlosh.x * 0.7,
+      transformedNormal.x - uSlosh.x * 0.5 * normFactor,
       transformedNormal.y,
-      transformedNormal.z - uSlosh.y * 0.7
+      transformedNormal.z - uSlosh.y * 0.5 * normFactor
     ));
   }`,
     );
 
-    // 4. Fragment shader Fresnel edge
+    // 4. Fragment shader: Luminous Fresnel rim & dielectric specular highlights
+    // Radiant pure liquid tone without muddy gray edge tints
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
   {
-    float edge = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), ${GLASS_EDGE.power.toFixed(1)});
-    gl_FragColor.a = clamp(gl_FragColor.a + edge * ${GLASS_EDGE.alpha.toFixed(2)}, 0.0, 1.0);
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${LIQUID_EDGE_COLOR}), edge * ${GLASS_EDGE.tint.toFixed(2)});
+    float cosTheta = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+    float fresnel = pow(1.0 - cosTheta, 2.5);
+
+    // Liquid surface specular glint catching studio environment light
+    float glint = pow(fresnel, 3.2) * 0.45;
+    gl_FragColor.rgb += vec3(glint);
+
+    // Natural fragrance translucency with subtle edge optical depth
+    gl_FragColor.a = clamp(gl_FragColor.a + fresnel * 0.18, 0.0, 0.70);
   }`,
     );
   };
@@ -239,7 +219,7 @@ function applyLiquidSloshShader(
  * The fragrance is widened to this fraction of the way out to the glass wall,
  * leaving 1% of clearance so the two surfaces don't shimmer against each other.
  */
-const LIQUID_WALL_CLEARANCE = 0.99;
+const LIQUID_WALL_CLEARANCE = 0.94;
 
 /** Largest distance from a lathe mesh's own Y axis, in its local space. */
 function localRadius(mesh: Mesh): number {
@@ -329,6 +309,8 @@ export function BottleGltf({
     const liquid = gltf.nodes[NODE.liquid] as Mesh;
     const dipTube = gltf.nodes[NODE.dipTube] as Mesh;
 
+    liquid.visible = true;
+
     dipTube.renderOrder = RENDER_ORDER.dipTube;
     glass.renderOrder = RENDER_ORDER.glass;
     capGlass.renderOrder = RENDER_ORDER.glass;
@@ -344,9 +326,13 @@ export function BottleGltf({
     Object.assign(glass.material as MeshPhysicalMaterial, GLASS_MATERIAL);
     Object.assign(capGlass.material as MeshPhysicalMaterial, CAP_GLASS_MATERIAL);
 
-    // Apply Fresnel edge contours
-    applyGlassEdge(glass.material as MeshPhysicalMaterial, GLASS_EDGE_COLOR, GLASS_EDGE);
-    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, CAP_EDGE_COLOR, CAP_GLASS_EDGE);
+    // Enforce pure white base color to eliminate any grey/dark import factor from glTF
+    (glass.material as MeshPhysicalMaterial).color = new Color(0xffffff);
+    (capGlass.material as MeshPhysicalMaterial).color = new Color(0xffffff);
+
+    // Apply clean crystalline specular edge highlights catching studio softbox light
+    applyGlassEdge(glass.material as MeshPhysicalMaterial, 0.85, 0.70, 0.20, "glass_edge_bottle_v5");
+    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, 0.95, 0.65, 0.25, "glass_edge_cap_v5");
     applyLiquidSloshShader(liquid.material as MeshPhysicalMaterial, liquidUniformsRef.current);
 
     const tube = dipTube.material as MeshPhysicalMaterial;
@@ -373,43 +359,26 @@ export function BottleGltf({
         <primitive object={gltf.scene} />
 
         {/* The fragrance is lifted out of the glTF's own scene graph so its
-            material can be attached here as a JSX child — the file ships it with
-            none. That is safe because the glTF root is exactly identity — so the
-            reparenting leaves the world transform untouched — and the fragrance is
-            strictly interior to the bottle, so it never contributed to the bounds
-            the framing above is measured from.
-
+            material can be attached here as a JSX child with its authentic curved
+            bottom bowl and meniscus.
             The radial fit is applied declaratively rather than by mutating
-            `liquid.scale`, which makes it idempotent: React's dev-time double
-            invoke re-applies the same absolute value instead of compounding it. */}
+            `liquid.scale`. */}
         <primitive
           object={gltf.nodes[NODE.liquid]}
           scale-x={fit.liquidRadialScale}
           scale-z={fit.liquidRadialScale}
           renderOrder={RENDER_ORDER.liquid}
         >
-          {/* Alpha-blended, not transmissive — see `GLASS_MATERIAL`. A refracting
-              fragrance samples an off-screen render of the scene, and the
-              oversized name behind the bottle is a DOM layer, not scene geometry,
-              so refraction could never pick it up; blending against the
-              transparent canvas can. What that costs is real lensing — no
-              chromatic aberration, no inverted letters through the middle.
-
-              Left front-faced (the default): one layer of `LIQUID_OPACITY` rather
-              than two, and a double-sided fragrance would blend its own back wall
-              in arbitrary order, since three sorts meshes but not the triangles
-              within one. `ior` still earns its place at `transmission: 0` — three
-              derives a dielectric's specular reflectance from it, so this reflects
-              like a liquid instead of like the 1.5 glass around it. */}
           <meshPhysicalMaterial
             color={initialLiquidColor}
             transparent
-            opacity={LIQUID_OPACITY}
-            ior={1.36}
-            roughness={0.05}
-            clearcoat={0.3}
-            clearcoatRoughness={0.05}
-            envMapIntensity={1.5}
+            opacity={0.50}
+            ior={1.34}
+            roughness={0.0}
+            metalness={0.0}
+            clearcoat={1.0}
+            clearcoatRoughness={0.0}
+            envMapIntensity={2.0}
             depthWrite={false}
           />
         </primitive>

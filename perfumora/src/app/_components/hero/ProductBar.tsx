@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import { Eyebrow } from "../ui/Eyebrow";
 import { Price } from "./Price";
 import { SizeSelector } from "./SizeSelector";
 import { RippleButton } from "../ui/RippleButton";
 import { useCart } from "../../_lib/cart-context";
 import { useScent } from "../../_lib/scent-context";
+import { prefersReducedMotion } from "../../_lib/motion";
 import { defaultSize, offeredSizes, type SizeMl } from "../../_lib/variants";
 
 /**
@@ -14,15 +17,40 @@ import { defaultSize, offeredSizes, type SizeMl } from "../../_lib/variants";
  * Stays accessible across all opening stage beats (Hero, Manifesto, Ritual).
  */
 export function ProductBar() {
-  const { variant } = useScent();
+  const { variant, index } = useScent();
   const { addItem } = useCart();
   const [picked, setPicked] = useState<SizeMl | null>(null);
+  const eyebrowScopeRef = useRef<HTMLSpanElement>(null);
+  const firstRun = useRef(true);
 
   const offered = offeredSizes(variant.sizes);
   const size =
     picked && offered.includes(picked) ? picked : defaultSize(variant.sizes);
   const { price, stock } = variant.sizes[size]!;
   const soldOut = stock === 0;
+
+  const text = `${variant.name} · ${variant.concentration ?? "Eau de Parfum"}`;
+
+  useGSAP(
+    () => {
+      const snap = firstRun.current || prefersReducedMotion();
+      firstRun.current = false;
+      if (snap) return;
+
+      gsap.fromTo(
+        ".eyebrow-letter",
+        { yPercent: 55, opacity: 0 },
+        {
+          yPercent: 0,
+          opacity: 1,
+          duration: 0.7,
+          stagger: 0.025,
+          ease: "power3.out",
+        },
+      );
+    },
+    { scope: eyebrowScopeRef, dependencies: [index], revertOnUpdate: true },
+  );
 
   const addToBag = () => {
     addItem({
@@ -37,8 +65,17 @@ export function ProductBar() {
   return (
     <div className="grid grid-cols-2 items-end gap-3 py-4 md:grid-cols-3 md:gap-6 md:py-4 pointer-events-[inherit]">
       <div className="order-2 md:order-1 min-w-0">
-        <Eyebrow className="whitespace-nowrap">
-          {variant.name} · {variant.concentration ?? "Eau de Parfum"}
+        <Eyebrow className="whitespace-nowrap overflow-hidden">
+          <span ref={eyebrowScopeRef} className="inline-block">
+            {text.split("").map((letter, i) => (
+              <span
+                key={`${index}-${i}`}
+                className="eyebrow-letter inline-block"
+              >
+                {letter === " " ? "\u00A0" : letter}
+              </span>
+            ))}
+          </span>
         </Eyebrow>
         <Price value={price} />
       </div>

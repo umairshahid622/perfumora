@@ -64,17 +64,22 @@ function paintStudioEquirect(): CanvasTexture | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  // Sky → floor falloff
+  // Studio backdrop: soft luxury gradient
   const base = ctx.createLinearGradient(0, 0, 0, height);
   base.addColorStop(0, "#ffffff");
-  base.addColorStop(0.45, "#eceae6");
-  base.addColorStop(0.62, "#d7d3cd");
-  base.addColorStop(1, "#a9a5a0");
+  base.addColorStop(0.35, "#f6f3ee");
+  base.addColorStop(0.70, "#eae5dc");
+  base.addColorStop(1, "#dfd8cd");
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, width, height);
 
-  // Softboxes: bright vertical bands with soft horizontal falloff
-  for (const box of SOFTBOXES) {
+  // Softboxes: bright vertical strips with soft horizontal falloff for crisp crystalline catchlights
+  const studioSoftboxes = [
+    { center: 0.20, width: 0.08, intensity: 1.2 },
+    { center: 0.72, width: 0.07, intensity: 1.6 },
+    { center: 0.46, width: 0.14, intensity: 0.85 },
+  ];
+  for (const box of studioSoftboxes) {
     const x0 = (box.center - box.width) * width;
     const x1 = (box.center + box.width) * width;
     const band = ctx.createLinearGradient(x0, 0, x1, 0);
@@ -82,16 +87,27 @@ function paintStudioEquirect(): CanvasTexture | null {
     band.addColorStop(0.5, `rgba(255,255,255,${box.intensity})`);
     band.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = band;
-    ctx.fillRect(x0, 0, x1 - x0, height * 0.78);
+    ctx.fillRect(x0, 0, x1 - x0, height * 0.92);
   }
 
-  // Fade the softboxes out towards the floor so highlights stay in the upper
-  // hemisphere and the glass keeps a darker core near its base.
-  const fade = ctx.createLinearGradient(0, height * 0.42, 0, height);
-  fade.addColorStop(0, "rgba(150,146,141,0)");
-  fade.addColorStop(1, "rgba(150,146,141,0.9)");
-  ctx.fillStyle = fade;
-  ctx.fillRect(0, height * 0.42, width, height * 0.58);
+  // Subtle studio flags (negative fill) on the far flanks:
+  // Creates the crisp, delicate reflection contrast seen in professional perfume photography
+  const studioFlags = [
+    { center: 0.02, width: 0.03, intensity: 0.25 },
+    { center: 0.90, width: 0.03, intensity: 0.22 },
+  ];
+  for (const flag of studioFlags) {
+    const x0 = (flag.center - flag.width) * width;
+    const x1 = (flag.center + flag.width) * width;
+    const band = ctx.createLinearGradient(x0, 0, x1, 0);
+    band.addColorStop(0, "rgba(80,75,70,0)");
+    band.addColorStop(0.5, `rgba(80,75,70,${flag.intensity})`);
+    band.addColorStop(1, "rgba(80,75,70,0)");
+    ctx.fillStyle = band;
+    ctx.fillRect(x0, 0, x1 - x0, height * 0.88);
+  }
+
+
 
   const texture = new CanvasTexture(canvas);
   texture.mapping = EquirectangularReflectionMapping;

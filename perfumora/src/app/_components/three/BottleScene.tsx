@@ -139,6 +139,14 @@ export default function BottleScene({
   // set on the material itself, so only the colour changes here.
   const juice = juiceColor(accent);
   const firstRun = useRef(true);
+
+  // Guarantee liquid material holds the exact calibrated studio color once loaded
+  useEffect(() => {
+    if (ready && refs.liquidMaterial.current) {
+      refs.liquidMaterial.current.color.set(juice);
+    }
+  }, [ready, juice, refs]);
+
   // Portrait viewports rest higher and smaller — see `REST_COMPACT`.
   const rest = isCompact ? REST_COMPACT : isTablet ? REST_TABLET : REST;
 
@@ -299,12 +307,15 @@ export default function BottleScene({
       >
         <StudioEnvironment />
 
-        {/* Key light, front-right, gives the cap its broad highlight */}
-        <directionalLight position={[2.6, 3.4, 4]} intensity={1.5} />
-        {/* Fill, front-left */}
-        <directionalLight position={[-3.2, 1.6, 2.4]} intensity={0.45} />
-        {/* Rim, behind, lights the glass edges and the liquid from within */}
-        <directionalLight position={[0, 1.2, -4]} intensity={1.1} />
+        {/* Balanced studio ambient fill */}
+        <ambientLight intensity={0.35} color="#ffffff" />
+
+        {/* Key light, front-right, gives the cap and glass shoulder their crisp gleam */}
+        <directionalLight position={[2.8, 3.4, 4]} intensity={1.6} />
+        {/* Fill light, front-left, defines the left flank softbox reflection */}
+        <directionalLight position={[-3.2, 1.8, 2.6]} intensity={0.65} />
+        {/* Rim / backlight, behind, illuminates internal liquid reflections and crystal bevels */}
+        <directionalLight position={[0, 1.4, -4]} intensity={1.4} />
 
         {/* The resting pose, set once as plain props — there is no longer a timeline
             writing this group, so React owns the transform outright and no ref is

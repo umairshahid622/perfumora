@@ -91,7 +91,7 @@ export function ScentProvider({
     if (!variant) return;
     const root = document.documentElement;
     const accent = readableAccent(variant.hex);
-    root.style.setProperty("--accent", accent);
+    root.style.setProperty("--accent", variant.hex);
     root.style.setProperty("--accent-contrast", "var(--paper)");
     root.style.setProperty("--accent-glow", accentGlow(variant.hex));
     // Legible-on-parchment accent for text/borders; fills + glow keep the true hex.
