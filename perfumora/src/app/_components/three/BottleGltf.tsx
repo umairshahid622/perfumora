@@ -3,7 +3,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useLoader, useThree, type ThreeElements } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Box3, Color, FrontSide, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
+import { Box3, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
 import type { BottleRefs } from "./useBottleRefs";
 import {
   useLiquidPhysics,
@@ -95,21 +95,6 @@ function applyLiquidSloshShader(
   material.needsUpdate = true;
 }
 
-/**
- * The glTF models the fragrance narrower than the glass around it: both are
- * unit-radius lathes carrying their own scale — 1.0671 for the fragrance against
- * 1.2030 for the glass — so 11.3% of the bottle's radius reads as an air gap.
- * The fragrance is widened to this fraction of the way out to the glass wall,
- * leaving 1% of clearance so the two surfaces don't shimmer against each other.
- */
-const LIQUID_WALL_CLEARANCE = 0.94;
-
-/** Largest distance from a lathe mesh's own Y axis, in its local space. */
-function localRadius(mesh: Mesh): number {
-  mesh.geometry.computeBoundingBox();
-  const box = mesh.geometry.boundingBox!;
-  return Math.max(box.max.x, box.max.z, -box.min.x, -box.min.z);
-}
 
 interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
   refs: BottleRefs;
@@ -155,21 +140,9 @@ export function BottleGltf({
     const scale = FRAMED_HEIGHT / bounds.getSize(new Vector3()).y;
     const offset = bounds.getCenter(new Vector3()).multiplyScalar(-scale);
 
-    const glass = gltf.nodes[NODE.glass] as Mesh;
-    const liquid = gltf.nodes[NODE.liquid] as Mesh;
-
-    // Derived from the two meshes' *geometry*, not by nudging the fragrance's
-    // current scale, so assigning it is idempotent: this runs again under
-    // React's dev-time double invoke, and a relative nudge would compound into
-    // the fragrance poking through the glass.
-    const liquidRadialScale =
-      (localRadius(glass) * glass.scale.x * LIQUID_WALL_CLEARANCE) /
-      localRadius(liquid);
-
     return {
       scale,
       offset,
-      liquidRadialScale,
     };
   }, [gltf]);
 
@@ -179,73 +152,26 @@ export function BottleGltf({
     const liquid = gltf.nodes[NODE.liquid] as Mesh;
     const dipTube = gltf.nodes[NODE.dipTube] as Mesh;
 
+    glass.visible = true;
     liquid.visible = true;
 
     dipTube.renderOrder = RENDER_ORDER.dipTube;
     glass.renderOrder = RENDER_ORDER.glass;
     capGlass.renderOrder = RENDER_ORDER.glass;
 
-    // Retain authored Blender materials for bottle, capOutside, and liquid.
+    // Retain native Blender materials for all meshes.
     // Injects slosh oscillation animation vertex displacement without touching material shading.
     applyLiquidSloshShader(liquid.material as MeshPhysicalMaterial, liquidUniformsRef.current);
 
-    // Dip tube: crisp translucent white plastic visible through tinted liquid
-    const tube = dipTube.material as MeshPhysicalMaterial;
-    tube.color.set("#ffffff");
-    tube.roughness = 0.05;
-    tube.clearcoat = 1.0;
-    tube.clearcoatRoughness = 0.02;
-    tube.transmission = 0;
-    tube.transparent = false;
-
-    // Liquid: transparent, shiny fluid with defined meniscus, refractive IOR and wet clearcoat gloss
+    // Keep dynamic liquid color
     const liquidMat = liquid.material as MeshPhysicalMaterial;
-    liquidMat.side = FrontSide;
-    liquidMat.depthWrite = false;
-    liquidMat.transparent = true;
-    liquidMat.opacity = 0.60;
-    liquidMat.transmission = 0;
-    liquidMat.roughness = 0.01;
-    liquidMat.metalness = 0.0;
-    liquidMat.clearcoat = 1.0;
-    liquidMat.clearcoatRoughness = 0.01;
-    liquidMat.ior = 1.333;
-    liquidMat.reflectivity = 1.0;
-
-    // Physical crystal glass parameters with high clarity, thickness and softbox specular highlights
-    const glassMat = glass.material as MeshPhysicalMaterial;
-    glassMat.side = FrontSide;
-    glassMat.depthWrite = false;
-    glassMat.transmission = 0.40;
-    glassMat.transparent = true;
-    glassMat.opacity = 0.70;
-    glassMat.thickness = 0.35;
-    glassMat.attenuationDistance = 2.0;
-    glassMat.attenuationColor = new Color(0x1a1a20);
-    glassMat.roughness = 0.01;
-    glassMat.clearcoat = 1.0;
-    glassMat.clearcoatRoughness = 0.01;
-    glassMat.ior = 1.5;
-    glassMat.reflectivity = 1.0;
-
-    const capGlassMat = capGlass.material as MeshPhysicalMaterial;
-    capGlassMat.side = FrontSide;
-    capGlassMat.depthWrite = false;
-    capGlassMat.transmission = 0.40;
-    capGlassMat.transparent = true;
-    capGlassMat.opacity = 0.70;
-    capGlassMat.thickness = 0.30;
-    capGlassMat.attenuationDistance = 2.0;
-    capGlassMat.attenuationColor = new Color(0x1a1a20);
-    capGlassMat.roughness = 0.01;
-    capGlassMat.clearcoat = 1.0;
-    capGlassMat.clearcoatRoughness = 0.01;
-    capGlassMat.ior = 1.5;
-    capGlassMat.reflectivity = 1.0;
+    if (liquidColor) {
+      liquidMat.color.set(liquidColor);
+    }
 
     refs.glass.current = glass;
     refs.liquid.current = liquid;
-    refs.liquidMaterial.current = liquid.material as MeshPhysicalMaterial;
+    refs.liquidMaterial.current = liquidMat;
     refs.dipTube.current = dipTube;
     refs.cap.current = gltf.nodes[NODE.cap];
     refs.pumpButton.current = gltf.nodes[NODE.pumpButton];
@@ -253,20 +179,13 @@ export function BottleGltf({
     invalidate();
     // Last, so the motion hooks that react to this only ever see fully wired refs.
     onReady?.();
-  }, [gltf, refs, invalidate, onReady]);
+  }, [gltf, refs, invalidate, onReady, liquidColor]);
 
   return (
     <group ref={refs.root} {...groupProps}>
-      <group scale={fit.scale} position={fit.offset}>
+      {/* Bottle orientation matching Blender asset: -PI/2 brings the graceful dip-tube curve to the left */}
+      <group scale={fit.scale} position={fit.offset} rotation-y={-Math.PI / 2}>
         <primitive object={gltf.scene} />
-
-        {/* Liquid mesh with slosh oscillation animation and native Blender material */}
-        <primitive
-          object={gltf.nodes[NODE.liquid]}
-          scale-x={fit.liquidRadialScale}
-          scale-z={fit.liquidRadialScale}
-          renderOrder={RENDER_ORDER.liquid}
-        />
       </group>
     </group>
   );

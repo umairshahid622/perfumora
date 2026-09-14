@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -40,12 +40,19 @@ const STEPS = [
 const STEP_RISE = 20;
 const STEP_DURATION = 0.8;
 const STEP_STAGGER = 0.14;
+const STEP_INTERVAL_MS = 4200;
 
 export function Ritual() {
   const [activeStep, setActiveStep] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [cycleKey, setCycleKey] = useState(0);
   const listRef = useRef<HTMLOListElement>(null);
   const mobileCardRef = useRef<HTMLDivElement>(null);
   const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const touchStartX = useRef(0);
+  const resumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useGSAP(
     () => {
@@ -53,6 +60,10 @@ export function Ritual() {
       if (!triggerEl) return;
 
       const still = prefersReducedMotion();
+
+      if (still) {
+        setIsRevealed(true);
+      }
 
       // Initial subtitle state: hidden until spray reveal with the steps
       if (subtitleRef.current) {
@@ -103,6 +114,7 @@ export function Ritual() {
         ].filter(Boolean);
 
         const reveal = () => {
+          setIsRevealed(true);
           gsap.killTweensOf(allStepElements());
 
           // Steps reveal cleanly on their own timeline
@@ -176,6 +188,7 @@ export function Ritual() {
         };
 
         const reset = () => {
+          setIsRevealed(false);
           // Steps and subtitle reset smoothly
           gsap.killTweensOf(allStepElements());
           if (items.length) {
@@ -206,6 +219,45 @@ export function Ritual() {
     },
     { dependencies: [] },
   );
+
+  // Auto-progress through the ritual steps on mobile view
+  useEffect(() => {
+    if (!isRevealed || !isAutoPlaying || prefersReducedMotion()) return;
+    const interval = setInterval(() => {
+      setDirection(1);
+      setActiveStep((prev) => (prev + 1) % STEPS.length);
+      setCycleKey((k) => k + 1);
+    }, STEP_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isRevealed, isAutoPlaying]);
+
+  const handleStepSelect = (idx: number) => {
+    if (idx === activeStep) return;
+    setDirection(idx > activeStep ? 1 : -1);
+    setActiveStep(idx);
+    setCycleKey((k) => k + 1);
+    setIsAutoPlaying(false);
+    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+    resumeTimeoutRef.current = setTimeout(() => {
+      setIsAutoPlaying(true);
+    }, 8000);
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const diff = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(diff) > 35) {
+      if (diff < 0) {
+        handleStepSelect((activeStep + 1) % STEPS.length);
+      } else {
+        handleStepSelect((activeStep - 1 + STEPS.length) % STEPS.length);
+      }
+    }
+  };
 
   return (
     <Section
@@ -367,50 +419,86 @@ export function Ritual() {
           <div
             ref={mobileCardRef}
             className="relative z-50 flex flex-col md:hidden pointer-events-auto mt-auto mb-2 sm:mb-4 md:mb-0 touch-manipulation select-none"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
           >
             <div className="border-hairline-on-light bg-bg-light/95 backdrop-blur-md rounded-2xl border p-2 sm:p-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
-              <div className="grid grid-cols-3 gap-1 border-b border-hairline-on-light pb-1.5">
+              {/* Segmented control track with sliding active pill */}
+              <div className="relative flex rounded-xl bg-black/[0.035] p-1 border border-black/[0.04]">
+                <div
+                  aria-hidden="true"
+                  className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] transition-transform duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
+                  style={{ transform: `translateX(${activeStep * 100}%)` }}
+                >
+                  <div className="relative h-full w-full rounded-lg bg-accent-on-light shadow-xs overflow-hidden">
+                    {isAutoPlaying && isRevealed && (
+                      <div className="absolute bottom-0 left-1 right-1 h-[2px] bg-white/20 rounded-full overflow-hidden">
+                        <div
+                          key={`prog-${activeStep}-${cycleKey}`}
+                          className="h-full bg-white/90 animate-ritual-progress rounded-full"
+                          style={{ animationDuration: `${STEP_INTERVAL_MS}ms` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {STEPS.map((step, idx) => {
                   const active = idx === activeStep;
                   return (
                     <button
                       key={step.num}
                       type="button"
-                      onClick={() => setActiveStep(idx)}
-                      className={cn(
-                        "flex items-center justify-center gap-1 rounded-lg py-1.5 px-1 transition-all text-[11px] uppercase tracking-wider cursor-pointer active:scale-95",
-                        active
-                          ? "bg-accent-on-light text-white font-semibold shadow-xs"
-                          : "bg-black/[0.03] text-muted-on-light hover:text-ink font-medium active:bg-black/[0.06]",
-                      )}
+                      onClick={() => handleStepSelect(idx)}
+                      className="relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 px-1 text-[11px] uppercase tracking-wider cursor-pointer active:scale-95 transition-all duration-200"
                     >
                       <span
-                        className={
-                          active
-                            ? "text-white/80 font-display"
-                            : "text-accent-on-light font-display"
-                        }
+                        className={cn(
+                          "font-display transition-colors duration-200",
+                          active ? "text-white/85 font-medium" : "text-accent-on-light font-normal",
+                        )}
                       >
                         {step.num}
                       </span>
-                      <span className="truncate">{step.title}</span>
+                      <span
+                        className={cn(
+                          "truncate transition-colors duration-200",
+                          active ? "text-white font-semibold" : "text-muted-on-light hover:text-ink font-medium",
+                        )}
+                      >
+                        {step.title}
+                      </span>
                     </button>
                   );
                 })}
               </div>
 
-              <div key={activeStep} className="pt-1.5 min-h-[2.25rem] transition-opacity duration-200">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="font-display text-accent-on-light text-sm sm:text-base leading-none font-medium">
-                    {STEPS[activeStep].num}
-                  </span>
-                  <h3 className="text-xs font-medium tracking-tight text-ink">
-                    {STEPS[activeStep].title}
-                  </h3>
+              {/* Directional sliding step content */}
+              <div className="relative overflow-hidden pt-2 pb-0.5 min-h-[3.25rem]">
+                <div
+                  key={activeStep}
+                  className={cn(
+                    "flex flex-col",
+                    direction >= 0 ? "animate-step-slide-in-right" : "animate-step-slide-in-left",
+                  )}
+                >
+                  <div className="flex items-baseline justify-between gap-1.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-display text-accent-on-light text-sm sm:text-base leading-none font-medium">
+                        {STEPS[activeStep].num}
+                      </span>
+                      <h3 className="text-xs font-medium tracking-tight text-ink">
+                        {STEPS[activeStep].title}
+                      </h3>
+                    </div>
+                    <span className="text-[10px] font-mono tracking-widest text-muted-on-light font-medium uppercase">
+                      0{activeStep + 1} / 03
+                    </span>
+                  </div>
+                  <p className="text-body text-muted-on-light mt-0.5 text-[11px] leading-snug">
+                    {STEPS[activeStep].body}
+                  </p>
                 </div>
-                <p className="text-body text-muted-on-light mt-0.5 text-[11px] leading-snug">
-                  {STEPS[activeStep].body}
-                </p>
               </div>
             </div>
           </div>

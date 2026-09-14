@@ -111,3 +111,51 @@
     text-transform: uppercase;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Ritual Mobile Tabs Animations
+--------------------------------------------------------------------------- */
+@keyframes stepSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes stepSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ritualProgress {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.animate-step-slide-in-right {
+  animation: stepSlideInRight 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-step-slide-in-left {
+  animation: stepSlideInLeft 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-ritual-progress {
+  animation: ritualProgress linear forwards;
+}
