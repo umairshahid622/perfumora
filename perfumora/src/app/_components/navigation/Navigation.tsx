@@ -512,13 +512,18 @@ export function Navigation() {
         </nav>
       </header>
 
-      {/* Picking a fragrance commits the variant, then hands back here for the
-          trip to the Hero — a scroll on home, a route change off it. */}
+      {/* Picking a fragrance commits the variant, then closes the menu without
+          resetting scroll position when on the home page. */}
       <MegaMenu
         open={panel === "menu"}
         onClose={close}
         onClosed={menuClosed}
-        onSelect={() => goTo(SECTION_IDS.hero)}
+        onSelect={() => {
+          close();
+          if (!atHome) {
+            navigate("/");
+          }
+        }}
       />
       <CartDrawer
         open={panel === "cart"}

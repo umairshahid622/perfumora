@@ -18,8 +18,7 @@ interface MegaMenuProps {
    *  is visible without restating this timeline's duration over there. */
   onClosed: () => void;
   /** Called once a fragrance is committed, for <Navigation> to close this panel
-   *  and take the visitor to the Hero — which is a scroll on home but a route
-   *  change from `/checkout` or `/collection`, a decision that belongs there. */
+   *  and update the fragrance at the visitor's current scroll position. */
   onSelect: () => void;
 }
 
@@ -27,9 +26,8 @@ interface MegaMenuProps {
  * The "Fragrances" dropdown (§4.0): a floating, rounded dark panel that drops
  * from beneath the nav to nearly the full viewport height and nearly full width,
  * over a dimming scrim. Open/close is a GSAP height + opacity timeline (not a
- * `max-height` CSS transition, not a native <details>). Its links are shortcuts
- * into the Hero fragrance changer, not routes: selecting a family sets the live
- * variant and hands off to `onSelect` for the trip to the Hero.
+ * `max-height` CSS transition, not a native <details>). Its links switch the live
+ * variant seamlessly at the current scroll position without resetting to top.
  */
 export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
   const { variants, setIndex, index } = useScent();

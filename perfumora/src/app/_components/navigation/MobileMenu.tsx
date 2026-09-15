@@ -78,7 +78,9 @@ export function MobileMenu({
   const selectFragrance = (idx: number) => {
     setIndex(idx);
     onClose();
-    onNavigateHomeSection(SECTION_IDS.hero);
+    if (!isHome) {
+      onNavigateRoute("/");
+    }
   };
 
   const isHome = pathname === "/";
