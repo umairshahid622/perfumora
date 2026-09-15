@@ -32,3 +32,4 @@ dist-ssr
 .claude/settings.local.json
 .claude/hooks/node_modules/
 .claude/tsc-cache/
+.vercel
