@@ -1,20 +1,22 @@
 "use client";
 
 import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import { CanvasTexture, Vector3 } from "three";
 import type { BottleRefs } from "./useBottleRefs";
 
 /**
  * Where the plume starts, right at the pump's nozzle orifice.
+ * Calibrated precisely to the nozzle node coordinates.
  */
-const NOZZLE: [number, number, number] = [0.15, 1.043, 0.02];
+const DEFAULT_NOZZLE: [number, number, number] = [0.169, 1.050, 0.023];
 
 /**
  * The cone the mist is scattered through:
- * Shoots horizontally to the right (+X) with a slight natural upward arc (+Y),
- * fanning out into an atomized cloud as seen in the reference image.
+ * Shoots from the nozzle towards the right (+X) with a slight natural upward arc (+Y)
+ * and slight forward depth (+Z), matching the nozzle orifice normal.
  */
-const PLUME = { axis: [1.0, 0.06, 0.02], reach: 1.35, spread: 0.38 } as const;
+const PLUME = { axis: [0.945, 0.12, 0.12], reach: 1.35, spread: 0.38 } as const;
 
 /** Droplet count: rich atomized plume matching the reference photograph. */
 const COUNT = 420;
@@ -93,12 +95,25 @@ interface BottleMistProps {
 export function BottleMist({ refs, color }: BottleMistProps) {
   const positions = useMemo(() => createPlume(), []);
   const droplet = useMemo(() => createDroplet(), []);
+  const tempVec = useMemo(() => new Vector3(), []);
   const { mist, mistMaterial } = refs;
+
+  // Dynamically lock the mist origin to the exact 3D nozzle orifice node
+  useFrame(() => {
+    const nozzle = refs.nozzle?.current;
+    const tiltGroup = refs.tiltGroup?.current;
+    const mistObj = mist.current;
+    if (nozzle && tiltGroup && mistObj) {
+      nozzle.getWorldPosition(tempVec);
+      tiltGroup.worldToLocal(tempVec);
+      mistObj.position.copy(tempVec);
+    }
+  });
 
   return (
     <points
       ref={mist}
-      position={NOZZLE}
+      position={DEFAULT_NOZZLE}
       scale={MIST_COLLAPSED}
       renderOrder={RENDER_ORDER}
     >

@@ -30,6 +30,10 @@ export interface BottleRefs {
    */
   pumpButton: RefObject<Object3D | null>;
   /**
+   * The pump nozzle orifice node for dynamic mist origin anchoring.
+   */
+  nozzle: RefObject<Object3D | null>;
+  /**
    * The spray itself, which is scenery rather than a part of the product: a
    * cloud of points parked at the nozzle (see `BottleMist`), expanded away from
    * it by its own scale. Kept on this one object so the choreography has a
@@ -53,6 +57,7 @@ export function useBottleRefs(): BottleRefs {
   const dipTube = useRef<Mesh | null>(null);
   const cap = useRef<Object3D | null>(null);
   const pumpButton = useRef<Object3D | null>(null);
+  const nozzle = useRef<Object3D | null>(null);
   const mist = useRef<Object3D | null>(null);
   const mistMaterial = useRef<PointsMaterial | null>(null);
   const tiltGroup = useRef<Group | null>(null);
@@ -68,6 +73,7 @@ export function useBottleRefs(): BottleRefs {
       dipTube,
       cap,
       pumpButton,
+      nozzle,
       mist,
       mistMaterial,
       tiltGroup,
@@ -80,6 +86,7 @@ export function useBottleRefs(): BottleRefs {
       dipTube,
       cap,
       pumpButton,
+      nozzle,
       mist,
       mistMaterial,
       tiltGroup,

@@ -35,6 +35,8 @@ const NODE = {
   cap: "cap",
   /** The pump's press button, which the closure above hides until it lifts. */
   pumpButton: "automizerButton",
+  /** The nozzle orifice node */
+  nozzle: "nozzle",
 } as const;
 
 /**
@@ -255,6 +257,7 @@ export function BottleGltf({
     refs.dipTube.current = dipTube;
     refs.cap.current = gltf.nodes[NODE.cap];
     refs.pumpButton.current = gltf.nodes[NODE.pumpButton];
+    refs.nozzle.current = gltf.nodes[NODE.nozzle] ?? null;
 
     invalidate();
     // Last, so the motion hooks that react to this only ever see fully wired refs.
