@@ -127,15 +127,23 @@ export function ResetPassword({ customer }: { customer: Customer }) {
             {/* Announced, since this replaced the form the press came from and focus
                 has nowhere to have landed. */}
             <p role="status" className="text-body text-muted-on-light">
-              You are signed in on this device. Use the new password next time you
+              Your password has been successfully updated. Use the new password next time you
               log in.
             </p>
-            <RippleButton
-              onClick={() => navigate("/")}
-              aria-label="Back to the shop"
-            >
-              Back to the shop
-            </RippleButton>
+            <div className="flex flex-wrap items-center gap-3">
+              <RippleButton
+                onClick={() => navigate("/")}
+                aria-label="Back to the shop"
+              >
+                Back to the shop
+              </RippleButton>
+              <a
+                href="https://admin-perfumora-fragnance.vercel.app/login"
+                className="inline-flex items-center justify-center rounded-full border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink hover:bg-ink hover:text-white"
+              >
+                Go to Admin Panel
+              </a>
+            </div>
           </div>
         ) : (
           <form onSubmit={submit} className="flex flex-col gap-5">
