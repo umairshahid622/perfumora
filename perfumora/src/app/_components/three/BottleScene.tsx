@@ -59,7 +59,11 @@ const REST_TABLET = { y: 0.0, scale: 0.48 };
 const REST_COMPACT = { y: 0.0, scale: 0.42 };
 
 export interface BottleSceneProps {
-  /** Variant colour for the fragrance; defaults to the live `--accent` token. */
+  /**
+   * Liquid colour, **already treated** — pass a `juiceColor(variant.hex)` result,
+   * not the raw hex, matching `BottlePreview`. Left out, it falls back to the live
+   * `--accent` token and treats that instead.
+   */
   liquidColor?: string;
   /** Live variant position. A change in it is what triggers the spin. */
   variantIndex: number;
@@ -132,12 +136,19 @@ export default function BottleScene({
   const isTablet = useMediaQuery(
     "(min-width: 768px) and (max-width: 1200px)",
   );
-  const accent = liquidColor ?? readCssToken("--accent", "#b87333");
-  // The 3D liquid renders a treated variant colour: a pale juice's faint hue is
-  // amplified so it reads as tinted clear liquid, not dead white; saturated juices
-  // pass through unchanged (see `juiceColor`). Opacity is uniform across variants,
-  // set on the material itself, so only the colour changes here.
-  const juice = juiceColor(accent);
+  // `liquidColor` arrives *already treated*. Every caller hands over a
+  // `juiceColor(...)` result — that is the contract `BottlePreview` documents, and
+  // what `PersistentBottle` and `MegaMenu` both pass — so running `juiceColor` over
+  // it again was a second application of a transform that is not idempotent.
+  //
+  // It is a channel subtraction, so it compounds. Parada's sage (`#b7bb81` raw,
+  // `#7c7f56` once darkened to the accent) came out of the first pass as `#465000`
+  // and out of the second as `#262100` — a near-black brown with no green left in
+  // it, which at the liquid's half opacity over the parchment composited to a
+  // grey-taupe. That is what read as "the liquid does not match the button".
+  //
+  // Only the fallback needs the treatment, because that one is the raw token.
+  const juice = liquidColor ?? juiceColor(readCssToken("--accent", "#b87333"));
   const firstRun = useRef(true);
 
   const rest = isCompact ? REST_COMPACT : isTablet ? REST_TABLET : REST;

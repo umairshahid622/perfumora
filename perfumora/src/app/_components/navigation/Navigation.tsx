@@ -7,6 +7,10 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useCart } from "../../_lib/cart-context";
 import { currentCustomer, type Customer } from "../../_lib/auth";
+import {
+  AUTH_REQUEST_EVENT,
+  type AuthRequestDetail,
+} from "../../_lib/auth-gate";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { scrollToSection } from "../../_lib/scroll-to";
 import { SECTION_IDS } from "../../_lib/sections";
@@ -100,10 +104,39 @@ export function Navigation() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const chevronRef = useRef<SVGSVGElement>(null);
   const navRef = useRef<HTMLElement>(null);
+  /** The caller waiting on a sign-in the page asked for — <Checkout>'s Place order
+   *  press, or null when nobody is waiting. Held in a ref rather than state because
+   *  it is a channel rather than something this file paints, and because resolving
+   *  it must not re-render the header mid-sign-out. */
+  const signInGate = useRef<((signedIn: boolean) => void) | null>(null);
 
-  const close = () => setPanel(null);
-  const toggle = (next: Exclude<Panel, null>) =>
-    setPanel((current) => (current === next ? null : next));
+  /** Answer whoever is waiting, once. Clearing before calling, so a resolve that
+   *  itself closes a panel cannot come back round and resolve a second time. */
+  const settleGate = (signedIn: boolean) => {
+    const gate = signInGate.current;
+    if (!gate) return;
+    signInGate.current = null;
+    gate(signedIn);
+  };
+
+  const close = () => {
+    setPanel(null);
+    // Every dismissal of the card runs through here — the X, the scrim, Escape, a
+    // browser Back, the account button — which is what makes it the one place a
+    // shopper can decline the offer. Declining is an answer, not a hang: the caller
+    // carries on and places the order as a guest.
+    settleGate(false);
+  };
+
+  const toggle = (next: Exclude<Panel, null>) => {
+    // Closing goes through `close()` rather than clearing `panel` here, so the
+    // account button cannot shut the card out from under a waiting caller.
+    if (panel === next) {
+      close();
+      return;
+    }
+    setPanel(next);
+  };
 
   const authOpen = panel === "auth";
 
@@ -154,6 +187,22 @@ export function Navigation() {
     if (pathname === "/orders" || pathname === "/settings") navigate("/");
   };
 
+  /** <AuthModal>'s report, plus the one case the card cannot handle on its own: a
+   *  sign-in somebody was waiting on. The gate is resolved and the card closed
+   *  before this returns, so the order goes through while the card is on its way
+   *  out rather than being placed behind a panel the shopper is still reading.
+   *
+   *  Only a sign-*in* settles it. A sign-out here is <AccountMenu>'s and cannot
+   *  arrive while a request is pending, since the card is what is open. */
+  const onCustomer = (next: Customer | null) => {
+    setCustomer(next);
+    if (!next || !signInGate.current) return;
+    // Closing without going through `close()`: that would settle the gate with
+    // `false` on the way past, and this sign-in is the one case that answers `true`.
+    setPanel(null);
+    settleGate(true);
+  };
+
   // The Fragrances button. The panel counts as on screen from this click either way:
   // on the way in that is the point, and on the way out it is already true and stays
   // so until the panel reports itself gone. Reported rather than timed here, so the
@@ -166,6 +215,28 @@ export function Navigation() {
   /** Handed to <MegaMenu> to call once its close animation has fully played out.
    *  Stable, because the panel keeps it in an effect's dependencies. */
   const menuClosed = useCallback(() => setMenuVisible(false), []);
+
+  /** A sign-in the page asked for on someone else's behalf. The card is the
+   *  header's to open and nobody else's, so a request arrives as an event and is
+   *  answered through the promise the sender is holding.
+   *
+   *  Superseding rather than queueing: a second request means the first caller has
+   *  gone (a route change, a remount), and resolving it `false` lets it finish its
+   *  order as a guest instead of waiting on a card that is now serving someone else. */
+  useEffect(() => {
+    const onRequest = (event: Event) => {
+      const detail = (event as CustomEvent<AuthRequestDetail>).detail;
+      if (!detail) return;
+      // Read back by `requestSignIn` the moment this dispatch returns, so a
+      // request with no header listening resolves instead of hanging.
+      detail.handled = true;
+      settleGate(false);
+      signInGate.current = detail.resolve;
+      setPanel("auth");
+    };
+    window.addEventListener(AUTH_REQUEST_EVENT, onRequest);
+    return () => window.removeEventListener(AUTH_REQUEST_EVENT, onRequest);
+  }, []);
 
   // Escape closes whatever panel is open.
   useEffect(() => {
@@ -549,7 +620,7 @@ export function Navigation() {
         open={authOpen}
         onClose={close}
         customer={customer}
-        onCustomer={setCustomer}
+        onCustomer={onCustomer}
       />
       {/* Out here beside the card rather than inside <AccountMenu>, for the reason the
           card is: it is `fixed`, and rendered from within the header it would sit in a

@@ -10,6 +10,7 @@ import {
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { currentCustomer } from "../../_lib/auth";
+import { requestSignIn } from "../../_lib/auth-gate";
 import { useCart, type CartLine } from "../../_lib/cart-context";
 import {
   EMPTY_DETAILS,
@@ -204,6 +205,12 @@ function CheckField({
  * placed order is not lost by that — it is a row in the database — but the
  * reference is only ever shown once (§1).
  *
+ * A signed-out shopper is offered the sign-in card on the final press, once, and
+ * only ever offered: dismissing it places the order as a guest. The card belongs
+ * to the header and lives in another tree, so the offer is made through
+ * `requestSignIn()` (see `_lib/auth-gate.ts`) rather than through a prop — and the
+ * order is placed on either answer, so nothing about this can block a sale.
+ *
  * The step change is the flow's one animation: the panel slides in from the
  * side travelled toward, so stepping forward and stepping back read differently.
  */
@@ -222,6 +229,11 @@ export function Checkout() {
    *  a stale "sold out" can't outlive the line that caused it. */
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  /** Whether this visit has already been offered the sign-in card, and whether
+   *  that offer is on screen right now. The offer is made once: a shopper who
+   *  waved it away is not asked again on the next press of the same button. */
+  const offeredSignIn = useRef(false);
+  const [offering, setOffering] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Direction is recorded by whoever moves the step, never derived from the index
@@ -308,12 +320,39 @@ export function Checkout() {
     go(2, 1);
   };
 
-  const place = () => {
-    // Both of these are already reflected in the button's `disabled`, so this is
-    // the second lock rather than the first — a double submit would write a second
-    // order, which is not a race worth leaving to the DOM alone.
-    if (!items.length || pending) return;
+  const place = async () => {
+    // All three of these are already reflected in the button's `disabled`, so this
+    // is the second lock rather than the first — a double submit would write a
+    // second order, which is not a race worth leaving to the DOM alone. `offering`
+    // is in the list because the press that opens the sign-in card is still
+    // pending while the card is up.
+    if (!items.length || pending || offering) return;
     setFailure(null);
+
+    // The final press is where a signed-out shopper is offered the account — once
+    // per visit, and offered rather than required. Cancelling the card is a valid
+    // answer: the order goes through as a guest, which is what `placeOrder` has
+    // always supported and what the majority of orders are.
+    //
+    // Asked here rather than read off `accountName` from the effect above: that
+    // answer is as old as the page, and a session that expired while the details
+    // were being typed would otherwise place the order against an account nobody
+    // is signed in to.
+    if (!offeredSignIn.current) {
+      const signedIn = await currentCustomer();
+      if (!signedIn) {
+        offeredSignIn.current = true;
+        setOffering(true);
+        try {
+          // Resolves either way — `true` on a sign-in, `false` on a dismissal —
+          // and the order is placed on both. Only the identity it is filed under
+          // differs.
+          await requestSignIn();
+        } finally {
+          setOffering(false);
+        }
+      }
+    }
 
     // Captured before the await: `clear()` below empties the cart, and the
     // confirmation is built from the bag as it was reviewed.
@@ -635,7 +674,10 @@ export function Checkout() {
               <div className="flex flex-wrap items-center gap-6">
                 <RippleButton
                   onClick={place}
-                  disabled={pending}
+                  // `offering` as well as `pending`: the press that raises the
+                  // sign-in card has not finished yet, and the card is over the
+                  // button rather than replacing it.
+                  disabled={pending || offering}
                   // Dropped while pending so the accessible name is the visible
                   // "Placing order…" rather than contradicting it.
                   aria-label={pending ? undefined : "Place order"}

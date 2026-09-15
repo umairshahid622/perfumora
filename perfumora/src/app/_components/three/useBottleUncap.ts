@@ -30,8 +30,13 @@ const PRESS_UP = 0.18;
 const SPRAY_DURATION = 0.6;
 /** How quickly the mist arrives once the button bottoms out. */
 const MIST_IN = 0.12;
-/** How long the showcase takes to glide the cap shut once its window is entered. */
-const SHOWCASE_CLOSE_DURATION = 0.9;
+/** The cap's chase time while the showcase glide is being driven by scroll — short,
+ *  so the cap tracks the wheel rather than lagging behind it. */
+const CLOSE_CHASE = 0.15;
+/** How long the cap takes to seat itself when the customer reverses back out of
+ *  the showcase. Slower than the chase above because this one is a gesture rather
+ *  than tracking: nothing is driving it, so it has to read as a movement. */
+const RESEAT_DURATION = 0.25;
 
 /** The instant the pump fires: the button has just bottomed out. */
 const SPRAY_AT = UNCAP_DURATION + PRESS_DOWN;
@@ -160,12 +165,17 @@ export function useBottleUncap(
 
       let hasUncapped = false;
       let activeSprayTl: gsap.core.Timeline | null = null;
+      /** Whether this pass has already told <Ritual> the close is done. The close
+       *  is reached by a range of scroll positions rather than an instant, so
+       *  without this the event fired on every wheel tick across it. */
+      let hasAnnouncedClose = false;
 
       // Master Directional Ritual Controller:
-      // - Downward entry (2.4+ screens): Cap smoothly un-caps, pump fires, mist sprays, sound plays, steps reveal.
-      // - Inside Ritual runway (3.0 -> 3.85 screens): Cap smoothly closes on scroll right inside Ritual!
-      // - Upward scrolling (from Craft/Showcase through Ritual back to Hero): CAP STAYS CLOSED!
-      // - Upward exit into Manifesto (< 2.0 screens): Resets trigger so future downward passes uncap fresh.
+      // - Downward entry (>= 3.0 screens): Cap smoothly un-caps, pump fires, mist sprays, sound plays, steps reveal.
+      // - Inside Ritual runway (3.9 -> 4.7 screens): Cap smoothly glides shut on scroll.
+      // - Upward scrolling (from Craft/Showcase through Ritual back to Hero): CAP STAYS CLOSED — and
+      //   is actively seated rather than left wherever a reversed close tween stranded it.
+      // - Upward exit into Manifesto (< 2.5 screens): Resets trigger so future downward passes uncap fresh.
       ScrollTrigger.create({
         trigger: stageEl,
         start: "top top",
@@ -179,6 +189,7 @@ export function useBottleUncap(
           if (currentScreen < 2.5) {
             if (hasUncapped) {
               hasUncapped = false;
+              hasAnnouncedClose = false;
               if (activeSprayTl) activeSprayTl.kill();
               resetSprayState();
               gsap.to(cap.position, {
@@ -195,6 +206,7 @@ export function useBottleUncap(
           // Zone 2: Uncap & Mist Spray Trigger (>= 3.0 screens when bottle has drifted to Ritual)
           if (currentScreen >= 3.0 && !hasUncapped && isScrollingDown) {
             hasUncapped = true;
+            hasAnnouncedClose = false;
 
             // 1. Gentle momentum dampening during mist theatre
             if (
@@ -299,20 +311,39 @@ export function useBottleUncap(
               // Smoothly glide cap down towards baseCapY with scroll
               gsap.to(cap.position, {
                 y: targetY,
-                duration: 0.15,
+                duration: CLOSE_CHASE,
                 ease: "power1.out",
                 overwrite: "auto",
               });
 
-              if (closeProgress >= 1) {
+              if (closeProgress >= 1 && !hasAnnouncedClose) {
+                hasAnnouncedClose = true;
                 if (activeSprayTl) activeSprayTl.kill();
                 resetSprayState();
                 window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
               }
             } else if (isScrollingUp) {
-              // When scrolling up through Ritual, keep cap firmly closed — NEVER reopen!
-              if (currentScreen >= 3.9) {
-                gsap.killTweensOf(cap.position);
+              // Reversing out of the showcase. The close above is a *timed* tween
+              // chasing the scroll position, so a reversal caught it mid-glide and
+              // this branch used to merely `killTweensOf` it — freezing the cap
+              // wherever it happened to be, partway up, with no spray behind it.
+              // That stranded cap was what read as the Ritual playing a second time
+              // on the way back: a detached cap and no mist, then the whole sequence
+              // again on the next downward pass.
+              //
+              // Seating it instead is what the comment above this block promises.
+              // Guarded on `isTweening` so the tween is started once and allowed to
+              // finish, rather than being restarted on every wheel tick.
+              if (
+                !gsap.isTweening(cap.position) &&
+                Math.abs(cap.position.y - baseCapY) > 0.0001
+              ) {
+                gsap.to(cap.position, {
+                  y: baseCapY,
+                  duration: still ? 0 : RESEAT_DURATION,
+                  ease: "power2.inOut",
+                  overwrite: "auto",
+                });
               }
             }
           }
