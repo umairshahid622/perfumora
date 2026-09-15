@@ -28,7 +28,7 @@ export default function Home() {
       <Suspense fallback={null}>
         <AuthErrorBanner />
       </Suspense>
-      <main>
+      <main className="scrollbar-hide">
         <OpeningStage />
         <Gallery />
         <Cta />
