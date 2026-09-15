@@ -298,28 +298,28 @@ export default function BottleScene({
           gl.toneMappingExposure = 1.05;
         }}
       >
-        <StudioEnvironment />
+        <StudioEnvironment intensity={0.65} />
 
         {/* Balanced studio ambient fill */}
-        <ambientLight intensity={0.4} color="#ffffff" />
+        <ambientLight intensity={0.5} color="#ffffff" />
 
-        {/* Studio_FrontSoftbox (front-facing softbox reflections across bottle, liquid meniscus & shoulder) */}
-        <directionalLight position={[0.5, 1.8, 6.0]} intensity={2.6} color="#ffffff" />
+        {/* Soft front fill (subtle, prevents blown-out harsh specular reflections) */}
+        <directionalLight position={[0.5, 1.8, 5.0]} intensity={0.18} color="#ffffff" />
 
-        {/* Studio_BottomBounce (creates luminous crescent highlight on curved bottom bowl of liquid) */}
-        <directionalLight position={[0, -2.0, 4.0]} intensity={1.6} color="#ffffff" />
+        {/* Studio_BottomBounce (delicate crescent contour on bottom curve of glass) */}
+        <directionalLight position={[0, -2.0, 3.5]} intensity={0.18} color="#ffffff" />
 
-        {/* Studio_KeyLight (from Blender: 850W, warm #fffaf2, front-right softbox) */}
-        <directionalLight position={[3.8, 2.4, 4.8]} intensity={2.0} color="#fffaf2" />
+        {/* Studio_KeyLight (warm softbox from upper right, defining bottle silhouette) */}
+        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.30} color="#fffaf2" />
 
-        {/* Studio_FillLight (from Blender: 550W, #ffffff, front-left softbox) */}
-        <directionalLight position={[-3.8, 1.4, 4.8]} intensity={1.3} color="#ffffff" />
+        {/* Studio_FillLight (soft left fill) */}
+        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.20} color="#ffffff" />
 
-        {/* Studio_RimLight (from Blender: 700W, cool #f2faff, back-left rim light through glass & liquid) */}
-        <directionalLight position={[-3.8, 2.4, -3.5]} intensity={1.8} color="#f2faff" />
+        {/* Studio_RimLight (back-left rim light giving authentic glass refraction edge) */}
+        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.25} color="#f2faff" />
 
-        {/* Studio_TopLight (from Blender: 500W, #ffffff, overhead down onto cap, button & shoulder) */}
-        <directionalLight position={[0, 5.5, 1.0]} intensity={1.4} color="#ffffff" />
+        {/* Studio_TopLight (overhead light defining cap bevels without blowing out shoulder) */}
+        <directionalLight position={[0, 4.5, 1.0]} intensity={0.22} color="#ffffff" />
 
         {/* The resting pose, set once as plain props — there is no longer a timeline
             writing this group, so React owns the transform outright and no ref is

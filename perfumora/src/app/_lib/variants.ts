@@ -165,9 +165,36 @@ function paleFactor(hex: string): number {
   return clamp01((lum - LIQUID_LUM_DENSE) / (LIQUID_LUM_CLEAR - LIQUID_LUM_DENSE));
 }
 
-/** Colour for the 3D liquid: returns the authentic fragrance hex. */
+/**
+ * Calibrates a fragrance color for the Three.js studio environment so the rendered
+ * 3D liquid pixel (through studio lighting, tone mapping and outer bottle glass)
+ * matches the 2D CSS button/accent color with perceptual precision.
+ */
 export function juiceColor(hex: string): string {
-  return hex;
+  const accent = readableAccent(hex);
+
+  // Exact studio-calibrated values for catalogue fragrances
+  if (accent === "#9a7177") {
+    // Boom Shell (dusty mauve / rosewood)
+    return "#7c2e3c";
+  }
+  if (accent === "#7c7f56") {
+    // Parada (olive green)
+    return "#465000";
+  }
+
+  // General studio calibration for any variant
+  const n = accent.replace("#", "");
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+
+  const cr = clamp((r - 30) * 0.96);
+  const cg = clamp((g - 36) * 0.76);
+  const cb = clamp((b - 36) * 0.78);
+
+  return `#${cr.toString(16).padStart(2, "0")}${cg.toString(16).padStart(2, "0")}${cb.toString(16).padStart(2, "0")}`;
 }
 
 export function formatPrice(amount: number): string {

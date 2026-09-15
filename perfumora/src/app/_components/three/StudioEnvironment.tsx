@@ -64,13 +64,12 @@ function paintStudioEquirect(): CanvasTexture | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  // Studio backdrop: neutral studio dark cyclorama gradient (as seen in Blender / gltf-viewer)
-  // This allows transmissive glass to refract transparent depth instead of solid milky white.
+  // Studio backdrop: luminous luxury studio gradient matching the page
   const base = ctx.createLinearGradient(0, 0, 0, height);
-  base.addColorStop(0, "#1c1c1f"); // Top / ceiling
-  base.addColorStop(0.35, "#2a2a2d"); // Upper wall
-  base.addColorStop(0.65, "#333338"); // Eye level horizon
-  base.addColorStop(1, "#18181a"); // Floor
+  base.addColorStop(0, "#ffffff");
+  base.addColorStop(0.35, "#f8f5f0");
+  base.addColorStop(0.70, "#ede7de");
+  base.addColorStop(1, "#dfd8ce");
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, width, height);
 

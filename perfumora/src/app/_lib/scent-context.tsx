@@ -91,10 +91,10 @@ export function ScentProvider({
     if (!variant) return;
     const root = document.documentElement;
     const accent = readableAccent(variant.hex);
-    root.style.setProperty("--accent", variant.hex);
+    root.style.setProperty("--accent", accent);
     root.style.setProperty("--accent-contrast", "var(--paper)");
     root.style.setProperty("--accent-glow", accentGlow(variant.hex));
-    // Legible-on-parchment accent for text/borders; fills + glow keep the true hex.
+    // Legible-on-parchment accent for text/borders; fills + glow keep the floored accent.
     root.style.setProperty("--accent-on-light", accent);
     // The same foreground over the near-black sections, where the on-light form is
     // the dimmest thing in a row of paper-white text.

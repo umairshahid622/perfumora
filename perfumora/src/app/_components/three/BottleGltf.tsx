@@ -95,6 +95,44 @@ function applyLiquidSloshShader(
   material.needsUpdate = true;
 }
 
+/**
+ * Clean crystal glass edge shader:
+ * Injects subtle specular Fresnel reflections along bevels, rims, and contours,
+ * coupled with subtle optical refraction depth so the flacon reads as heavy,
+ * weighted, authentic crystal glass with clear center transparency.
+ */
+function applyGlassEdge(
+  material: MeshPhysicalMaterial,
+  glintStrength: number = 0.45,
+  alphaGlint: number = 0.35,
+  edgeContourStrength: number = 0.12,
+  cacheKey: string = "glass_edge_crystal_v8",
+): void {
+  material.customProgramCacheKey = () => cacheKey;
+  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <dithering_fragment>",
+      `#include <dithering_fragment>
+  {
+    float cosTheta = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+    float fresnel = pow(1.0 - cosTheta, 2.5);
+
+    // 1. Crystalline specular glint catching studio softbox lighting along bevels and vertical sides
+    float glint = pow(fresnel, 2.2) * ${glintStrength.toFixed(2)};
+    gl_FragColor.rgb += vec3(glint);
+
+    // 2. Optical refraction contour: subtle luxury glass edge definition
+    vec3 glassEdgeTone = vec3(0.55, 0.52, 0.48);
+    float contour = pow(fresnel, 4.0) * ${edgeContourStrength.toFixed(2)};
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, glassEdgeTone, contour);
+
+    // 3. Physical Fresnel alpha: crystal-clear center, gentle edge definition
+    gl_FragColor.a = clamp(gl_FragColor.a + fresnel * ${alphaGlint.toFixed(2)}, 0.0, 0.85);
+  }`,
+    );
+  };
+  material.needsUpdate = true;
+}
 
 interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
   refs: BottleRefs;
@@ -156,15 +194,57 @@ export function BottleGltf({
     liquid.visible = true;
 
     dipTube.renderOrder = RENDER_ORDER.dipTube;
+    liquid.renderOrder = RENDER_ORDER.liquid;
     glass.renderOrder = RENDER_ORDER.glass;
     capGlass.renderOrder = RENDER_ORDER.glass;
 
-    // Retain native Blender materials for all meshes.
-    // Injects slosh oscillation animation vertex displacement without touching material shading.
-    applyLiquidSloshShader(liquid.material as MeshPhysicalMaterial, liquidUniformsRef.current);
+    // Crystal-clear luxury glass transparency for both bottle and capOutside
+    const configureGlassMaterial = (mat: MeshPhysicalMaterial, opacity: number = 0.08) => {
+      mat.transparent = true;
+      mat.depthWrite = false;
+      mat.transmission = 0;
+      mat.opacity = opacity;
+      mat.roughness = 0.02;
+      mat.metalness = 0;
+      mat.clearcoat = 0.85;
+      mat.clearcoatRoughness = 0.01;
+      mat.ior = 1.5;
+      mat.reflectivity = 0.8;
+      mat.color.set(0xffffff);
+    };
+
+    configureGlassMaterial(glass.material as MeshPhysicalMaterial, 0.08);
+    configureGlassMaterial(capGlass.material as MeshPhysicalMaterial, 0.12);
+
+    applyGlassEdge(glass.material as MeshPhysicalMaterial, 0.50, 0.40, 0.12, "glass_edge_bottle_v7");
+    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, 0.45, 0.35, 0.12, "glass_edge_cap_v7");
+
+    // Translucent luxury perfume liquid matching the authentic 3D model
+    const liquidMat = liquid.material as MeshPhysicalMaterial;
+    liquidMat.transparent = true;
+    liquidMat.depthWrite = false;
+    liquidMat.transmission = 0;
+    liquidMat.opacity = 0.3;
+    liquidMat.roughness = 0.01;
+    liquidMat.metalness = 0.0;
+    liquidMat.clearcoat = 0.0;
+    liquidMat.clearcoatRoughness = 0.0;
+    liquidMat.ior = 1.333;
+    liquidMat.reflectivity = 0.8;
+
+    // Translucent white dip tube visible through the liquid
+    const tubeMat = dipTube.material as MeshPhysicalMaterial;
+    tubeMat.transparent = true;
+    tubeMat.depthWrite = false;
+    tubeMat.transmission = 0;
+    tubeMat.opacity = 0.80;
+    tubeMat.color.set(0xffffff);
+    tubeMat.roughness = 0.05;
+    tubeMat.clearcoat = 0.5;
+
+    applyLiquidSloshShader(liquidMat, liquidUniformsRef.current);
 
     // Keep dynamic liquid color
-    const liquidMat = liquid.material as MeshPhysicalMaterial;
     if (liquidColor) {
       liquidMat.color.set(liquidColor);
     }

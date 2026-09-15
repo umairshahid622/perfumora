@@ -1,6 +1,7 @@
 "use client";
 
 import { useScent } from "../../_lib/scent-context";
+import { juiceColor } from "../../_lib/variants";
 import { BottleSceneMount } from "./BottleSceneMount";
 
 /**
@@ -41,7 +42,7 @@ export function PersistentBottle() {
     >
       <BottleSceneMount
         className="h-full w-full"
-        liquidColor={variant.hex}
+        liquidColor={juiceColor(variant.hex)}
         variantIndex={index}
         spinDirection={direction}
       />
