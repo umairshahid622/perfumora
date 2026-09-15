@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { Contact } from "./_components/sections/Contact";
 import { Cta } from "./_components/sections/Cta";
 import { Footer } from "./_components/sections/Footer";
 import { Gallery } from "./_components/sections/Gallery";
 import { OpeningStage } from "./_components/sections/OpeningStage";
+import { AuthErrorBanner } from "./_components/ui/AuthErrorBanner";
 
 /**
  * The home route (§2.9). Its sections are reached by in-page anchor, never by a
@@ -20,6 +22,12 @@ import { OpeningStage } from "./_components/sections/OpeningStage";
 export default function Home() {
   return (
     <>
+      {/* Catches Supabase auth errors (expired/invalid links) that land on `/`
+          with error params in the URL, and shows a dismissible banner. Wrapped in
+          Suspense because useSearchParams needs it in a Server Component tree. */}
+      <Suspense fallback={null}>
+        <AuthErrorBanner />
+      </Suspense>
       <main>
         <OpeningStage />
         <Gallery />
