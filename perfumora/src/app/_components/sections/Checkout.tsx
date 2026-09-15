@@ -454,6 +454,7 @@ export function Checkout() {
                 <RippleButton
                   onClick={() => navigate("/")}
                   aria-label="Explore the collection"
+                  silent
                 >
                   Explore the collection
                 </RippleButton>
@@ -468,6 +469,7 @@ export function Checkout() {
                   onClick={() => go(1, 1)}
                   className="self-start"
                   aria-label="Continue to delivery details"
+                  silent
                 >
                   Continue to details
                 </RippleButton>
@@ -594,7 +596,7 @@ export function Checkout() {
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-6">
-                <RippleButton type="submit" aria-label="Continue to review">
+                <RippleButton type="submit" aria-label="Continue to review" silent>
                   Continue to review
                 </RippleButton>
                 <StepBack onClick={() => go(0, -1)}>Back to cart</StepBack>
@@ -674,6 +676,7 @@ export function Checkout() {
               <div className="flex flex-wrap items-center gap-6">
                 <RippleButton
                   onClick={place}
+                  silent
                   // `offering` as well as `pending`: the press that raises the
                   // sign-in card has not finished yet, and the card is over the
                   // button rather than replacing it.

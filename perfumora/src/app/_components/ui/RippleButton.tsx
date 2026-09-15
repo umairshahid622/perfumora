@@ -12,7 +12,9 @@ interface RippleButtonProps {
   type?: "button" | "submit";
   className?: string;
   /** Opt out of the shared click cue — for the CTAs inside the navigation
-   *  panels (cart, auth), which the sound spec excludes. */
+   *  panels (cart, auth) and the whole checkout flow, which the sound spec
+   *  excludes. The cue belongs to browsing the collection; a transactional
+   *  screen that fires it on every "Continue" reads as noise. */
   silent?: boolean;
   /** Inert and visibly so — an out-of-stock Add to Bag. The hover ripple is
    *  skipped too: a fill that still animates reads as "try me". */
