@@ -214,10 +214,10 @@ export function BottleGltf({
     };
 
     configureGlassMaterial(glass.material as MeshPhysicalMaterial, 0.08);
-    configureGlassMaterial(capGlass.material as MeshPhysicalMaterial, 0.12);
+    configureGlassMaterial(capGlass.material as MeshPhysicalMaterial, 0.28);
 
     applyGlassEdge(glass.material as MeshPhysicalMaterial, 0.50, 0.40, 0.12, "glass_edge_bottle_v7");
-    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, 0.45, 0.35, 0.12, "glass_edge_cap_v7");
+    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, 0.95, 0.60, 0.25, "glass_edge_cap_v8");
 
     // Translucent luxury perfume liquid matching the authentic 3D model
     const liquidMat = liquid.material as MeshPhysicalMaterial;
