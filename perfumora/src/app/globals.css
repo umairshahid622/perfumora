@@ -97,6 +97,36 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* The scrollbar, hidden but not disabled.
+   *
+   * Three declarations because there is no one way to say this: `scrollbar-width`
+   * is the standard (Firefox, and Chromium 121+), the `::-webkit-` pseudo-element
+   * covers the rest of Chromium and Safari, and `-ms-overflow-style` is legacy
+   * Edge. All three remove only the *chrome* — the document still scrolls, and
+   * the wheel, the keyboard, Lenis and every ScrollTrigger are untouched. Nothing
+   * is `overflow: hidden` here; there is simply nothing to draw.
+   *
+   * Named on both `html` and `body` because which of the two is the scrolling
+   * element depends on the document's own overflow, and <Navigation> toggles that
+   * on both while a panel is open.
+   *
+   * It also removes a jump that was there before. That same toggle takes the
+   * scrollbar's gutter away, so on any platform with classic (space-taking)
+   * scrollbars the whole page shifted sideways by its width the moment the cart
+   * or the menu opened, and shifted back on close. With the scrollbar never
+   * occupying space, there is nothing to take away.
+   */
+  html,
+  body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
   body {
     background-color: var(--bg-light);
     color: var(--ink);
