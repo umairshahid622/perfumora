@@ -230,19 +230,25 @@ export function useBottleUncap(
       let latestScreen = 0;
       let lastDirection = 1;
       /**
-       * How far the customer *wants* to be — the furthest the page has been seen
-       * to reach while heading down, and the position itself while heading back.
+       * Whether the hold is running — `null` when it is not, and the end of the
+       * sequence while it is.
        *
-       * This exists because of a trap that is easy to walk into: the hold below
-       * clamps the page to the journey, and the ScrollTrigger reports the clamped
-       * position. So if the journey chased `latestScreen` it would be chasing its
-       * own output — the clamp would report "you are already where you wanted to
-       * be", the distance would read zero, and the journey would stop dead with
-       * the cap half open. Chasing the intent instead keeps the two separate: the
-       * customer's wheel still says "five screens", and the journey takes its own
-       * time getting there while the page is held at whatever it has reached.
+       * It is always `CLOSE_TO`, and that is the point: the hold exists to play
+       * the Ritual for someone who scrolled past it, so its destination is the end
+       * of the sequence by definition. A nearer destination guessed from how far
+       * the customer had got would not be an intention — the hold clamps the page
+       * a frame later, so anything read at that moment is a frame of scroll rather
+       * than a plan, and the journey would stop a third of the way in.
        */
-      let intentScreen = 0;
+      let holdTo: number | null = null;
+
+      /**
+       * How far ahead the page has to get inside the Ritual before the hold is
+       * taken, in screens. Small enough that a fast page is caught promptly, large
+       * enough that an ordinary scroll — whose page leads the journey by about a
+       * frame's travel — never trips it.
+       */
+      const LATCH_GAP = 0.12;
       /**
        * The journey's own position, which chases the intent at `MAX_JOURNEY_RATE`.
        *
@@ -342,16 +348,24 @@ export function useBottleUncap(
         onUpdate: (self) => {
           latestScreen = self.progress * 5;
           lastDirection = self.direction;
-          // The intent, captured before the hold can clamp the page back. On the
-          // way down it only ever grows, so a flick that overshoots is not
-          // forgotten when the clamp pulls the page back to the journey.
-          if (self.direction > 0) {
-            if (latestScreen > intentScreen) intentScreen = latestScreen;
-          } else {
-            intentScreen = latestScreen;
-          }
         },
       });
+
+      /** Put the page at a document offset, through Lenis when it is driving. */
+      const setScroll = (top: number) => {
+        const lenis = (
+          window as unknown as {
+            lenis?: { scrollTo?: (y: number, o?: object) => void };
+          }
+        ).lenis;
+        if (lenis && typeof lenis.scrollTo === "function") {
+          // `immediate` because this is the hold placing the page, not a journey
+          // of its own — animating it would fight Lenis's own easing.
+          lenis.scrollTo(top, { immediate: true, force: true });
+        } else {
+          window.scrollTo({ top });
+        }
+      };
 
       /**
        * The zone ladder, evaluated against the journey's position.
@@ -512,80 +526,101 @@ export function useBottleUncap(
       };
 
       /**
-       * One tick of the journey: advance it toward the page, evaluate the zones
-       * there, and hold the page back while the Ritual is running.
+       * One tick of the journey. Two modes, and only ever one of them:
+       *
+       *   - **Holding** — latched. The journey runs to the destination captured
+       *     when the hold was taken, and the page is driven to wherever the journey
+       *     has got to.
+       *   - **Free** — the journey follows the page, capped at the bounded rate
+       *     inside the Ritual. A customer simply scrolling lives here, and a fast
+       *     one is caught here: once the page has genuinely outrun the journey,
+       *     the hold is taken.
        */
       const tick = (_time: number, deltaMs: number) => {
         const dt = Math.min(deltaMs / 1000, 0.05);
-        const delta = intentScreen - journeyScreen;
 
-        // Only *forward*, and only inside the Ritual. Below `RITUAL_ENTRY` the
-        // journey tracks the page exactly, so it arrives at the window the moment
-        // the page does — rate-limiting it from zero would leave it lagging the
-        // Hero and the hold below would then have to drag the page back to it.
-        // Reversing is unlimited too: the customer is leaving, and making them
-        // wait out the cap's reverse would only feel like lag.
-        const limiting =
-          delta > 0 && journeyScreen >= RITUAL_ENTRY && journeyScreen < CLOSE_TO;
+        // ---- holding ------------------------------------------------------
+        if (holdTo !== null) {
+          journeyScreen = Math.min(holdTo, journeyScreen + MAX_JOURNEY_RATE * dt);
+          evaluate(journeyScreen, 1);
 
-        if (Math.abs(delta) > 0.0005) {
-          let step =
-            Math.sign(delta) *
-            Math.min(Math.abs(delta), (limiting ? MAX_JOURNEY_RATE : Infinity) * dt);
-
-          // Never overshoot the window's entrance. A flick can carry the journey
-          // from below `RITUAL_ENTRY` to past `CLOSE_TO` in a single tick, and
-          // because `limiting` is read *before* the step that tick would run at
-          // full speed and skip the whole sequence. Stopping it exactly on the
-          // threshold means the next tick is inside the window, where the limit
-          // applies — so the journey can only ever enter the Ritual at its own
-          // pace, however hard the page arrived.
-          if (
-            delta > 0 &&
-            journeyScreen < RITUAL_ENTRY &&
-            journeyScreen + step > RITUAL_ENTRY
-          ) {
-            step = RITUAL_ENTRY - journeyScreen;
-          }
-
-          journeyScreen += step;
-          evaluate(journeyScreen, Math.sign(delta));
-        } else {
-          journeyScreen = intentScreen;
-        }
-
-        // The hold. Once the page has reached the Ritual it may not outrun the
-        // journey, so the sequence is seen rather than skipped — but it is held
-        // *at* where it already is, never dragged back behind it. See `holdAnchor`.
-        //
-        // Released at `CLOSE_TO`, where the journey is done and the stage is free
-        // to leave as it always did. Only on the way *down*: reversing is the
-        // customer changing their mind, and braking them out of it would be the
-        // opposite of helpful.
-        const holding =
-          delta > 0 && journeyScreen >= RITUAL_ENTRY && journeyScreen < CLOSE_TO;
-
-        if (holding) {
-          if (holdAnchor === null) holdAnchor = latestScreen;
+          // **Driven, not corrected.** Setting the position only once the page had
+          // run ahead made the hold a series of corrections: the customer's wheel
+          // pushed the page forward, this snapped it back, and the two alternated
+          // frame by frame — a sawtooth that read as stutter, and worse the faster
+          // they scrolled. Following the journey every frame is what makes the hold
+          // smooth: the page moves at exactly the journey's rate, so there is never
+          // anything left to correct.
+          //
+          // The half-pixel deadband only stops a settled page being written to
+          // sixty times a second.
           const allowed =
             controller.start +
-            Math.max(journeyScreen, holdAnchor) * window.innerHeight;
-          if (window.scrollY > allowed + 1) {
-            const lenis = (
-              window as unknown as {
-                lenis?: { scrollTo?: (y: number, o?: object) => void };
-              }
-            ).lenis;
-            if (lenis && typeof lenis.scrollTo === "function") {
-              // `immediate` because this is a correction, not a journey of its
-              // own — animating it would fight the customer's own easing.
-              lenis.scrollTo(allowed, { immediate: true, force: true });
-            } else {
-              window.scrollTo({ top: allowed });
-            }
+            Math.max(journeyScreen, holdAnchor ?? journeyScreen) *
+              window.innerHeight;
+          if (Math.abs(window.scrollY - allowed) > 0.5) setScroll(allowed);
+
+          if (journeyScreen >= holdTo - 0.0005) {
+            holdTo = null;
+            holdAnchor = null;
           }
-        } else {
-          holdAnchor = null;
+          return;
+        }
+
+        // ---- free ---------------------------------------------------------
+        const delta = latestScreen - journeyScreen;
+        if (Math.abs(delta) <= 0.0005) {
+          journeyScreen = latestScreen;
+          return;
+        }
+
+        const inWindow = journeyScreen >= RITUAL_ENTRY && journeyScreen < CLOSE_TO;
+        let step = delta;
+        if (delta > 0 && inWindow) step = Math.min(delta, MAX_JOURNEY_RATE * dt);
+
+        // Never overshoot the window's entrance. A flick can carry the journey
+        // from below `RITUAL_ENTRY` to past `CLOSE_TO` in a single tick, and
+        // because `inWindow` is read *before* the step that tick would run at full
+        // speed and skip the whole sequence. Stopping it exactly on the threshold
+        // means the next tick is inside the window, where the limit applies — so
+        // the journey can only ever enter the Ritual at its own pace, however hard
+        // the page arrived.
+        if (
+          delta > 0 &&
+          journeyScreen < RITUAL_ENTRY &&
+          journeyScreen + step > RITUAL_ENTRY
+        ) {
+          step = RITUAL_ENTRY - journeyScreen;
+        }
+
+        journeyScreen += step;
+        evaluate(journeyScreen, Math.sign(delta));
+
+        // Take the hold, once the page has genuinely outrun the journey inside the
+        // window — the one case that would otherwise skip the sequence. A gap of a
+        // frame's travel is just the customer scrolling; a gap this size is the
+        // journey being left behind.
+        //
+        // The destination is always the end of the sequence, and that is the whole
+        // point: the customer scrolled past the Ritual, so the Ritual is played for
+        // them rather than skipped. Trying to guess a nearer destination from how
+        // far they had got at this instant does not work — the hold is about to
+        // clamp the page, so their ask stops being readable a frame later, and a
+        // destination read here would be one frame of scroll rather than an
+        // intention.
+        if (
+          !still &&
+          delta > 0 &&
+          inWindow &&
+          latestScreen - journeyScreen > LATCH_GAP
+        ) {
+          holdTo = CLOSE_TO;
+          holdAnchor = latestScreen;
+          // Freeze Lenis here in the same breath. Without this it keeps easing
+          // toward the target it was given, moves the page on before the next
+          // tick's hold can place it, and the first frame of the hold shows as a
+          // step backwards by however far it travelled.
+          setScroll(controller.start + latestScreen * window.innerHeight);
         }
       };
 
