@@ -6,7 +6,7 @@ import gsap from "gsap";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { useScent } from "../../_lib/scent-context";
-import { accentGlow, juiceColor } from "../../_lib/variants";
+import { accentGlow } from "../../_lib/variants";
 import { BottlePreview } from "./BottlePreview";
 
 interface MegaMenuProps {
@@ -155,9 +155,9 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
             </span>
 
             {/* Live vessel preview — the hovered (or selected) fragrance's juice,
-                tinted with `juiceColor` so the near-clear SKUs read as colour and
-                match the 3D Hero bottle. Desktop only; the mobile menu leads with
-                the list below. Left-aligned to share the column's text axis. */}
+                in its own colour so it matches the 3D Hero bottle. Desktop only;
+                the mobile menu leads with the list below. Left-aligned to share
+                the column's text axis. */}
             <div className="relative hidden flex-1 items-center md:flex">
               {/* Sized to the artwork's own aspect ratio, so the glow inside can be
                   placed in vessel coordinates rather than column coordinates. */}
@@ -175,7 +175,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
                   }}
                 />
                 <BottlePreview
-                  liquidColor={juiceColor(displayVariant.hex)}
+                  liquidColor={displayVariant.hex}
                   className="relative h-full w-full"
                 />
               </div>

@@ -9,7 +9,6 @@ import { AgXToneMapping, ACESFilmicToneMapping, Color, Box3, Vector3, type Objec
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
-import { juiceColor } from "../../_lib/variants";
 import { useMediaQuery } from "../../_hooks/useMediaQuery";
 import { BottleGltf } from "./BottleGltf";
 import { BottleMist } from "./BottleMist";
@@ -60,9 +59,8 @@ const REST_COMPACT = { y: 0.0, scale: 0.42 };
 
 export interface BottleSceneProps {
   /**
-   * Liquid colour, **already treated** — pass a `juiceColor(variant.hex)` result,
-   * not the raw hex, matching `BottlePreview`. Left out, it falls back to the live
-   * `--accent` token and treats that instead.
+   * Liquid colour — the fragrance's own `hex`, untransformed, matching
+   * `BottlePreview`. Left out, it falls back to the live `--accent` token.
    */
   liquidColor?: string;
   /** Live variant position. A change in it is what triggers the spin. */
@@ -136,19 +134,10 @@ export default function BottleScene({
   const isTablet = useMediaQuery(
     "(min-width: 768px) and (max-width: 1200px)",
   );
-  // `liquidColor` arrives *already treated*. Every caller hands over a
-  // `juiceColor(...)` result — that is the contract `BottlePreview` documents, and
-  // what `PersistentBottle` and `MegaMenu` both pass — so running `juiceColor` over
-  // it again was a second application of a transform that is not idempotent.
-  //
-  // It is a channel subtraction, so it compounds. Parada's sage (`#b7bb81` raw,
-  // `#7c7f56` once darkened to the accent) came out of the first pass as `#465000`
-  // and out of the second as `#262100` — a near-black brown with no green left in
-  // it, which at the liquid's half opacity over the parchment composited to a
-  // grey-taupe. That is what read as "the liquid does not match the button".
-  //
-  // Only the fallback needs the treatment, because that one is the raw token.
-  const juice = liquidColor ?? juiceColor(readCssToken("--accent", "#b87333"));
+  // The fragrance's own colour, straight through. Callers pass the variant's
+  // `hex`; the fallback is the live `--accent` token for the case where none was
+  // given. Nothing is derived from it on the way in.
+  const juice = liquidColor ?? readCssToken("--accent", "#b87333");
   const firstRun = useRef(true);
 
   const rest = isCompact ? REST_COMPACT : isTablet ? REST_TABLET : REST;

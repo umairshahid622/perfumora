@@ -355,7 +355,12 @@ export function BottleGltf({
     liquidMat.transparent = true;
     liquidMat.depthWrite = false;
     liquidMat.transmission = 0;
-    liquidMat.opacity = 0.34;
+    // One opacity for every fragrance, deliberately. A per-colour density used to
+    // live here to compensate for a colour transform that no longer exists, and
+    // the pair of them meant every new colour needed reasoning about how it would
+    // render. The hex is used exactly as the database gives it and this number is
+    // the same for all of them, so adding a colour is adding a colour.
+    liquidMat.opacity = 0.3;
     liquidMat.roughness = 0.01;
     liquidMat.metalness = 0.0;
     // A touch of clearcoat gives the surface its own specular, so the top of the

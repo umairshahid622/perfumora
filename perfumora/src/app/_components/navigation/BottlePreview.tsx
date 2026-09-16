@@ -21,8 +21,10 @@ const EDGE = "#B8B5B0";
 
 interface BottlePreviewProps {
   /**
-   * Fill for the liquid region. Pass a `juiceColor(variant.hex)` result (not the
-   * raw hex) so the near-clear SKUs read as a tint and agree with the 3D bottle.
+   * Fill for the liquid region — the fragrance's own `hex`, untransformed, so it
+   * agrees with the 3D bottle. Drawn at full strength here rather than at the 3D
+   * liquid's 0.25: this sits on the near-black panel, where a quarter-strength
+   * fill would be a smudge.
    */
   liquidColor: string;
   className?: string;
