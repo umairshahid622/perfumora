@@ -3,10 +3,12 @@
 import { useMemo, useRef, type RefObject } from "react";
 import type {
   Group,
+  Material,
   Mesh,
   MeshPhysicalMaterial,
   Object3D,
   PointsMaterial,
+  ShaderMaterial,
 } from "three";
 
 /**
@@ -41,7 +43,7 @@ export interface BottleRefs {
    * fragrance is — a timeline needs the opacity as well as the transform.
    */
   mist: RefObject<Object3D | null>;
-  mistMaterial: RefObject<PointsMaterial | null>;
+  mistMaterial: RefObject<PointsMaterial | ShaderMaterial | Material | null>;
   /**
    * Group wrapping the model and mist for scroll-driven tilt and showcase pose.
    * Keeps tilt independent of the variant spin on root.
@@ -59,7 +61,7 @@ export function useBottleRefs(): BottleRefs {
   const pumpButton = useRef<Object3D | null>(null);
   const nozzle = useRef<Object3D | null>(null);
   const mist = useRef<Object3D | null>(null);
-  const mistMaterial = useRef<PointsMaterial | null>(null);
+  const mistMaterial = useRef<PointsMaterial | ShaderMaterial | Material | null>(null);
   const tiltGroup = useRef<Group | null>(null);
 
   // Stable identity, so the assembly can wire these up in an effect without

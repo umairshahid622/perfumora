@@ -7,7 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Box3, Vector3, type Object3D } from "three";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { useSoundCue } from "../../_hooks/useSoundCue";
-import { MIST_OPACITY, MIST_COLLAPSED } from "./BottleMist";
+import { MIST_OPACITY } from "./BottleMist";
 import type { BottleRefs } from "./useBottleRefs";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -27,9 +27,9 @@ const STRAIGHTEN_DURATION = 0.2;
 const UNCAP_START = STRAIGHTEN_DURATION;
 const PRESS_DOWN = 0.1;
 const PRESS_UP = 0.18;
-const SPRAY_DURATION = 0.6;
+const SPRAY_DURATION = 1.14;
 /** How quickly the mist arrives once the button bottoms out. */
-const MIST_IN = 0.12;
+const MIST_IN = 0.16;
 /** The cap's chase time while the showcase glide is being driven by scroll — short,
  *  so the cap tracks the wheel rather than lagging behind it. */
 const CLOSE_CHASE = 0.15;
@@ -177,26 +177,24 @@ export function useBottleUncap(
         document.querySelector<HTMLElement>("[data-opening-stage]") ||
         document.body;
 
-      const button = refs.pumpButton.current;
-      const mist = refs.mist.current;
-      const material = refs.mistMaterial.current;
-
-      if (button && initialButtonY.current === null) {
-        initialButtonY.current = button.position.y;
+      if (refs.pumpButton.current && initialButtonY.current === null) {
+        initialButtonY.current = refs.pumpButton.current.position.y;
       }
       const baseButtonY = initialButtonY.current ?? 0;
 
       // Clean state helper for spray effects
       const resetSprayState = () => {
-        if (button) gsap.set(button.position, { y: baseButtonY });
-        if (mist) {
-          gsap.set(mist.scale, {
-            x: MIST_COLLAPSED,
-            y: MIST_COLLAPSED,
-            z: MIST_COLLAPSED,
-          });
+        const liveButton = refs.pumpButton.current;
+        const liveMist = refs.mist.current;
+        const liveMaterial = refs.mistMaterial.current;
+        if (liveButton) gsap.set(liveButton.position, { y: baseButtonY });
+        if (liveMist) {
+          gsap.set(liveMist.scale, { x: 1, y: 1, z: 1 });
+          liveMist.userData.sprayTime = 0;
+          liveMist.userData.isAutonomous = false;
+          liveMist.userData.isSpraying = false;
         }
-        if (material) gsap.set(material, { opacity: 0 });
+        if (liveMaterial) gsap.set(liveMaterial, { opacity: 0 });
       };
 
       let hasUncapped = false;
@@ -431,7 +429,11 @@ export function useBottleUncap(
             overwrite: "auto",
           });
 
-          if (still || !button || !mist || !material) {
+          const liveButton = refs.pumpButton.current;
+          const liveMist = refs.mist.current;
+          const liveMaterial = refs.mistMaterial.current;
+
+          if (still || !liveButton || !liveMist || !liveMaterial) {
             resetSprayState();
             // Nothing will spray, so the cap is free to move straight away.
             sprayDone = true;
@@ -455,7 +457,7 @@ export function useBottleUncap(
           // Press pump button
           activeSprayTl
             .to(
-              button.position,
+              liveButton.position,
               {
                 y: baseButtonY - height * PRESS,
                 duration: PRESS_DOWN,
@@ -465,32 +467,34 @@ export function useBottleUncap(
               UNCAP_START + UNCAP_DURATION,
             )
             .to(
-              button.position,
+              liveButton.position,
               { y: baseButtonY, duration: PRESS_UP, ease: "power2.out" },
               UNCAP_START + SPRAY_AT,
             );
 
-          // Mist spray & sound cue
+          // Mist spray projectile physics & sound cue
           activeSprayTl
             .to(
-              mist.scale,
+              liveMist.userData,
               {
-                x: 1,
-                y: 1,
-                z: 1,
+                sprayTime: SPRAY_DURATION,
                 duration: SPRAY_DURATION,
-                ease: "power2.out",
-                onStart: () => playSprayRef.current(),
+                ease: "none",
+                onStart: () => {
+                  liveMist.userData.sprayTime = 0;
+                  liveMist.userData.isSpraying = true;
+                  playSprayRef.current();
+                },
               },
               UNCAP_START + SPRAY_AT,
             )
             .to(
-              material,
+              liveMaterial,
               { opacity: MIST_OPACITY, duration: MIST_IN, ease: "power1.out" },
               UNCAP_START + SPRAY_AT,
             )
             .to(
-              material,
+              liveMaterial,
               {
                 opacity: 0,
                 duration: SPRAY_DURATION - MIST_IN,

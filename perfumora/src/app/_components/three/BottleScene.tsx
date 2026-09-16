@@ -5,7 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { AgXToneMapping, ACESFilmicToneMapping, Color, Box3, Vector3, type Object3D } from "three";
+import { AgXToneMapping, Color } from "three";
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
@@ -16,7 +16,6 @@ import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
 import { useBottleUncap } from "./useBottleUncap";
-import { useScrollScene } from "./useScrollScene";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -96,7 +95,8 @@ export default function BottleScene({
   spinDirection,
   className,
 }: BottleSceneProps) {
-  const refs = useBottleRefs();
+  const bottleRefs = useBottleRefs();
+  const { tiltGroup: tiltGroupRef } = bottleRefs;
   // Flipped once the glTF resolves and `refs.root` is wired, so a motion that needs
   // the assembly root can start against one that exists — the model loads well after
   // first render, and that resolution doesn't re-run the hooks here on its own.
@@ -154,8 +154,8 @@ export default function BottleScene({
    */
   useGSAP(
     () => {
-      const root = refs.root.current;
-      const material = refs.liquidMaterial.current;
+      const root = bottleRefs.root.current;
+      const material = bottleRefs.liquidMaterial.current;
       if (!root || !ready) return;
 
       if (firstRun.current) {
@@ -217,7 +217,7 @@ export default function BottleScene({
   // has, that gate would have been the last piece of scroll-driven motion left, and
   // switching the hook off keeps exactly the stillness the Hero always showed. Its
   // `enabled` flag is the hook's own opt-in, so this is a one-word change to revisit.
-  useBottleFloat(refs, { enabled: false, ready });
+  useBottleFloat(bottleRefs, { enabled: false, ready });
 
   // The Ritual's theatre: the closure lifts off, the pump fires, the fragrance
   // hangs in the air (§4.3). Cued by the beat's own screen of the document — the
@@ -225,7 +225,7 @@ export default function BottleScene({
   // because a spray is an event and not a state to be scrubbed. The DOM half of
   // the same sequence, the three steps that arrive once the mist is up, is in
   // `<Ritual>`.
-  useBottleUncap(refs, {
+  useBottleUncap(bottleRefs, {
     enabled: true,
     ready,
     trigger: `#${SECTION_IDS.ritual}`,
@@ -239,7 +239,7 @@ export default function BottleScene({
   // 3.0 -> 3.8 screens: Tilts to the showcase angle (x: 0.1, y: 0.35, z: 0.28) as cap glides shut
   useGSAP(
     () => {
-      const tiltGroup = refs.tiltGroup.current;
+      const tiltGroup = bottleRefs.tiltGroup.current;
       const stageEl = document.querySelector<HTMLElement>("[data-opening-stage]");
       if (!ready || !tiltGroup || !stageEl || prefersReducedMotion()) return;
 
@@ -329,16 +329,16 @@ export default function BottleScene({
             map down with it and rebuild both. */}
         <group position={[0, rest.y, 0]} scale={rest.scale}>
           {/* Tilt group for scroll-driven showcase pose and bottle tilt */}
-          <group ref={refs.tiltGroup}>
+          <group ref={tiltGroupRef}>
             <Suspense fallback={null}>
-              <BottleGltf refs={refs} liquidColor={juice} onReady={handleReady} />
+              <BottleGltf refs={bottleRefs} liquidColor={juice} onReady={handleReady} />
             </Suspense>
 
             {/* The spray, a sibling of the model so it shares its framed space
                 without being turned by the variant spin — and outside the suspense
                 boundary, so its handles are wired from the first commit rather than
                 when the download lands. */}
-            <BottleMist refs={refs} color={juice} />
+            <BottleMist refs={bottleRefs} color={juice} />
           </group>
         </group>
       </Canvas>
