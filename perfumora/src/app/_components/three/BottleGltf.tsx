@@ -360,7 +360,7 @@ export function BottleGltf({
     // the pair of them meant every new colour needed reasoning about how it would
     // render. The hex is used exactly as the database gives it and this number is
     // the same for all of them, so adding a colour is adding a colour.
-    liquidMat.opacity = 0.3;
+    liquidMat.opacity = 0.25;
     liquidMat.roughness = 0.01;
     liquidMat.metalness = 0.0;
     // A touch of clearcoat gives the surface its own specular, so the top of the

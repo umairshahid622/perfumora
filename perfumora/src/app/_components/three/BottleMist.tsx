@@ -21,14 +21,30 @@ const DEFAULT_NOZZLE: [number, number, number] = [0, 1.05, 0.17];
  * plume has to fire the same way, or the mist leaves the bottle sideways. There is
  * no `X` component because the yaw trim already took the spout's sideways lean out;
  * adding one back here would only push the plume off the spout again.
+ *
+ * `reach` and `spread` are two thirds of how much mist there *is* — see the note
+ * on `COUNT` below.
  */
-const PLUME = { axis: [0, 0.12, 0.99], reach: 1.35, spread: 0.38 } as const;
+const PLUME = { axis: [0, 0.12, 0.99], reach: 1.5, spread: 0.45 } as const;
 
-/** Droplet count: rich atomized plume matching the reference photograph. */
-const COUNT = 420;
+/**
+ * The cloud's volume is these three numbers, and they are the ones to turn:
+ *
+ *   - `COUNT` — how many droplets. Density, and the main lever.
+ *   - `DOT_SIZE` — how big each one is. Weight, and how solid the cloud reads
+ *     before it starts to look like fog rather than atomised droplets.
+ *   - `PLUME.reach` / `PLUME.spread` — how far it carries and how wide it opens.
+ *
+ * Raised together for a fuller plume: about 3× the ink on screen (1.8× the
+ * droplets at 1.8× the area each, over a slightly longer, wider cone). The fill
+ * cost is trivial at this count — a few hundred points against a scene already
+ * drawing a transmissive bottle — so `COUNT` is the safe one to push further if
+ * it still reads thin, and the first to pull back if it starts to look like fog.
+ */
+const COUNT = 760;
 
 /** Droplet diameter in world units — crisp, defined atomized particles. */
-const DOT_SIZE = 0.03;
+const DOT_SIZE = 0.04;
 
 /** Opacity at the peak of the spray. */
 export const MIST_OPACITY = 0.88;
