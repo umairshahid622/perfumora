@@ -5,6 +5,7 @@ import { useCart } from "../../_lib/cart-context";
 import {
   defaultSize,
   formatPrice,
+  quotedSize,
   readableAccent,
   type SizeMl,
   type Variant,
@@ -43,15 +44,20 @@ export function GalleryCard({
   const { addItem } = useCart();
   // Unlike the Hero's, this card's fragrance never changes under the selection —
   // the grid keys each card by variant id — so the opening size is an initialiser
-  // and there is nothing to reconcile on re-render.
-  const [size, setSize] = useState<SizeMl>(() => defaultSize(variant.sizes));
+  // and there is nothing to reconcile on re-render. `null` when every size is out
+  // of stock, which opens the card with nothing selected.
+  const [size, setSize] = useState<SizeMl | null>(() => defaultSize(variant.sizes));
 
   const accent = readableAccent(variant.hex);
-  // Present by construction: `size` only ever holds a size this fragrance sells.
-  const { price, stock } = variant.sizes[size]!;
+  // The same rule the product bar uses, so the two cannot quote different prices
+  // for the same fragrance.
+  const { price, stock } = quotedSize(variant.sizes, size);
   const soldOut = stock === 0;
 
-  const add = () =>
+  const add = () => {
+    // Unreachable while the button is disabled, which is exactly when `size` is
+    // null — but the guard keeps the null out of the payload.
+    if (!size) return;
     addItem({
       variantId: variant.id,
       name: variant.name,
@@ -59,6 +65,15 @@ export function GalleryCard({
       size,
       price,
     });
+  };
+
+  /** What the button announces. With no size selected there is none to name, so
+   *  the label drops the volume rather than reading "nullml". */
+  const addLabel = soldOut
+    ? size
+      ? `${variant.name}, ${size}ml, sold out`
+      : `${variant.name}, sold out`
+    : `Add ${variant.name}, ${size}ml, to bag`;
 
   // Scope the accent tokens to THIS card. The accent utilities are var()-based,
   // so the reused controls below inherit the card's own floored colour.
@@ -143,11 +158,7 @@ export function GalleryCard({
                 onClick={add}
                 disabled={soldOut}
                 className="w-full"
-                aria-label={
-                  soldOut
-                    ? `${variant.name}, ${size}ml, sold out`
-                    : `Add ${variant.name}, ${size}ml, to bag`
-                }
+                aria-label={addLabel}
               >
                 {soldOut ? "Sold Out" : "Add to Bag"}
               </RippleButton>

@@ -10,7 +10,7 @@ import { RippleButton } from "../ui/RippleButton";
 import { useCart } from "../../_lib/cart-context";
 import { useScent } from "../../_lib/scent-context";
 import { prefersReducedMotion } from "../../_lib/motion";
-import { defaultSize, offeredSizes, type SizeMl } from "../../_lib/variants";
+import { defaultSize, offeredSizes, quotedSize, type SizeMl } from "../../_lib/variants";
 
 /**
  * Persistent product bar (§4.1) — price, variant name, size selector, and Add to Bag.
@@ -24,12 +24,23 @@ export function ProductBar() {
   const firstRun = useRef(true);
 
   const offered = offeredSizes(variant.sizes);
-  const size =
-    picked && offered.includes(picked) ? picked : defaultSize(variant.sizes);
-  const { price, stock } = variant.sizes[size]!;
+  // The size the bar is quoting, or `null` when every size is out of stock — in
+  // which case nothing is selected and the button below is the Sold Out state.
+  const size = picked && offered.includes(picked) ? picked : defaultSize(variant.sizes);
+  // With no selection there is nothing to price, so the bar falls back to the
+  // entry size rather than quoting one that is not on screen. See `quotedSize`.
+  const { price, stock } = quotedSize(variant.sizes, size);
   const soldOut = stock === 0;
 
   const text = `${variant.name} · ${variant.concentration ?? "Eau de Parfum"}`;
+
+  /** What the button announces. With no size selected there is none to name, so
+   *  the label drops the volume rather than reading "nullml". */
+  const addLabel = soldOut
+    ? size
+      ? `${variant.name}, ${size}ml, sold out`
+      : `${variant.name}, sold out`
+    : `Add ${variant.name} to bag`;
 
   useGSAP(
     () => {
@@ -53,6 +64,10 @@ export function ProductBar() {
   );
 
   const addToBag = () => {
+    // Unreachable while the button is disabled — which is exactly when `size` is
+    // null — but the guard keeps the null out of the payload rather than
+    // asserting it away.
+    if (!size) return;
     addItem({
       variantId: variant.id,
       name: variant.name,
@@ -88,11 +103,7 @@ export function ProductBar() {
         <RippleButton
           onClick={addToBag}
           disabled={soldOut}
-          aria-label={
-            soldOut
-              ? `${variant.name}, ${size}ml, sold out`
-              : `Add ${variant.name} to bag`
-          }
+          aria-label={addLabel}
         >
           {soldOut ? "Sold Out" : "Add to Bag"}
         </RippleButton>
