@@ -15,6 +15,11 @@ import { offeredSizes, type SizeMap, type SizeMl } from "../../_lib/variants";
  * stock still gets a pill — hiding it would say "we don't make this", which is a
  * different thing — struck through and disabled, with the state in the accessible
  * name too so it doesn't rest on colour or a dimmed edge alone.
+ *
+ * `value` is `null` when nothing is buyable at all, and then no pill is active:
+ * the group opens with every option struck through, which is the honest picture
+ * of a fragrance with no stock. It is not an error state — the caller's Add to
+ * Bag is what says it cannot be bought.
  */
 export function SizeSelector({
   sizes,
@@ -22,7 +27,7 @@ export function SizeSelector({
   onChange,
 }: {
   sizes: SizeMap;
-  value: SizeMl;
+  value: SizeMl | null;
   onChange: (size: SizeMl) => void;
 }) {
   return (

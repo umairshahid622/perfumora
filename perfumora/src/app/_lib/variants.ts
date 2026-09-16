@@ -57,12 +57,50 @@ export function offeredSizes(sizes: SizeMap): SizeMl[] {
 }
 
 /**
- * The size a fresh selector opens on: 50ml where it is sold, otherwise the only
- * other option. Non-optional because every variant that reaches the UI sells at
- * least one size (see `Variant.sizes`).
+ * The size a fresh selector opens on, or `null` when nothing is buyable.
+ *
+ * Preference is 50ml over 30ml, but only among the sizes actually *in stock*.
+ * "Which sizes does this fragrance sell" and "which can be bought right now" are
+ * different questions — a size keeps its row when it sells out, so it stays on
+ * screen struck through — and this answers the second.
+ *
+ * The old version asked the first (`sizes[50] ? 50 : 30`), which on a fragrance
+ * whose 50ml had sold out opened the selector on the unavailable pill and quoted
+ * its price: Boom Shell showed Rs. 4,100 for a 50ml nobody could buy while the
+ * 30ml sat in stock at Rs. 2,900.
+ *
+ * `null` is a real answer. A fragrance with every size out of stock opens with
+ * nothing selected, and the product bar shows its Sold Out state rather than
+ * pre-selecting a size that cannot be added.
  */
-export function defaultSize(sizes: SizeMap): SizeMl {
-  return sizes[50] ? 50 : 30;
+export function defaultSize(sizes: SizeMap): SizeMl | null {
+  const buyable = (size: SizeMl) => (sizes[size]?.stock ?? 0) > 0;
+  if (buyable(50)) return 50;
+  if (buyable(30)) return 30;
+  return null;
+}
+
+/**
+ * The size entry a product surface should quote, given whatever is selected.
+ *
+ * `selected` is `null` when the fragrance is entirely out of stock, and then
+ * there is no selection to price — so this answers with the entry size (the
+ * smallest the fragrance sells) to keep a price on screen. The caller reads
+ * `stock === 0` to know the thing cannot be bought.
+ *
+ * Shared rather than written out in both places because <ProductBar> and
+ * <GalleryCard> have to agree: the same fragrance must quote the same price in
+ * both, and a rule stated twice is a rule that drifts.
+ */
+export function quotedSize(
+  sizes: SizeMap,
+  selected: SizeMl | null,
+): { size: SizeMl; price: number; stock: number } {
+  // Present by construction: `offeredSizes` only names sizes this fragrance has
+  // a row for, and a fragrance with no rows never reaches the UI (see
+  // `Variant.sizes`).
+  const chosen = selected ?? offeredSizes(sizes)[0]!;
+  return { size: chosen, ...sizes[chosen]! };
 }
 
 /** WCAG relative luminance of an sRGB hex, 0 (black) … 1 (white). */
