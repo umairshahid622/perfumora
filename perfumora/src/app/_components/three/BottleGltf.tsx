@@ -240,6 +240,23 @@ function applyGlassEdge(
   material.needsUpdate = true;
 }
 
+/**
+ * The nozzle's horizontal offset from the pump button it hangs off, read from the
+ * asset (`nozzle.translation`). The spout runs along that offset, so it is not
+ * quite parallel to the model's own -Z — hence the trim in the yaw below.
+ */
+const NOZZLE_OFFSET = { x: 0.151, z: -1.134 } as const;
+
+/**
+ * Yaw that puts the pump's spout straight at the camera.
+ *
+ * `PI` turns the model's -Z (the spout, see the group below) to face front;
+ * `atan2` then takes out the few degrees the nozzle's own sideways offset leaves
+ * in it, so the spout lands on +Z exactly rather than 7.6° off it.
+ */
+const NOZZLE_YAW =
+  Math.PI + Math.atan2(NOZZLE_OFFSET.x, -NOZZLE_OFFSET.z);
+
 interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
   refs: BottleRefs;
   /**
@@ -393,8 +410,23 @@ export function BottleGltf({
 
   return (
     <group ref={refs.root} {...groupProps}>
-      {/* Bottle orientation matching Blender asset: -PI/2 brings the graceful dip-tube curve to the left */}
-      <group scale={fit.scale} position={fit.offset} rotation-y={-Math.PI / 2}>
+      {/*
+       * Bottle orientation.
+       *
+       * `NOZZLE_YAW` is chosen for the *nozzle*. The asset's spout runs along the
+       * model's own **-Z**: the `nozzle` node sits at `z = -1.134` relative to
+       * `automizerButton`, and the orifice sphere is the `z[-1.158..-0.794]` end of
+       * that button's geometry. The yaw turns that to world **+Z** — straight at
+       * the camera — so the pump faces the customer and the mist has somewhere
+       * sensible to go.
+       *
+       * It used to be `-PI/2`, which was chosen for the dip tube's curve and sent
+       * the spout to world **+X**: hard right, a full quarter turn off front, which
+       * is what read as the nozzle pointing sideways. The tube's curve is now on
+       * the other side; the bottle is otherwise symmetric, so that is the only
+       * cost.
+       */}
+      <group scale={fit.scale} position={fit.offset} rotation-y={NOZZLE_YAW}>
         <primitive object={gltf.scene} />
       </group>
     </group>

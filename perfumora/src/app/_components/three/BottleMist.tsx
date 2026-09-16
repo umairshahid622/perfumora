@@ -6,17 +6,23 @@ import { CanvasTexture, Vector3 } from "three";
 import type { BottleRefs } from "./useBottleRefs";
 
 /**
- * Where the plume starts, right at the pump's nozzle orifice.
- * Calibrated precisely to the nozzle node coordinates.
+ * Where the plume starts before the first frame has run. The live position is
+ * locked to the nozzle node every frame below, so this only ever paints the
+ * initial commit — and the material starts at `opacity: 0`, so it is never seen.
  */
-const DEFAULT_NOZZLE: [number, number, number] = [0.169, 1.050, 0.023];
+const DEFAULT_NOZZLE: [number, number, number] = [0, 1.05, 0.17];
 
 /**
- * The cone the mist is scattered through:
- * Shoots from the nozzle towards the right (+X) with a slight natural upward arc (+Y)
- * and slight forward depth (+Z), matching the nozzle orifice normal.
+ * The cone the mist is scattered through: from the nozzle **towards the camera**,
+ * with a slight upward arc.
+ *
+ * `+Z` is the important part. The vessel's yaw is trimmed so the spout lands on
+ * world `+Z` — straight at the viewer (see `NOZZLE_YAW` in `BottleGltf`) — so the
+ * plume has to fire the same way, or the mist leaves the bottle sideways. There is
+ * no `X` component because the yaw trim already took the spout's sideways lean out;
+ * adding one back here would only push the plume off the spout again.
  */
-const PLUME = { axis: [0.945, 0.12, 0.12], reach: 1.35, spread: 0.38 } as const;
+const PLUME = { axis: [0, 0.12, 0.99], reach: 1.35, spread: 0.38 } as const;
 
 /** Droplet count: rich atomized plume matching the reference photograph. */
 const COUNT = 420;
@@ -60,7 +66,10 @@ function createDroplet(): CanvasTexture {
 /** Droplet positions: fine atomized particles scattered through the cone plume. */
 function createPlume(): Float32Array {
   const axis = new Vector3(...PLUME.axis).normalize();
-  const across = new Vector3(0, 0, 1).cross(axis).normalize();
+  // Built off +Y, not +Z. The plume now fires along +Z, and a cross product with
+  // its own direction is degenerate — the spread basis would collapse and the
+  // cone would come out as a line.
+  const across = new Vector3(0, 1, 0).cross(axis).normalize();
   const up = axis.clone().cross(across);
 
   const positions = new Float32Array(COUNT * 3);

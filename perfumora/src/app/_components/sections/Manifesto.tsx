@@ -16,6 +16,12 @@ const PARAGRAPHS = [
  * The entire entrance, reading hold, and exit transitions are master-choreographed
  * by OpeningStage to avoid conflicting scroll triggers and maintain frame-perfect
  * synchronization with the 3D bottle drift and tilt.
+ *
+ * The copy sits flush to the container's left edge, and the vessel is pushed to
+ * the right of the frame — the pair is the composition, so the two move together:
+ * this column has no left indent of its own, and <OpeningStage> is what sends the
+ * bottle out to meet it. Widening or narrowing the gap means changing the vessel
+ * drift there, not padding here.
  */
 export function Manifesto() {
   return (
@@ -26,7 +32,7 @@ export function Manifesto() {
       className="bg-transparent pt-16 md:pt-20 pb-8 md:pb-12"
     >
       <Container className="flex flex-1 flex-col justify-end pb-8 sm:pb-12 md:justify-center md:pb-0">
-        <div className="flex max-w-md flex-col md:ml-[calc(3rem+4vw)] md:max-w-[min(28rem,38vw)]">
+        <div className="flex max-w-md flex-col md:max-w-[min(28rem,34vw)]">
           <Eyebrow>Manifesto</Eyebrow>
 
           <h2 className="font-display text-xl sm:text-2xl md:text-section mt-2 sm:mt-4 max-w-[14ch] text-balance font-semibold uppercase md:mt-6">

@@ -182,18 +182,23 @@ export function readableAccentOnDark(hex: string): string {
 }
 
 /**
- * The 3D fragrance renders the true `hex` (the UI accent is the one `readableAccent`
- * darkens). But the palette's near-clear SKUs — Tahnoun, Walaya, the "crystal
- * clear" Marlys — sit so close to white that they read as dead white rather than
- * clear liquid. `juiceColor` treats the liquid *only*, keyed on how pale the juice
- * is: it amplifies a pale juice's own faint hue (its cool / rose / warm cast) around
- * its grey level so it reads as a *tinted* clear liquid, and leaves the saturated
- * golds / pinks / turquoises exactly as authored. Opacity is uniform across every
- * juice (`LIQUID_OPACITY` in BottleGltf) — hue is all that changes between them.
+ * Where a juice stops being darkened for the studio and starts being kept pale,
+ * and how much its own faint cast is amplified once it is.
+ *
+ * `LIQUID_LUM_DENSE` is the switch: at or above it the fragrance is a near-clear
+ * one and takes the `paleJuice` route below. `LIQUID_LUM_CLEAR` and
+ * `LIQUID_TINT_BOOST` shape that route — the boost ramps in across the band
+ * between them, reaching `LIQUID_TINT_BOOST`× at the clear end, so a juice with a
+ * whisper of rose or blue in it gains a visible cast while a neutral one is left
+ * exactly as authored.
+ *
+ * These three were left behind by an earlier rewrite: documented, still exported
+ * to nothing, and referenced only by a `paleFactor` no one called. The consequence
+ * was that the near-clear case had no handling at all — see `paleJuice`.
  */
-const LIQUID_LUM_DENSE = 0.6; // at/below: no tint boost — the saturated SKUs pass through
-const LIQUID_LUM_CLEAR = 0.9; // at/above: full tint boost — the near-clear SKUs
-const LIQUID_TINT_BOOST = 3; // saturation multiplier at the pale end
+const LIQUID_LUM_DENSE = 0.6;
+const LIQUID_LUM_CLEAR = 0.9;
+const LIQUID_TINT_BOOST = 3;
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
@@ -201,6 +206,40 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 function paleFactor(hex: string): number {
   const lum = relativeLuminance(hex);
   return clamp01((lum - LIQUID_LUM_DENSE) / (LIQUID_LUM_CLEAR - LIQUID_LUM_DENSE));
+}
+
+/** Clamp a channel value to a byte. */
+const clampChannel = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+
+/**
+ * A pale juice, kept pale.
+ *
+ * `readableAccent` floors every colour to luminance 0.2 so it stays legible as
+ * text on the parchment, and the calibration below darkens it further. Both are
+ * right for a *button* and wrong for a *liquid*. Cobalt Elixir is `#e5e5e5` — a
+ * neutral near-white — and through those it came out `#5a4345`: dark, and warm, a
+ * cast its own hex does not contain, because the calibration scales each channel
+ * by a different factor. Over the parchment that rendered as grey, which is what
+ * the bottle was reported as showing for a colour that is almost white.
+ *
+ * A clear fragrance has to read as clear liquid, so a pale juice keeps its own
+ * luminance and has only its own faint cast amplified — its deviation from its own
+ * grey level, scaled up. A neutral near-white therefore stays exactly itself, and
+ * a juice with a whisper of rose or blue gains just enough to read as *tinted*
+ * rather than as water.
+ */
+function paleJuice(hex: string): string {
+  const n = hex.replace("#", "");
+  const channels = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+  const grey = (channels[0] + channels[1] + channels[2]) / 3;
+  const boost = 1 + (LIQUID_TINT_BOOST - 1) * paleFactor(hex);
+  return `#${channels
+    .map((c) =>
+      clampChannel(grey + (c - grey) * boost)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 /**
@@ -221,16 +260,21 @@ export function juiceColor(hex: string): string {
     return "#465000";
   }
 
+  // A pale juice is not darkened at all — see `paleJuice`. Checked before the
+  // calibration below, because that calibration is the thing that turns a
+  // near-white into grey. The comparison is on the fragrance's own `hex`, not on
+  // the darkened accent: it is the juice that is pale, not the button.
+  if (relativeLuminance(hex) >= LIQUID_LUM_DENSE) return paleJuice(hex);
+
   // General studio calibration for any variant
   const n = accent.replace("#", "");
   const r = parseInt(n.slice(0, 2), 16);
   const g = parseInt(n.slice(2, 4), 16);
   const b = parseInt(n.slice(4, 6), 16);
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
 
-  const cr = clamp((r - 30) * 0.96);
-  const cg = clamp((g - 36) * 0.76);
-  const cb = clamp((b - 36) * 0.78);
+  const cr = clampChannel((r - 30) * 0.96);
+  const cg = clampChannel((g - 36) * 0.76);
+  const cb = clampChannel((b - 36) * 0.78);
 
   return `#${cr.toString(16).padStart(2, "0")}${cg.toString(16).padStart(2, "0")}${cb.toString(16).padStart(2, "0")}`;
 }

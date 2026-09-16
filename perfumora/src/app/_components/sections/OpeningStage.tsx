@@ -78,10 +78,10 @@ gsap.registerPlugin(ScrollTrigger);
  * paints over both layers of copy rather than under one of them — and that is what makes
  * it leave with the stage rather than with scroll logic of its own: it is nailed to the
  * viewport for as long as that wrapper is lifted or stuck, then travels off with the
- * block. Its one move across the three beats is the drift, 19vw right on the Manifesto's
+ * block. Its one move across the three beats is the drift, 34vw right on the Manifesto's
  * own curve and window and back to 0 on the Ritual's, so the glass is centred for the two
  * beats composed on the middle of the screen and stepped aside for the one that puts a
- * column of prose in the left third.
+ * column of prose hard against the left edge.
  *
  * The Hero's own furniture stays where it was through all of this, the counter and the
  * product bar included. They belong to the section underneath, which by design does not
@@ -179,11 +179,16 @@ export function OpeningStage() {
 
           // In Manifesto:
           // Mobile: bottle drifts up to the top half to let Manifesto text sit cleanly below it.
-          // Desktop: bottle drifts 21vw to the right to frame Manifesto text on the left.
+          // Desktop: bottle drifts right so the copy sits flush left and the vessel
+          // holds the right of the frame. The number is the gap between them — the
+          // copy has no indent of its own (see <Manifesto>), so this is the only
+          // thing setting the split, and it is the one to turn to widen or narrow
+          // it. 34vw puts the vessel's centre at 84vw, clear of the column and
+          // still inside the frame.
           if (isMobile) {
             tl.to(stageEl, { "--vessel-y": -20, ...beat }, 0);
           } else {
-            tl.to(stageEl, { "--vessel-x": 21, "--vessel-y": 0, ...beat }, 0);
+            tl.to(stageEl, { "--vessel-x": 34, "--vessel-y": 0, ...beat }, 0);
           }
 
           // 1.0 → 2.0: MANIFESTO READING WINDOW (held still at 100% opacity for 1 full screen)
