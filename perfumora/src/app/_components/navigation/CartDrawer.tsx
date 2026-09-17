@@ -27,7 +27,7 @@ interface CartDrawerProps {
  * the confirmation (§4.0).
  */
 export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
-  const { items, subtotal, removeItem } = useCart();
+  const { items, subtotal, removeItem, updateQuantity } = useCart();
   const pathName = usePathname();
   const rootRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLButtonElement>(null);
@@ -102,9 +102,18 @@ export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-6">
           {items.length === 0 ? (
-            <p className="text-body text-muted-on-light mt-8 text-center">
-              Your cart is empty.
-            </p>
+            <div className="mt-12 flex flex-col items-center justify-center text-center">
+              <p className="text-body text-muted-on-light">
+                Your cart is empty.
+              </p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="hover:text-accent-on-light text-micro mt-4 font-medium uppercase tracking-wider underline underline-offset-4 transition-colors"
+              >
+                Continue Browsing
+              </button>
+            </div>
           ) : (
             <ul className="flex flex-col gap-6">
               {items.map((line) => (
@@ -117,8 +126,32 @@ export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
                   <div className="flex-1">
                     <p className="text-base font-medium">{line.name}</p>
                     <p className="text-micro text-muted-on-light font-medium uppercase">
-                      {line.size}ml · Qty {line.quantity}
+                      {line.size}ml
                     </p>
+                    {/* Quantity Controls */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="border-hairline-on-light flex items-center rounded-full border bg-bg-light/60">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(line.key, -1)}
+                          aria-label={`Decrease quantity of ${line.name}`}
+                          className="hover:text-accent-on-light flex size-6 items-center justify-center text-xs font-semibold transition-colors"
+                        >
+                          −
+                        </button>
+                        <span className="w-5 text-center text-xs font-medium">
+                          {line.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(line.key, 1)}
+                          aria-label={`Increase quantity of ${line.name}`}
+                          className="hover:text-accent-on-light flex size-6 items-center justify-center text-xs font-semibold transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className="text-base font-medium">

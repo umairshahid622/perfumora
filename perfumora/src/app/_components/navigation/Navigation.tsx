@@ -5,7 +5,11 @@ import { usePathname } from "next/navigation";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useCart } from "../../_lib/cart-context";
+import {
+  CART_CLOSE_EVENT,
+  CART_OPEN_EVENT,
+  useCart,
+} from "../../_lib/cart-context";
 import { currentCustomer, type Customer } from "../../_lib/auth";
 import {
   AUTH_REQUEST_EVENT,
@@ -84,6 +88,19 @@ export function Navigation() {
   const lenis = useLenis();
   const pathname = usePathname();
   const [panel, setPanel] = useState<Panel>(null);
+
+  useEffect(() => {
+    const onOpen = () => setPanel("cart");
+    const onClose = () => {
+      setPanel((current) => (current === "cart" ? null : current));
+    };
+    window.addEventListener(CART_OPEN_EVENT, onOpen);
+    window.addEventListener(CART_CLOSE_EVENT, onClose);
+    return () => {
+      window.removeEventListener(CART_OPEN_EVENT, onOpen);
+      window.removeEventListener(CART_CLOSE_EVENT, onClose);
+    };
+  }, []);
   // Whether the Fragrances panel is on screen at all: true from the click that opens
   // it, cleared by the panel itself once its close animation has finished. `panel`
   // can't answer that — it flips at the closing click, while the panel is still there

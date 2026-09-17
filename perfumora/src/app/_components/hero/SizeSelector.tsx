@@ -34,7 +34,8 @@ export function SizeSelector({
     <div role="radiogroup" aria-label="Size" className="flex items-center gap-2">
       {offeredSizes(sizes).map((size) => {
         const active = size === value;
-        const soldOut = sizes[size]?.stock === 0;
+        const stock = sizes[size]?.stock ?? 0;
+        const soldOut = stock === 0;
         return (
           <button
             key={size}

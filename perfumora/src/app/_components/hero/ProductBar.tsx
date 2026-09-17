@@ -13,7 +13,7 @@ import { prefersReducedMotion } from "../../_lib/motion";
 import { defaultSize, offeredSizes, quotedSize, type SizeMl } from "../../_lib/variants";
 
 /**
- * Persistent product bar (§4.1) — price, variant name, size selector, and Add to Bag.
+ * Persistent product bar (§4.1) — price, variant name, size selector, and Add to Cart.
  * Stays accessible across all opening stage beats (Hero, Manifesto, Ritual).
  */
 export function ProductBar() {
@@ -63,7 +63,7 @@ export function ProductBar() {
     { scope: eyebrowScopeRef, dependencies: [index], revertOnUpdate: true },
   );
 
-  const addToBag = () => {
+  const addToCart = () => {
     // Unreachable while the button is disabled — which is exactly when `size` is
     // null — but the guard keeps the null out of the payload rather than
     // asserting it away.
@@ -74,6 +74,7 @@ export function ProductBar() {
       hex: variant.hex,
       size,
       price,
+      maxStock: stock,
     });
   };
 
@@ -101,7 +102,7 @@ export function ProductBar() {
 
       <div className="order-3 flex justify-end md:order-3">
         <RippleButton
-          onClick={addToBag}
+          onClick={addToCart}
           disabled={soldOut}
           aria-label={addLabel}
         >

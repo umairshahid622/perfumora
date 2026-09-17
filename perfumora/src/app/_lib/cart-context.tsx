@@ -5,10 +5,12 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { SizeMl, VariantId } from "./variants";
+import { useToast } from "./toast-context";
 
 /**
  * Cart state (§5): a plain array of line items plus add/remove/clear, held in a
@@ -32,6 +34,8 @@ export interface CartLine {
   /** Unit price at the time it was added (placeholder pricing). */
   price: number;
   quantity: number;
+  /** Maximum available inventory stock for this variant + size. */
+  maxStock?: number;
 }
 
 export interface AddToCartInput {
@@ -40,13 +44,34 @@ export interface AddToCartInput {
   hex: string;
   size: SizeMl;
   price: number;
+  maxStock?: number;
+}
+
+export const CART_OPEN_EVENT = "perfumora:cart-open";
+export const CART_CLOSE_EVENT = "perfumora:cart-close";
+
+export function requestCartOpen(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(CART_OPEN_EVENT));
+  }
+}
+
+export function requestCartClose(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(CART_CLOSE_EVENT));
+  }
 }
 
 interface CartContextValue {
   items: CartLine[];
   count: number;
   subtotal: number;
-  addItem: (input: AddToCartInput) => void;
+  isOpen: boolean;
+  openCart: () => void;
+  closeCart: () => void;
+  toggleCart: () => void;
+  addItem: (input: AddToCartInput, openDrawer?: boolean) => void;
+  updateQuantity: (key: string, delta: number) => void;
   removeItem: (key: string) => void;
   clear: () => void;
 }
@@ -84,7 +109,8 @@ function isLine(value: unknown): value is CartLine {
     (line.size === 30 || line.size === 50) &&
     typeof line.price === "number" &&
     typeof line.quantity === "number" &&
-    line.quantity > 0
+    line.quantity > 0 &&
+    (line.maxStock === undefined || typeof line.maxStock === "number")
   );
 }
 
@@ -137,22 +163,107 @@ function getServerSnapshot() {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [isOpen, setIsOpen] = useState(false);
+  const { showToast } = useToast();
 
-  const addItem = useCallback((input: AddToCartInput) => {
-    const key = `${input.variantId}-${input.size}`;
-    // Read through `getSnapshot()`, not the `items` above: these handlers are memoised
-    // with no dependencies, so a closed-over array would be whatever the bag held when
-    // the provider first mounted — nothing.
-    const current = getSnapshot();
-    const existing = current.find((line) => line.key === key);
-    commit(
-      existing
-        ? current.map((line) =>
-            line.key === key ? { ...line, quantity: line.quantity + 1 } : line,
-          )
-        : [...current, { ...input, key, quantity: 1 }],
-    );
+  const openCart = useCallback(() => {
+    setIsOpen(true);
+    requestCartOpen();
   }, []);
+
+  const closeCart = useCallback(() => {
+    setIsOpen(false);
+    requestCartClose();
+  }, []);
+
+  const toggleCart = useCallback(() => {
+    setIsOpen((prev) => {
+      const next = !prev;
+      if (next) requestCartOpen();
+      else requestCartClose();
+      return next;
+    });
+  }, []);
+
+  const addItem = useCallback(
+    (input: AddToCartInput, openDrawer = false) => {
+      const key = `${input.variantId}-${input.size}`;
+      // Read through `getSnapshot()`, not the `items` above: these handlers are memoised
+      // with no dependencies, so a closed-over array would be whatever the bag held when
+      // the provider first mounted — nothing.
+      const current = getSnapshot();
+      const existing = current.find((line) => line.key === key);
+      const max = input.maxStock ?? existing?.maxStock;
+
+      if (existing) {
+        if (max !== undefined && existing.quantity >= max) {
+          showToast(
+            `Only ${max} bottle${max === 1 ? "" : "s"} of ${input.name} (${input.size}ml) available in stock.`,
+          );
+          return;
+        }
+        const nextQuantity = existing.quantity + 1;
+        commit(
+          current.map((line) =>
+            line.key === key
+              ? { ...line, quantity: nextQuantity, maxStock: max ?? line.maxStock }
+              : line,
+          ),
+        );
+      } else {
+        if (max !== undefined && max <= 0) {
+          showToast(`${input.name} (${input.size}ml) is currently sold out.`);
+          return;
+        }
+        commit([
+          ...current,
+          {
+            ...input,
+            key,
+            quantity: 1,
+          },
+        ]);
+      }
+
+      if (openDrawer) {
+        setIsOpen(true);
+        requestCartOpen();
+      }
+    },
+    [showToast],
+  );
+
+  const updateQuantity = useCallback(
+    (key: string, delta: number) => {
+      const current = getSnapshot();
+      const existing = current.find((line) => line.key === key);
+      if (!existing) return;
+
+      if (
+        delta > 0 &&
+        existing.maxStock !== undefined &&
+        existing.quantity >= existing.maxStock
+      ) {
+        showToast(
+          `Only ${existing.maxStock} bottle${existing.maxStock === 1 ? "" : "s"} of ${existing.name} (${existing.size}ml) available in stock.`,
+        );
+        return;
+      }
+
+      const nextQuantity = existing.quantity + delta;
+      if (nextQuantity <= 0) {
+        commit(current.filter((line) => line.key !== key));
+        return;
+      }
+
+      commit(
+        current.map((line) =>
+          line.key === key ? { ...line, quantity: nextQuantity } : line,
+        ),
+      );
+    },
+    [showToast],
+  );
 
   const removeItem = useCallback((key: string) => {
     commit(getSnapshot().filter((line) => line.key !== key));
@@ -170,8 +281,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<CartContextValue>(
-    () => ({ items, count, subtotal, addItem, removeItem, clear }),
-    [items, count, subtotal, addItem, removeItem, clear],
+    () => ({
+      items,
+      count,
+      subtotal,
+      isOpen,
+      openCart,
+      closeCart,
+      toggleCart,
+      addItem,
+      updateQuantity,
+      removeItem,
+      clear,
+    }),
+    [
+      items,
+      count,
+      subtotal,
+      isOpen,
+      openCart,
+      closeCart,
+      toggleCart,
+      addItem,
+      updateQuantity,
+      removeItem,
+      clear,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

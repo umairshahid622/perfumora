@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ToastProvider } from "../../_lib/toast-context";
 import { CartProvider } from "../../_lib/cart-context";
 import { ScentProvider } from "../../_lib/scent-context";
 import { SoundProvider } from "../../_lib/sound-context";
@@ -28,14 +29,16 @@ export function AppProviders({
   children: ReactNode;
 }) {
   return (
-    <SoundProvider>
-      <CartProvider>
-        <ScentProvider variants={variants}>
-          <RouteTransitionProvider>
-            <SmoothScrollProvider>{children}</SmoothScrollProvider>
-          </RouteTransitionProvider>
-        </ScentProvider>
-      </CartProvider>
-    </SoundProvider>
+    <ToastProvider>
+      <SoundProvider>
+        <CartProvider>
+          <ScentProvider variants={variants}>
+            <RouteTransitionProvider>
+              <SmoothScrollProvider>{children}</SmoothScrollProvider>
+            </RouteTransitionProvider>
+          </ScentProvider>
+        </CartProvider>
+      </SoundProvider>
+    </ToastProvider>
   );
 }

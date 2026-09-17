@@ -111,6 +111,13 @@ export function quotedSize(
   return { size: chosen, ...sizes[chosen]! };
 }
 
+/**
+ * Total available stock for a fragrance across all its offered sizes.
+ */
+export function totalStock(sizes: SizeMap): number {
+  return Object.values(sizes).reduce((sum, s) => sum + (s?.stock ?? 0), 0);
+}
+
 /** WCAG relative luminance of an sRGB hex, 0 (black) … 1 (white). */
 function relativeLuminance(hex: string): number {
   const n = hex.replace("#", "");

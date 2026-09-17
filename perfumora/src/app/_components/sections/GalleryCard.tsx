@@ -64,6 +64,7 @@ export function GalleryCard({
       hex: variant.hex,
       size,
       price,
+      maxStock: stock,
     });
   };
 
@@ -131,8 +132,7 @@ export function GalleryCard({
 
           {/* Content */}
           <div className="px-6 pb-6">
-            {/* Price tag — pulled up to straddle the seam, filled in the card's
-                own accent so it reads as emerging from the panel above it. */}
+            {/* Price tag */}
             <div className="mt-3 mb-4 flex">
               <span className="bg-accent text-accent-contrast inline-flex items-center rounded-full px-4 py-1.5 text-[0.95rem] font-semibold tracking-tight tabular-nums shadow-[0_10px_22px_-10px_rgba(11,11,12,0.6)]">
                 {formatPrice(price)}
