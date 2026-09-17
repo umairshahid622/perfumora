@@ -48,8 +48,16 @@ type PlaceOrderResult =
 /** Ceilings, not preferences: the text columns are unbounded, so without these a
  *  forged body could write a megabyte of "city" into the admin panel. The billing
  *  fields reuse `address`, `city` and `postal` — the same kind of text, so the same
- *  ceilings apply to it. */
-const LIMITS = { name: 120, phone: 40, address: 400, city: 80, postal: 20, notes: 500 };
+ *  ceilings apply to it. `email` is the RFC 5321 maximum for an address. */
+const LIMITS = {
+  name: 120,
+  email: 254,
+  phone: 40,
+  address: 400,
+  city: 80,
+  postal: 20,
+  notes: 500,
+};
 const MAX_LINES = 24;
 const MAX_QTY = 20;
 
@@ -97,6 +105,7 @@ export async function placeOrder(
 ): Promise<PlaceOrderResult> {
   const customer = {
     name: clean(details?.name, LIMITS.name),
+    email: clean(details?.email, LIMITS.email),
     phone: clean(details?.phone, LIMITS.phone),
     address: clean(details?.address, LIMITS.address),
     city: clean(details?.city, LIMITS.city),
@@ -104,10 +113,20 @@ export async function placeOrder(
     notes: clean(details?.notes, LIMITS.notes),
   };
 
-  if (!customer.name || !customer.phone || !customer.address || !customer.city) {
+  // Presence and length only — the same treatment every other field here gets. The
+  // *shape* of the address is the browser's `type="email"` to enforce, and a regex
+  // here would only turn a valid-but-unusual address into a refused sale. A wrong
+  // one costs nothing the phone number doesn't already cover.
+  if (
+    !customer.name ||
+    !customer.email ||
+    !customer.phone ||
+    !customer.address ||
+    !customer.city
+  ) {
     return {
       ok: false,
-      message: "Please fill in your name, phone, address and city.",
+      message: "Please fill in your name, email, phone, address and city.",
     };
   }
 
@@ -191,6 +210,14 @@ export async function placeOrder(
     const { data, error } = await supabaseAdmin().rpc("place_order", {
       p_id: reference,
       p_name: customer.name,
+      // Requires the `p_email` parameter on the deployed `place_order`, which is in
+      // perfumora-admin/supabase/schema.sql. **Apply that schema before this file
+      // ships.** By the PostgREST rule noted below, a key the function does not
+      // declare is a 404 (PGRST202), so a storefront carrying `p_email` against an
+      // un-migrated function fails every order, not just the ones with an address.
+      // The parameter is defaulted there, so migrating first is safe in either
+      // direction — an old storefront simply keeps writing blank rows.
+      p_email: customer.email,
       p_phone: customer.phone,
       p_address: customer.address,
       p_city: customer.city,

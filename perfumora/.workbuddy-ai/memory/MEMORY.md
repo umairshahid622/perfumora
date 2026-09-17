@@ -22,6 +22,14 @@ PATH** — use `/opt/homebrew/bin/pnpm`.
 - Orders go through the `placeOrder` Server Action (`_lib/orders.ts`) → one `place_order` RPC.
   **Guest checkout is supported end to end** (`orders.user_id` is nullable, `p_user_id` defaults
   to null); the database prices every order itself, never the client.
+- **The storefront and the DB schema live in different repos** (`perfumora` and
+  `perfumora-admin/supabase/schema.sql`) and must deploy in step. PostgREST resolves an RPC by
+  argument *name*, and a key the function does not declare is a 404 (`PGRST202`) rather than a
+  harmless extra — so a new `p_*` key in `orders.ts` fails **every** order until the schema is
+  applied. Always add the parameter `default`-ed so the schema can go first. Adding a parameter
+  also means: drop the old arity explicitly (`create or replace` cannot change an argument
+  list), and extend the `revoke`/`grant` type lists. Postgres also requires every parameter
+  after the first defaulted one to carry a default.
 
 ## Conventions worth keeping
 

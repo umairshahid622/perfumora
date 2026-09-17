@@ -220,10 +220,11 @@ export function Checkout() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [details, setDetails] = useState<CustomerDetails>(EMPTY_DETAILS);
-  /** The signed-in customer's name, or `""` for a guest. Held separately from
-   *  `details` so that "start a new order" can seed the form again without asking
-   *  the server a second time. */
+  /** The signed-in customer's name and email, or `""` for a guest. Held separately
+   *  from `details` so that "start a new order" can seed the form again without
+   *  asking the server a second time. */
   const [accountName, setAccountName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
   const [order, setOrder] = useState<Order | null>(null);
   /** The server's refusal, shown on the review step. Cleared on every attempt so
    *  a stale "sold out" can't outlive the line that caused it. */
@@ -275,11 +276,11 @@ export function Checkout() {
     { dependencies: [step], revertOnUpdate: false },
   );
 
-  // The one delivery field the account already knows, filled in so a signed-in
-  // customer doesn't retype what they gave us at sign-up. Asked for here rather
-  // than handed down: <Navigation> holds the same answer, but it is a sibling of
-  // this island rather than an ancestor, and a context carrying one string would
-  // be more plumbing than the string is worth.
+  // The two delivery fields the account already knows — the name and the email —
+  // filled in so a signed-in customer doesn't retype what they gave us at sign-up.
+  // Asked for here rather than handed down: <Navigation> holds the same answer, but
+  // it is a sibling of this island rather than an ancestor, and a context carrying
+  // two strings would be more plumbing than the strings are worth.
   //
   // `.then` rather than `await` in the effect body, matching <Navigation>: a
   // synchronous setState inside an effect is the cascading render that
@@ -290,12 +291,16 @@ export function Checkout() {
     currentCustomer().then((customer) => {
       if (!live || !customer) return;
       setAccountName(customer.name);
-      // Never over something already typed. A signed-in shopper may well be
-      // sending a bottle to someone else, and the name they entered has to
-      // survive both this answer arriving late and every later re-render.
-      setDetails((current) =>
-        current.name ? current : { ...current, name: customer.name },
-      );
+      setAccountEmail(customer.email);
+      // Never over something already typed, and per field rather than as a pair. A
+      // signed-in shopper may well be sending a bottle to someone else, so whatever
+      // they have entered has to survive both this answer arriving late and every
+      // later re-render — while a field they have not reached yet still gets seeded.
+      setDetails((current) => ({
+        ...current,
+        name: current.name || customer.name,
+        email: current.email || customer.email,
+      }));
     });
     return () => {
       live = false;
@@ -386,9 +391,10 @@ export function Checkout() {
   };
 
   const restart = () => {
-    // Back to blank except for the name, which the account still knows — the same
-    // state a signed-in customer's first visit to the details step starts from.
-    setDetails({ ...EMPTY_DETAILS, name: accountName });
+    // Back to blank except for the name and email, which the account still knows —
+    // the same state a signed-in customer's first visit to the details step starts
+    // from.
+    setDetails({ ...EMPTY_DETAILS, name: accountName, email: accountEmail });
     setOrder(null);
     setFailure(null);
     go(0, -1);
@@ -500,6 +506,22 @@ export function Checkout() {
                   placeholder="3xx xxx xxxx"
                 />
               </div>
+              {/* Full width rather than a third cell in the grid above: the pair
+                  there is name-beside-phone, and an odd third item would sit alone in
+                  the left column of a new row with a hole beside it. Required, like
+                  the two it sits under — it is the order's written channel, and the
+                  postal code below is the one field this form deliberately leaves
+                  optional. The format is left to `type="email"`; `placeOrder` checks
+                  presence and length only. */}
+              <AppInput
+                label="Email"
+                variant="email"
+                required
+                autoComplete="email"
+                value={details.email}
+                onChange={setField("email")}
+                placeholder="you@example.com"
+              />
               {/* Two rows, not three: "house, street, area" wraps onto a second line
                   and stops, so the third was empty box paid for out of the one screen
                   this step has. It still scrolls inside itself for a longer address. */}
@@ -611,6 +633,9 @@ export function Checkout() {
                 <div className="text-body mt-2 flex flex-col">
                   <span>{details.name}</span>
                   <span>{details.phone}</span>
+                  {/* Below the phone, mirroring the order the details step asks for
+                      them in — name and phone paired, the email under both. */}
+                  <span>{details.email}</span>
                   <span className="text-muted-on-light">
                     {details.address}
                   </span>

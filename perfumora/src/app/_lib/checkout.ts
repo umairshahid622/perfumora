@@ -13,10 +13,11 @@ import type { SizeMl, VariantId } from "./variants";
 
 /**
  * What a COD delivery needs from the customer, plus what a card payment will.
- * Phone rather than email: the courier calls, and nothing here can send mail.
+ * Phone first because the courier calls — but an email is collected beside it, so
+ * an order has a written channel as well as a spoken one.
  *
- * Four fields are required — name, phone, address, city. The postal code is not:
- * Pakistan's five-digit codes are widely unknown by the people who live at the
+ * Five fields are required — name, email, phone, address, city. The postal code is
+ * not: Pakistan's five-digit codes are widely unknown by the people who live at the
  * address, and a courier routes on the city and the landmark regardless, so making
  * it mandatory would only buy an abandoned bag. The billing address is optional in
  * the practical sense — it sits behind a "same as shipping" checkbox that ships
@@ -28,6 +29,10 @@ import type { SizeMl, VariantId } from "./variants";
  */
 export interface CustomerDetails {
   name: string;
+  /** Reaches the order row's `customer_email`, which the admin panel reads. Not
+   *  used to send anything yet — the storefront still has no mailer wired to an
+   *  order (§1) — so it is contact information the atelier can write to by hand. */
+  email: string;
   phone: string;
   address: string;
   city: string;
@@ -47,6 +52,7 @@ export interface CustomerDetails {
 
 export const EMPTY_DETAILS: CustomerDetails = {
   name: "",
+  email: "",
   phone: "",
   address: "",
   city: "",
@@ -136,6 +142,7 @@ export function buildOrder(
     currency: "PKR",
     customer: {
       name: details.name.trim(),
+      email: details.email.trim(),
       phone: details.phone.trim(),
       address: details.address.trim(),
       city: details.city.trim(),

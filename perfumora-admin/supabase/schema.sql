@@ -347,6 +347,12 @@ create policy "admin delete fragrance images" on storage.objects
 -- no owner and no billing address, and an ambiguity for PostgREST to resolve.
 drop function if exists place_order(text,text,text,text,text,text,jsonb);
 drop function if exists place_order(text,text,text,text,text,text,jsonb,uuid);
+-- The 13-argument form this file shipped before `p_email` existed. Adding a
+-- parameter is a new overload rather than a replacement, so the old one has to be
+-- dropped by name or it stays callable — writing orders with a blank
+-- `customer_email` — and leaves PostgREST an ambiguity to resolve.
+drop function if exists place_order(text,text,text,text,text,text,jsonb,uuid,
+  text,boolean,text,text,text);
 
 create or replace function place_order(
   p_id text, p_name text, p_phone text, p_address text,
@@ -364,7 +370,17 @@ create or replace function place_order(
   p_billing_same boolean default true,
   p_billing_address text default '',
   p_billing_city text default '',
-  p_billing_postal_code text default ''
+  p_billing_postal_code text default '',
+  -- The customer's email, collected at checkout beneath the name and phone.
+  -- Defaulted for the same deploy-order reason as everything above it:
+  -- `customer_email` is `not null default ''`, so a schema applied ahead of the
+  -- storefront keeps writing blank rows rather than failing every order.
+  --
+  -- Declared last rather than beside `p_name`/`p_phone` because Postgres requires
+  -- every parameter after the first defaulted one to carry a default too, and
+  -- `p_address` onward do not. Position is irrelevant to PostgREST, which resolves
+  -- this function by argument *name*.
+  p_email text default ''
 ) returns integer
 language plpgsql
 -- Pinned, so an unqualified name below can't be resolved through a caller's
@@ -381,11 +397,12 @@ begin
 
   -- Inserted at 0 and corrected at the end: the total is the sum of the prices
   -- read below, and there is nothing to sum until the loop has run.
-  insert into orders (id, customer_name, customer_phone,
+  insert into orders (id, customer_name, customer_email, customer_phone,
                       shipping_address, city, postal_code, notes, total, user_id,
                       billing_same, billing_address, billing_city,
                       billing_postal_code)
-  values (p_id, p_name, p_phone, p_address, p_city, p_postal_code, p_notes, 0,
+  values (p_id, p_name, p_email, p_phone, p_address, p_city, p_postal_code,
+          p_notes, 0,
           p_user_id, p_billing_same, p_billing_address, p_billing_city,
           p_billing_postal_code);
 
@@ -434,11 +451,11 @@ end $$;
 -- them and the first insert aborts the transaction), but failing closed is not the
 -- same as being unreachable, and this is a public POST endpoint.
 revoke all on function place_order(text,text,text,text,text,text,jsonb,uuid,
-  text,boolean,text,text,text) from public;
+  text,boolean,text,text,text,text) from public;
 revoke execute on function place_order(text,text,text,text,text,text,jsonb,uuid,
-  text,boolean,text,text,text) from anon, authenticated;
+  text,boolean,text,text,text,text) from anon, authenticated;
 grant execute on function place_order(text,text,text,text,text,text,jsonb,uuid,
-  text,boolean,text,text,text) to service_role;
+  text,boolean,text,text,text,text) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Audit — the one invariant the database can't enforce itself.
