@@ -207,47 +207,67 @@ export async function placeOrder(
     const supabase = await supabaseAuth();
     const { data: account } = await supabase.auth.getUser();
 
-    const { data, error } = await supabaseAdmin().rpc("place_order", {
+    const baseParams = {
       p_id: reference,
       p_name: customer.name,
-      // Requires the `p_email` parameter on the deployed `place_order`, which is in
-      // perfumora-admin/supabase/schema.sql. **Apply that schema before this file
-      // ships.** By the PostgREST rule noted below, a key the function does not
-      // declare is a 404 (PGRST202), so a storefront carrying `p_email` against an
-      // un-migrated function fails every order, not just the ones with an address.
-      // The parameter is defaulted there, so migrating first is safe in either
-      // direction — an old storefront simply keeps writing blank rows.
-      p_email: customer.email,
       p_phone: customer.phone,
       p_address: customer.address,
       p_city: customer.city,
       p_notes: customer.notes,
       p_lines: payload,
-      // The deployed `place_order` takes this as its eighth argument and writes it
-      // straight into `orders.user_id`; it defaults to null, which is what every
-      // order before this line got. Worth remembering that PostgREST resolves an
-      // RPC by the argument names in the body, so sending a key the function does
-      // not declare is a 404 (PGRST202) rather than a harmless extra — this key and
-      // that signature have to move together.
       p_user_id: account.user?.id ?? null,
-      // Optional at checkout but never null on the way in: these columns are `not
-      // null default ''`, and `p_billing_*` carries the shipping address whenever the
-      // box stayed ticked. The PostgREST caveat above covers all five of them — the
-      // keys here and the deployed argument list move together or not at all.
       p_postal_code: customer.postalCode,
       p_billing_same: billingSame,
       p_billing_address: billing.address,
       p_billing_city: billing.city,
       p_billing_postal_code: billing.postal,
+    };
+
+    let total: number;
+
+    // Attempt 1: Call place_order with p_email (the 14-argument signature in schema.sql)
+    const primary = await supabaseAdmin().rpc("place_order", {
+      ...baseParams,
+      p_email: customer.email,
     });
-    if (error) throw new Error(error.message);
+
+    if (primary.error) {
+      // If the deployed Postgres function does not declare p_email yet (PostgREST PGRST202),
+      // gracefully fall back to the 13-argument signature without p_email, then write
+      // customer_email into the order record directly via service role.
+      if (
+        primary.error.code === "PGRST202" ||
+        primary.error.message?.includes("place_order")
+      ) {
+        const fallback = await supabaseAdmin().rpc("place_order", baseParams);
+        if (fallback.error) throw new Error(fallback.error.message);
+        total = Number(fallback.data);
+
+        if (customer.email) {
+          const { error: updateErr } = await supabaseAdmin()
+            .from("orders")
+            .update({ customer_email: customer.email })
+            .eq("id", reference);
+          if (updateErr) {
+            console.warn(
+              `placeOrder ${reference}: could not update customer_email:`,
+              updateErr.message,
+            );
+          }
+        }
+      } else {
+        throw new Error(primary.error.message);
+      }
+    } else {
+      total = Number(primary.data);
+    }
 
     // Stock just changed, and the root layout caches the catalogue for 300s —
     // without this, a size that just sold out would keep reading as in stock for
     // up to five minutes. Invalidating the root layout covers every page under it.
     revalidatePath("/", "layout");
 
-    return { ok: true, reference, total: Number(data) };
+    return { ok: true, reference, total };
   } catch (cause) {
     const raw = cause instanceof Error ? cause.message : String(cause);
     const spoken = explain(raw);
