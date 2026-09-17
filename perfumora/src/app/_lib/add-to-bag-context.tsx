@@ -31,7 +31,7 @@ interface AddToBagContextValue {
 const AddToBagContext = createContext<AddToBagContextValue | null>(null);
 
 export function AddToBagProvider({ children }: { children: ReactNode }) {
-  const { addItem } = useCart();
+  const { addItem, canAddItem } = useCart();
   const [isAddingToBag, setIsAddingToBag] = useState(false);
   const bottleBridgeRef = useRef<BottleBridgeRegistration | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -46,6 +46,12 @@ export function AddToBagProvider({ children }: { children: ReactNode }) {
   const triggerAddToBag = useCallback(
     (input: AddToCartInput) => {
       if (isAddingToBag) return;
+
+      // When the max stock error comes the add to cart animation should not work
+      if (!canAddItem(input, true)) {
+        return;
+      }
+
       setIsAddingToBag(true);
 
       const reducedMotion = prefersReducedMotion();
@@ -335,7 +341,7 @@ export function AddToBagProvider({ children }: { children: ReactNode }) {
         0.58,
       );
     },
-    [addItem, isAddingToBag],
+    [addItem, canAddItem, isAddingToBag],
   );
 
   return (

@@ -70,7 +70,8 @@ interface CartContextValue {
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
-  addItem: (input: AddToCartInput, openDrawer?: boolean) => void;
+  canAddItem: (input: AddToCartInput, notify?: boolean) => boolean;
+  addItem: (input: AddToCartInput, openDrawer?: boolean) => boolean;
   updateQuantity: (key: string, delta: number) => void;
   removeItem: (key: string) => void;
   clear: () => void;
@@ -185,8 +186,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const canAddItem = useCallback(
+    (input: AddToCartInput, notify = true): boolean => {
+      const key = `${input.variantId}-${input.size}`;
+      const current = getSnapshot();
+      const existing = current.find((line) => line.key === key);
+      const max = input.maxStock ?? existing?.maxStock;
+
+      if (existing) {
+        if (max !== undefined && existing.quantity >= max) {
+          if (notify) {
+            showToast(
+              `Only ${max} bottle${max === 1 ? "" : "s"} of ${input.name} (${input.size}ml) available in stock.`,
+            );
+          }
+          return false;
+        }
+      } else {
+        if (max !== undefined && max <= 0) {
+          if (notify) {
+            showToast(`${input.name} (${input.size}ml) is currently sold out.`);
+          }
+          return false;
+        }
+      }
+      return true;
+    },
+    [showToast],
+  );
+
   const addItem = useCallback(
-    (input: AddToCartInput, openDrawer = false) => {
+    (input: AddToCartInput, openDrawer = false): boolean => {
       const key = `${input.variantId}-${input.size}`;
       // Read through `getSnapshot()`, not the `items` above: these handlers are memoised
       // with no dependencies, so a closed-over array would be whatever the bag held when
@@ -200,7 +230,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           showToast(
             `Only ${max} bottle${max === 1 ? "" : "s"} of ${input.name} (${input.size}ml) available in stock.`,
           );
-          return;
+          return false;
         }
         const nextQuantity = existing.quantity + 1;
         commit(
@@ -213,7 +243,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       } else {
         if (max !== undefined && max <= 0) {
           showToast(`${input.name} (${input.size}ml) is currently sold out.`);
-          return;
+          return false;
         }
         commit([
           ...current,
@@ -229,6 +259,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsOpen(true);
         requestCartOpen();
       }
+      return true;
     },
     [showToast],
   );
@@ -289,6 +320,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       openCart,
       closeCart,
       toggleCart,
+      canAddItem,
       addItem,
       updateQuantity,
       removeItem,
@@ -302,6 +334,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       openCart,
       closeCart,
       toggleCart,
+      canAddItem,
       addItem,
       updateQuantity,
       removeItem,
