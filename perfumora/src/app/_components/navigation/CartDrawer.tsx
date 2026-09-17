@@ -8,6 +8,7 @@ import { prefersReducedMotion } from "../../_lib/motion";
 import { useCart } from "../../_lib/cart-context";
 import { formatPrice } from "../../_lib/variants";
 import { RippleButton } from "../ui/RippleButton";
+import { RollingNumber } from "../ui/RollingNumber";
 import { CloseIcon } from "./icons";
 import { usePathname } from "next/navigation";
 
@@ -139,9 +140,11 @@ export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
                         >
                           −
                         </button>
-                        <span className="w-5 text-center text-xs font-medium">
-                          {line.quantity}
-                        </span>
+                        <RollingNumber
+                          value={line.quantity}
+                          className="text-xs font-medium text-ink"
+                          containerClassName="h-6 w-6"
+                        />
                         <button
                           type="button"
                           onClick={() => updateQuantity(line.key, 1)}
