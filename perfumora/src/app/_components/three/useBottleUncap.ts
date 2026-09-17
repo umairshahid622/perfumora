@@ -222,6 +222,22 @@ export function useBottleUncap(
        *  a fast pass that arrives there mid-spray still gets its close afterwards
        *  instead of losing it. */
       let closeRequested = false;
+      /**
+       * Whether the cap is off the bottle right now, and therefore owed a close.
+       *
+       * `applyClose` places the cap on an *absolute* curve — `1 - closeProgress`,
+       * which is fully open at `CLOSE_FROM` and shut at `CLOSE_TO`. So it can only
+       * be applied while the cap is genuinely open.
+       *
+       * `hasUncapped` cannot stand in for that. It stays true from the moment the
+       * Ritual fires until the journey drops back below 2.5, so a customer who
+       * scrolls up from the Gallery into the Ritual and then straight back down
+       * re-enters the close window with a *seated* cap while `hasUncapped` is still
+       * set. The close then snaps the cap open on its way to shutting it — a flap
+       * with no spray behind it, on a pass that never uncapped. That is the "cap
+       * opens and closes in a very short frame" report.
+       */
+      let capLifted = false;
       /** The last screen and direction the controller saw, so a callback that is
        *  not itself a scroll update — the spray finishing — can still place the
        *  cap correctly. */
@@ -289,6 +305,8 @@ export function useBottleUncap(
 
         if (closeProgress >= 1 && !hasAnnouncedClose) {
           hasAnnouncedClose = true;
+          // Fully shut again, so the next pass is free to lift it from scratch.
+          capLifted = false;
           if (activeSprayTl) activeSprayTl.kill();
           resetSprayState();
           window.dispatchEvent(new Event(SPRAY_COMPLETE_EVENT));
@@ -318,12 +336,17 @@ export function useBottleUncap(
        */
       const settleAfterSpray = () => {
         if (closeRequested) applyClose();
-        else if (lastDirection < 0) seatCap();
+        else if (lastDirection < 0) {
+          seatCap();
+          capLifted = false;
+        }
       };
 
       // Master Directional Ritual Controller:
       // - Downward entry (>= 3.0 screens): Cap smoothly un-caps, pump fires, mist sprays, sound plays, steps reveal.
-      // - Inside Ritual runway (3.9 -> 4.7 screens): Cap smoothly glides shut.
+      // - Inside Ritual runway (3.9 -> 4.7 screens): Cap smoothly glides shut — but only if this pass actually
+      //   uncapped it (`capLifted`). Re-entering the window from above with the cap already shut must do nothing,
+      //   or the close snaps the cap open on its way to closing it.
       // - Upward scrolling (from Craft/Showcase through Ritual back to Hero): CAP STAYS CLOSED — and
       //   is actively seated rather than left wherever a reversed close tween stranded it.
       // - Upward exit into Manifesto (< 2.5 screens): Resets trigger so future downward passes uncap fresh.
@@ -383,6 +406,7 @@ export function useBottleUncap(
             hasAnnouncedClose = false;
             sprayDone = false;
             closeRequested = false;
+            capLifted = false;
             if (activeSprayTl) activeSprayTl.kill();
             resetSprayState();
             gsap.to(cap.position, {
@@ -428,6 +452,9 @@ export function useBottleUncap(
             ease: "power2.out",
             overwrite: "auto",
           });
+          // The cap is now off, so a close is owed and may be applied. Set before
+          // the early return below, which also leaves the cap lifted.
+          capLifted = true;
 
           const liveButton = refs.pumpButton.current;
           const liveMist = refs.mist.current;
@@ -507,7 +534,7 @@ export function useBottleUncap(
 
         // Zone 3: Cap Closing inside Ritual (3.9 -> 4.7 screens)
         if (hasUncapped) {
-          if (screen >= CLOSE_FROM && isScrollingDown) {
+          if (screen >= CLOSE_FROM && isScrollingDown && capLifted) {
             // Requested, not performed. The journey says where it wants the cap;
             // `sprayDone` says whether it is allowed to go there yet.
             closeRequested = true;
@@ -524,7 +551,10 @@ export function useBottleUncap(
             // a spray that is still in the air is the same conflict seen backwards,
             // so this waits for the mist too.
             closeRequested = false;
-            if (sprayDone) seatCap();
+            if (sprayDone) {
+              seatCap();
+              capLifted = false;
+            }
           }
         }
       };

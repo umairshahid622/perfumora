@@ -13,6 +13,12 @@ PATH** — use `/opt/homebrew/bin/pnpm`.
   headless Chromium in this sandbox cannot hydrate the page at all.
 - `useBottleUncap` is the Ritual's theatre (cap lift → pump press → mist → `SPRAY_COMPLETE_EVENT`
   → steps reveal), now a single "master directional controller" keyed on stage progress.
+  **Its zones must gate on `capLifted`, not `hasUncapped`.** `hasUncapped` only clears below
+  2.5 screens, so it stays true while the customer is anywhere past the Ritual — and
+  `applyClose` places the cap on an *absolute* curve (`1 - closeProgress`, fully open at
+  `CLOSE_FROM`). Gating the close on `hasUncapped` therefore snapped a seated cap open on
+  any re-entry from below/above (Gallery → Ritual → Gallery). Any state that commands an
+  absolute transform must be gated on the object actually being in that state.
 - Orders go through the `placeOrder` Server Action (`_lib/orders.ts`) → one `place_order` RPC.
   **Guest checkout is supported end to end** (`orders.user_id` is nullable, `p_user_id` defaults
   to null); the database prices every order itself, never the client.
