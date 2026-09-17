@@ -20,8 +20,11 @@ import {
  */
 const DEFAULT_NOZZLE: [number, number, number] = [0, 1.0504, 0.174];
 
-/** Maximum opacity at peak atomization. */
-export const MIST_OPACITY = 0.88;
+/** Maximum opacity at peak atomization. Mirrors the physics profile so the GSAP
+ *  fade on the scroll-driven path and the autonomous fallback in
+ *  `useMistPhysics` can neither disagree with each other nor drift from the value
+ *  the tuning in `MIST_PHYSICS` settled on. */
+export const MIST_OPACITY = MIST_PHYSICS.peakOpacity;
 
 /** Retained for backwards compatibility. */
 export const MIST_COLLAPSED = 0.04;
@@ -76,23 +79,24 @@ const VERTEX_SHADER = /* glsl */ `
     pos.y += cos(tau * aTurbulence.x + aTurbulence.w) * (turbAmp * 0.5);
     pos.z += sin(tau * aTurbulence.x * 1.3 + aTurbulence.z + 1.57) * (turbAmp * 0.4);
 
-    // Ensure mist emerges strictly at nozzle level and curves downward under gravity
-    pos.y = min(0.0, pos.y);
-
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    // Point size attenuation with realistic aerosol cloud expansion
+    // Point size attenuation with aerosol cloud expansion. The expansion is small:
+    // a droplet that doubles in size as it ages is what makes a mist look like it is
+    // condensing into a solid mass, so it only widens by half before it evaporates.
     float ageRatio = tau / lifetime;
-    float expansion = 1.0 + 1.1 * smoothstep(0.0, 0.7, ageRatio);
+    float expansion = 1.0 + 0.55 * smoothstep(0.0, 0.7, ageRatio);
     float pSize = uBaseSize * sizeMultiplier * expansion * (300.0 / -mvPosition.z) * uPixelRatio;
-    gl_PointSize = clamp(pSize, 3.0, 16.0);
+    gl_PointSize = clamp(pSize, 1.5, 5.0);
 
     // Smooth natural alpha envelope:
     // Rapid birth fade-in as mist emerges from orifice
     float fadeIn = smoothstep(0.0, 0.05, ageRatio);
-    // Soft, velvety dissipation as droplets evaporate into ambient air
-    float fadeOut = 1.0 - smoothstep(0.35, 1.0, ageRatio);
+    // Soft, velvety dissipation. Kicks in earlier than the end of the lifetime, so
+    // droplets thin out while they still hang instead of holding full density right
+    // up to an abrupt disappearance — the accumulated cloud stays gossamer.
+    float fadeOut = 1.0 - smoothstep(0.16, 0.8, ageRatio);
     vAlpha = fadeIn * fadeOut * uGlobalOpacity;
   }
 `;
@@ -109,15 +113,20 @@ const FRAGMENT_SHADER = /* glsl */ `
     float dist = length(coord);
     if (dist > 0.5) discard;
 
-    // Smooth circular droplet with dense core and feathered rim
-    float core = smoothstep(0.5, 0.02, dist);
-    float halo = exp(-dist * 4.5);
-    float finalAlpha = mix(core, halo, 0.35) * vAlpha * 0.95;
+    // Soft circular droplet. The core is deliberately not allowed to reach full
+    // opacity and the halo carries most of the weight: a dense disc with a hard
+    // edge is what stacks up across a thousand neighbours into a solid blob,
+    // whereas a faint soft disc accumulates into a translucent haze.
+    float core = smoothstep(0.5, 0.14, dist) * 0.85;
+    float halo = exp(-dist * 6.5);
+    float finalAlpha = mix(core, halo, 0.55) * vAlpha * 0.42;
 
     if (finalAlpha <= 0.003) discard;
 
-    // Rich tint contrast so atomized mist is clearly discernible against light parchment
-    vec3 mistColor = mix(vec3(0.20, 0.17, 0.14), uColor, 0.50);
+    // Tint contrast so atomized mist is discernible against the light parchment
+    // ground the Ritual plays over. Alpha carries the delicacy, so the colour can
+    // stay deep enough to read without the cloud looking like a heavy solid.
+    vec3 mistColor = mix(vec3(0.24, 0.21, 0.18), uColor, 0.55);
     gl_FragColor = vec4(mistColor, finalAlpha);
   }
 `;
@@ -129,7 +138,29 @@ interface BottleMistProps {
 }
 
 export function BottleMist({ refs, color }: BottleMistProps) {
-  const uniforms = useMemo(() => createMistUniforms(color ?? "#322924"), [color]);
+  // Created once and kept for the component's whole life, on purpose.
+  //
+  // R3F does not hand a `ShaderMaterial` the `uniforms` object a prop carries.
+  // `applyProps` *merges* it into the one the material already holds, copying each
+  // fresh value into a stable target ("ShaderMaterial uniforms must keep a stable
+  // target reference"), and only the `onUpdate` shunt below re-points the material
+  // at the new object afterwards. The per-frame writer in `useMistPhysics` holds
+  // this same object, so the two are only ever agreed while there is exactly one.
+  //
+  // Recreating it on `color` broke that, and in the way that stays hidden. The
+  // merge copies the new object's defaults in — `uGlobalOpacity` and `uTime` both
+  // 0 — and the shunt is then the single thing keeping the writer and the renderer
+  // pointed at the same object. It is not guaranteed to run: `invalidateInstance`
+  // returns early while the instance has no parent. On the paths where it did not,
+  // the material kept rendering with the object the writer had stopped updating, so
+  // `uGlobalOpacity` stayed at 0 and every spray after that was invisible. That is
+  // the reported bug — the mist only ever showed from a fresh load, because only a
+  // variant change ever created a second uniforms object.
+  //
+  // The tint is applied by the effect below, so keeping this identity fixed costs
+  // nothing. If it ever depends on `color` again, the shunt becomes load-bearing
+  // rather than belt-and-braces — see the note on it.
+  const uniforms = useMemo(() => createMistUniforms("#322924"), []);
   const buffers = useMemo(() => generateMistBuffers(MIST_PHYSICS.count), []);
 
   // Construct Three.js BufferGeometry imperatively to guarantee attributes mapping
@@ -142,7 +173,9 @@ export function BottleMist({ refs, color }: BottleMistProps) {
     return geom;
   }, [buffers]);
 
-  // Update perfume tint color on variant transition
+  // The whole of the variant transition, as far as the mist is concerned: the
+  // uniforms object above is fixed for life, so the tint travels through this one
+  // `set` rather than through a new object.
   useEffect(() => {
     uniforms.uColor.value.set(color ?? "#322924");
   }, [color, uniforms]);
@@ -166,6 +199,12 @@ export function BottleMist({ refs, color }: BottleMistProps) {
           // eslint-disable-next-line react-hooks/immutability
           (refs.mistMaterial as { current: ShaderMaterial | null }).current = node;
         }}
+        // Needed at mount, not afterwards. R3F's first `applyProps` merges these
+        // uniforms into the material as *copies* (`{ ...uniform }` per entry), so
+        // without this the writer above would be updating objects the material
+        // never reads. Once the material holds the real object it keeps it: with a
+        // stable identity the props never diff as changed, so this stops firing and
+        // nothing down this path runs on a variant change.
         onUpdate={(mat) => {
           mat.uniforms = uniforms;
         }}

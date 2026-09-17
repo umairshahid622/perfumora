@@ -37,6 +37,20 @@ const COLOUR_DURATION = 0.4;
 const COLOUR_START = (SPIN_DURATION - COLOUR_DURATION) / 2;
 
 /**
+ * The yaw the bottle takes for the Ritual — a three-quarter turn toward the
+ * viewer's right, held from just before the pump fires until the showcase.
+ *
+ * The plume's axis is the nozzle's own +Z, and at a dead-front pose that points
+ * straight down the lens. Seen head-on, the cloud's whole forward travel
+ * foreshortens to nothing and only its narrow lateral spread is left to look at,
+ * which is why a correctly-tuned mist still read as a faint puff. Turning the
+ * bottle opens the trajectory: the reach, the droop under gravity and the spread
+ * of the cloud all become legible in profile instead of being compressed into a
+ * circle. `+y` carries the face toward the viewer's right.
+ */
+const RITUAL_YAW = 0.55;
+
+/**
  * Where the vessel rests — one pose, held for the whole page.
  *
  * Units are the canvas's own (camera z 7.2, 24° fov → ~3.06 world units of visible
@@ -232,11 +246,11 @@ export default function BottleScene({
   });
 
   // Master scrubbed tilt choreography across the opening stage:
-  // 0.0 -> 0.6 screens: Leans into Manifesto pose (y: -0.14, z: -0.16)
-  // 0.6 -> 1.4 screens: Holds lean while reading Manifesto
-  // 1.4 -> 2.0 screens: Returns upright (0, 0, 0) as Ritual enters
-  // 2.0 -> 3.0 screens: Remains upright while Ritual uncapping and spray mist happen
-  // 3.0 -> 3.8 screens: Tilts to the showcase angle (x: 0.1, y: 0.35, z: 0.28) as cap glides shut
+  // 0.0 -> 1.0 screens: Leans into Manifesto pose (y: -0.14, z: -0.16)
+  // 1.0 -> 2.0 screens: Holds lean while reading Manifesto
+  // 2.0 -> 2.9 screens: Settles into the Ritual's three-quarter pose (y: RITUAL_YAW) as it arrives
+  // 2.9 -> 4.5 screens: Holds that pose through the uncapping, the spray and the steps reveal
+  // 4.5 -> 5.0 screens: Eases into the showcase angle (x: 0.1, y: 0.35, z: 0.28) as the cap shuts
   useGSAP(
     () => {
       const tiltGroup = bottleRefs.tiltGroup.current;
@@ -262,11 +276,16 @@ export default function BottleScene({
         // 0.0 -> 1.0 screens: Tilt into Manifesto lean as bottle drifts right
         .to(tiltGroup.rotation, { y: -0.14, z: -0.16, duration: 1.0, ...beat }, 0)
         // 1.0 -> 2.0 screens: Held tilted during Manifesto reading
-        // 2.0 -> 3.0 screens: Return upright cleanly as Ritual arrives and bottle drifts back center
-        .to(tiltGroup.rotation, { x: 0, y: 0, z: 0, duration: 1.0, ...beat }, 2.0)
-        // 3.0 -> 4.5 screens: Held upright during Ritual uncapping, spray mist, and steps reveal
-        // 4.5 -> 5.0 screens: Smoothly transition to showcase pose as cap shuts when entering Craft
-        .to(tiltGroup.rotation, { x: 0.1, y: 0.35, z: 0.28, duration: 0.5, ...beat }, 4.5)
+        // 2.0 -> 2.9 screens: Turn to the three-quarter pose as the bottle drifts
+        //   back to centre and the Ritual arrives. The pump fires at 3.0, so the
+        //   yaw has to be settled before it does, and it eases in over 0.9s rather
+        //   than snapping on the frame the spray starts.
+        .to(tiltGroup.rotation, { x: 0, y: RITUAL_YAW, z: 0, duration: 0.9, ...beat }, 2.0)
+        // 2.9 -> 4.5 screens: Held in the three-quarter pose through the Ritual's
+        //   uncapping, spray and steps reveal — the plume reads in profile throughout.
+        // 4.5 -> 5.0 screens: Ease into the showcase pose as the cap shuts. Its yaw
+        //   is near RITUAL_YAW already, so this is mostly the x/z tilt.
+        .to(tiltGroup.rotation, { x: 0.1, y: 0.5, z: 0.28, duration: 0.5, ...beat }, 4.5)
         .set({}, {}, 5.0);
     },
     { dependencies: [ready], revertOnUpdate: true },

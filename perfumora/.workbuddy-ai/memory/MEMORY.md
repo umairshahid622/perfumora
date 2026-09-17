@@ -32,4 +32,15 @@ PATH** — use `/opt/homebrew/bin/pnpm`.
   `account`, `logout`, `mobileMenu`. **All dismissals must go through `close()`**, never a bare
   `setPanel(null)` — other logic hangs off it.
 - Motion is authored in GSAP, not CSS. 3D components expose refs and own no animation.
+- **A `ShaderMaterial`'s `uniforms` must be created once and never rebuilt.** R3F v9 does
+  not hand the material the object a `uniforms` prop carries — `applyProps` *merges* it
+  into a stable target and only the `onUpdate` shunt re-points the material afterwards,
+  which `invalidateInstance` can skip (early-returns while the instance has no parent).
+  A `useMemo(..., [color])` that rebuilds it per variant leaves the per-frame writer and
+  the renderer holding different objects; `uGlobalOpacity` sticks at 0 and the object goes
+  invisible with no error. Apply changing values through an effect instead
+  (`uniforms.uColor.value.set(color)`).
+- Tune a particle cloud by **percentiles across the whole cloud**, never the nominal
+  particle — a cone's upper edge launches at `elevation + coneAngle`, so the on-axis
+  number can look flat while the cloud climbs.
 - Comments in this codebase are long-form and explain *why*. Match that when editing.

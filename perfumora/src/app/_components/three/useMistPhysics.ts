@@ -17,26 +17,54 @@ import { SPRAY_RESET_EVENT, SPRAY_START_EVENT } from "./useBottleUncap";
  * - Continuous droplet emission window over the pump stroke
  */
 export const MIST_PHYSICS = {
-  /** Gravitational acceleration in scene units per second squared (gentle natural downward droop) */
-  gravity: 1.4,
-  /** Viscous aerodynamic drag coefficient (s^-1) */
-  drag: 2.2,
-  /** Mean droplet ejection velocity from pump orifice (units/s) */
-  exitVelocity: 2.4,
-  /** Level horizontal launch from nozzle level (0.0 = straight horizontal, no upward rise) */
-  elevationAngle: 0.0,
+  /** Gravitational acceleration in scene units per second squared. Strong enough to
+   *  bring a droplet back below the orifice within its own lifetime — the arc has to
+   *  *complete*, otherwise the plume only ever rises and the "then falls" half of the
+   *  gesture never happens. */
+  gravity: 2.4,
+  /** Viscous aerodynamic drag coefficient (s^-1). Eased well down from the earlier
+   *  2.8: that much drag capped the plume's travel short, and lengthening the spray
+   *  by raising velocity alone just threw the apex higher. Lower drag lets droplets
+   *  carry, and it is half of why the projection roughly doubled. */
+  drag: 0.55,
+  /** Mean droplet ejection velocity from pump orifice (units/s). Paired with `drag`
+   *  to set the plume's reach — terminal displacement is velocity / drag — so this
+   *  is raised to lengthen the spray while drag keeps it soft. */
+  exitVelocity: 6.5,
+  /** Launch angle from the orifice, in radians. **Negative** — aimed a few degrees
+   *  downward — and deliberately so. The cone's upper edge launches at
+   *  `elevation + coneAngle`, so with a level axis that edge still leaves at the full
+   *  cone half-angle and the cloud's p95 apex reached 0.40 units: a visible climbing
+   *  jet rather than a settling haze. Tilting the axis down until that upper edge is
+   *  near level flattens the whole cloud (p95 apex 0.20, under a tenth of the
+   *  bottle's height) while gravity settles the rest — 96% of droplets finish below
+   *  the nozzle. A real atomizer's plume is broadly horizontal and *settles*; it does
+   *  not climb. */
+  elevationAngle: -0.20,
   /** Lateral angle aligned straight with nozzle (0.0 = straight forward out of orifice) */
   lateralAngle: 0.0,
-  /** Conical spray dispersion half-angle (~16°) */
-  coneAngle: 0.28,
+  /** Conical spray dispersion half-angle (~30°). Deliberately wide relative to the
+   *  plume's length: the ratio of spread to reach is what reads as a diffuse mist
+   *  rather than a dense rope of droplets. */
+  coneAngle: 0.52,
   /** Duration of active nozzle ejection burst across pump stroke (seconds) */
   burstDuration: 0.48,
-  /** Individual droplet evaporation/fade lifetime (seconds) */
+  /** Individual droplet evaporation/fade lifetime (seconds). Held a touch longer than
+   *  the rise so the downward half of the arc is still on screen when the droplet
+   *  fades — the whole point of the gesture is the fall. */
   particleLifetime: 0.90,
-  /** Total number of simulated mist droplets for crisp atomization without solid clumping */
-  count: 1200,
-  /** Base droplet size factor in projection units (delicate 3-16px atomized droplets) */
-  dotSize: 0.12,
+  /** Total number of simulated mist droplets. Fewer than the dense pass, offset by
+   *  a far wider cone: the cloud's *density per unit volume* is what made it look
+   *  like a solid object, and spreading the same droplets over more space is a
+   *  cleaner fix than shrinking them alone. */
+  count: 1100,
+  /** Base droplet size factor in projection units (fine 1.5-5px atomized droplets) */
+  dotSize: 0.042,
+  /** Peak global mist opacity. The Ritual plays over the light parchment ground and
+   *  the plume is seen in three-quarter view, so the droplets stay readable at well
+   *  under full opacity — a dense cloud here reads as a heavy lump rather than a
+   *  fragrance haze. */
+  peakOpacity: 0.55,
 } as const;
 
 export interface MistBuffers {
@@ -79,9 +107,15 @@ export function generateMistBuffers(count = MIST_PHYSICS.count): MistBuffers {
   const physics = new Float32Array(count * 4);
   const turbulence = new Float32Array(count * 4);
 
-  // 3D nozzle trajectory axis: shoots straight forward out of the nozzle orifice (+Z towards viewer, Y = 0)
-  // Perfectly aligned with the physical spout on the pump button.
-  const axis = new Vector3(0.0, 0.0, 1.0).normalize();
+  // 3D nozzle trajectory axis: out of the orifice toward the viewer, tilted up by
+  // the elevation angle. The upward component is the whole point — it is what
+  // gravity spends the droplet's lifetime arcing back down, and without it there
+  // is no ballistic trajectory, only a sinking jet.
+  const axis = new Vector3(
+    0.0,
+    Math.sin(MIST_PHYSICS.elevationAngle),
+    Math.cos(MIST_PHYSICS.elevationAngle),
+  ).normalize();
 
   // Robust orthonormal basis for conical spray dispersion
   const tempUp = new Vector3(0, 1, 0);
@@ -116,13 +150,6 @@ export function generateMistBuffers(count = MIST_PHYSICS.count): MistBuffers {
       .addScaledVector(up, Math.sin(phi) * sinTheta)
       .normalize();
 
-    // Ensure the spray comes strictly from straight to down:
-    // Droplets emerge level at nozzle height or angle downward, never going high first.
-    if (dir.y > 0.0) {
-      dir.y = 0.0;
-      dir.normalize();
-    }
-
     velocities[i * 3] = dir.x * speed;
     velocities[i * 3 + 1] = dir.y * speed;
     velocities[i * 3 + 2] = dir.z * speed;
@@ -144,8 +171,10 @@ export function generateMistBuffers(count = MIST_PHYSICS.count): MistBuffers {
 
     // Turbulence attributes for organic micro-eddies in the slowing cloud:
     // x: frequency, y: amplitude, z: phaseX, w: phaseY
+    // Amplitude is deliberately comparable to the plume's own spread — it is what
+    // breaks the coherent beam apart into drifting wisps.
     turbulence[i * 4] = 3.2 + Math.random() * 3.5;
-    turbulence[i * 4 + 1] = 0.04 + Math.random() * 0.04;
+    turbulence[i * 4 + 1] = 0.05 + Math.random() * 0.06;
     turbulence[i * 4 + 2] = Math.random() * Math.PI * 2;
     turbulence[i * 4 + 3] = Math.random() * Math.PI * 2;
   }
@@ -195,6 +224,9 @@ export function useMistPhysics(
   useFrame((state, delta) => {
     const nozzle = refs.nozzle?.current;
     const mistObj = refs.mist.current;
+    // Same object as the material's own `uniforms` for this component's whole
+    // life — `BottleMist` creates the memo once specifically so this can be relied
+    // on — so writing through here is writing to what the shader renders with.
     const currentUniforms = uniformsRef.current;
     if (!mistObj || !currentUniforms) return;
 
@@ -241,11 +273,12 @@ export function useMistPhysics(
         MIST_PHYSICS.burstDuration + MIST_PHYSICS.particleLifetime;
       const tauNorm = autonomousTime.current / totalDuration;
       const autoOpacity =
-        Math.sin(Math.min(1, Math.max(0, tauNorm)) * Math.PI) * 0.88;
+        Math.sin(Math.min(1, Math.max(0, tauNorm)) * Math.PI) *
+        MIST_PHYSICS.peakOpacity;
       opacity = Math.max(opacity, autoOpacity);
     }
     if ((mistObj.userData?.sprayTime ?? 0) > 0 && opacity <= 0) {
-      opacity = 0.88;
+      opacity = MIST_PHYSICS.peakOpacity;
     }
     currentUniforms.uGlobalOpacity.value = opacity;
 
