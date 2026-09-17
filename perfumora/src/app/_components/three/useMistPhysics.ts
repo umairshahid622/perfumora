@@ -17,54 +17,70 @@ import { SPRAY_RESET_EVENT, SPRAY_START_EVENT } from "./useBottleUncap";
  * - Continuous droplet emission window over the pump stroke
  */
 export const MIST_PHYSICS = {
-  /** Gravitational acceleration in scene units per second squared. Strong enough to
-   *  bring a droplet back below the orifice within its own lifetime — the arc has to
-   *  *complete*, otherwise the plume only ever rises and the "then falls" half of the
-   *  gesture never happens. */
-  gravity: 2.4,
-  /** Viscous aerodynamic drag coefficient (s^-1). Eased well down from the earlier
-   *  2.8: that much drag capped the plume's travel short, and lengthening the spray
-   *  by raising velocity alone just threw the apex higher. Lower drag lets droplets
-   *  carry, and it is half of why the projection roughly doubled. */
-  drag: 0.55,
-  /** Mean droplet ejection velocity from pump orifice (units/s). Paired with `drag`
-   *  to set the plume's reach — terminal displacement is velocity / drag — so this
-   *  is raised to lengthen the spray while drag keeps it soft. */
-  exitVelocity: 6.5,
-  /** Launch angle from the orifice, in radians. **Negative** — aimed a few degrees
-   *  downward — and deliberately so. The cone's upper edge launches at
-   *  `elevation + coneAngle`, so with a level axis that edge still leaves at the full
-   *  cone half-angle and the cloud's p95 apex reached 0.40 units: a visible climbing
-   *  jet rather than a settling haze. Tilting the axis down until that upper edge is
-   *  near level flattens the whole cloud (p95 apex 0.20, under a tenth of the
-   *  bottle's height) while gravity settles the rest — 96% of droplets finish below
-   *  the nozzle. A real atomizer's plume is broadly horizontal and *settles*; it does
-   *  not climb. */
-  elevationAngle: -0.20,
+  /** Gravitational acceleration in scene units per second squared. Sized against the
+   *  (now much shallower) launch angle so the plume rises out of the orifice and
+   *  then *settles back to about the orifice* rather than carrying on up — the
+   *  cloud's centre lands near level with the nozzle, which is what the reference
+   *  does and what stops the whole gesture reading as a climbing jet. */
+  gravity: 1.4,
+  /** Viscous aerodynamic drag coefficient (s^-1). Raised from the 0.55 that gave
+   *  the old long plume: at that setting droplets barely decelerated, so the
+   *  spray stayed a thin rope to the very end. This much drag makes them slow and
+   *  bunch as they arrive, which is what piles the far end up into the soft cloud
+   *  the reference shows, and it caps the reach at `exitVelocity / drag`. */
+  drag: 1.1,
+  /** Mean droplet ejection velocity from pump orifice (units/s). Sized against
+   *  `drag` for the plume's reach, which has to land near 0.85 of the bottle's
+   *  height *on screen* — and because the Ritual yaw foreshortens the forward
+   *  travel to about half, that means a considerably longer path in local space
+   *  than the screen figure suggests. */
+  exitVelocity: 5.3,
+  /** Launch angle from the orifice, in radians. **Dead level** — the plume leaves
+   *  the nozzle flat and gravity does the rest, so the whole read is "out, then
+   *  gently down" with no climb at all.
+   *
+   *  Zero is worth stating explicitly here because this number is *not* what the
+   *  eye gets. The Ritual yaw compresses the plume's forward travel to `sin(0.55)`
+   *  of its length, so the angle on screen is
+   *  `atan(tan(elevation) / sin(RITUAL_YAW))` — very nearly *double*. It was 0.34
+   *  (19.5° local) and presented as 34°, which is the "going too much upwards"
+   *  report; 0.13 presented at ~14° and still read as a drift. Anything above
+   *  ~0.20 local starts to look like a jet. Level is the floor of that scale, and
+   *  the yaw multiplier is what to keep in mind if it ever moves back up.
+   *
+   *  Note the plume still settles: `gravity` takes the cloud below the orifice over
+   *  the flight, so this is level *leaving*, not level *arriving*. */
+  elevationAngle: 0.0,
   /** Lateral angle aligned straight with nozzle (0.0 = straight forward out of orifice) */
   lateralAngle: 0.0,
-  /** Conical spray dispersion half-angle (~30°). Deliberately wide relative to the
-   *  plume's length: the ratio of spread to reach is what reads as a diffuse mist
-   *  rather than a dense rope of droplets. */
-  coneAngle: 0.52,
+  /** Conical spray dispersion half-angle (~15°). Deliberately *tight*, and the
+   *  opposite of the earlier wide fan: the reference leaves the nozzle as a narrow
+   *  speckled cone and only balloons later. That ballooning is the turbulence
+   *  below plus the age-driven sprite growth, not the launch angle — a wide cone
+   *  here would make the nozzle end fat and the cloud no bigger. */
+  coneAngle: 0.31,
   /** Duration of active nozzle ejection burst across pump stroke (seconds) */
-  burstDuration: 0.48,
-  /** Individual droplet evaporation/fade lifetime (seconds). Held a touch longer than
-   *  the rise so the downward half of the arc is still on screen when the droplet
-   *  fades — the whole point of the gesture is the fall. */
-  particleLifetime: 0.90,
-  /** Total number of simulated mist droplets. Fewer than the dense pass, offset by
-   *  a far wider cone: the cloud's *density per unit volume* is what made it look
-   *  like a solid object, and spreading the same droplets over more space is a
-   *  cleaner fix than shrinking them alone. */
-  count: 1100,
-  /** Base droplet size factor in projection units (fine 1.5-5px atomized droplets) */
-  dotSize: 0.042,
-  /** Peak global mist opacity. The Ritual plays over the light parchment ground and
-   *  the plume is seen in three-quarter view, so the droplets stay readable at well
-   *  under full opacity — a dense cloud here reads as a heavy lump rather than a
-   *  fragrance haze. */
-  peakOpacity: 0.55,
+  burstDuration: 0.46,
+  /** Individual droplet evaporation/fade lifetime (seconds). Long enough that the
+   *  far cloud is still on screen while it is still growing into its final soft
+   *  mass, rather than dissolving the moment it arrives. */
+  particleLifetime: 0.92,
+  /** Total number of simulated mist droplets. Raised: the reference's far cloud is
+   *  a smooth wash, and smoothness there is particle count, not opacity — the same
+   *  droplets over a wider cloud is what keeps it a veil rather than a lump. */
+  count: 1500,
+  /** Base droplet size factor in projection units. Raised back up from 0.038: the
+   *  reference is fine atomization, but fine is only readable when there is
+   *  contrast to read it with, and this was shrunk in the same pass that paled the
+   *  colour — two reductions in visibility at once, which is what produced the
+   *  "barely visible" report. */
+  dotSize: 0.045,
+  /** Peak global mist opacity. Carries visibility now that the colour has been
+   *  taken back down to a mid warm grey: against the `--paper: #f3ece0` ground a
+   *  pale cloud cannot read by hue alone, so density has to do it. Lower this
+   *  first if the cloud ever looks heavy again — it is the softer of the two
+   *  visibility levers. */
+  peakOpacity: 0.58,
 } as const;
 
 export interface MistBuffers {
@@ -107,10 +123,15 @@ export function generateMistBuffers(count = MIST_PHYSICS.count): MistBuffers {
   const physics = new Float32Array(count * 4);
   const turbulence = new Float32Array(count * 4);
 
-  // 3D nozzle trajectory axis: out of the orifice toward the viewer, tilted up by
-  // the elevation angle. The upward component is the whole point — it is what
-  // gravity spends the droplet's lifetime arcing back down, and without it there
-  // is no ballistic trajectory, only a sinking jet.
+  // 3D nozzle trajectory axis: straight out of the orifice along the nozzle's own
+  // forward (+Z), level. The elevation term is kept rather than baked out so the
+  // launch angle stays a single knob — and at 0 it is well-behaved: the axis is
+  // (0, 0, 1), so `across` comes out pure X and `up` pure Y below, with no
+  // degenerate cross product.
+  //
+  // This is level *launch*, not a level plume. The cone's upper half still throws
+  // droplets above the axis and gravity brings the cloud back down over the flight,
+  // so the settle now comes entirely from those two instead of from a tilted axis.
   const axis = new Vector3(
     0.0,
     Math.sin(MIST_PHYSICS.elevationAngle),
@@ -171,10 +192,16 @@ export function generateMistBuffers(count = MIST_PHYSICS.count): MistBuffers {
 
     // Turbulence attributes for organic micro-eddies in the slowing cloud:
     // x: frequency, y: amplitude, z: phaseX, w: phaseY
-    // Amplitude is deliberately comparable to the plume's own spread — it is what
-    // breaks the coherent beam apart into drifting wisps.
+    //
+    // The amplitude is what *balloons* the plume. It is scaled by `oneMinusExp` in
+    // the shader, so a droplet scatters barely at all as it leaves the orifice and
+    // most as it arrives — which is exactly the reference's read: a tight speckled
+    // cone that opens out into a broad soft cloud only at the far end. Raising it
+    // is therefore how the cloud is grown, and it has to be done here rather than
+    // with `coneAngle`, which would fatten the nozzle end instead. Kept random per
+    // droplet so the cloud has no repeating structure.
     turbulence[i * 4] = 3.2 + Math.random() * 3.5;
-    turbulence[i * 4 + 1] = 0.05 + Math.random() * 0.06;
+    turbulence[i * 4 + 1] = 0.28 + Math.random() * 0.26;
     turbulence[i * 4 + 2] = Math.random() * Math.PI * 2;
     turbulence[i * 4 + 3] = Math.random() * Math.PI * 2;
   }

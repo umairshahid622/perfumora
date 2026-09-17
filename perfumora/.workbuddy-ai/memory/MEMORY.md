@@ -43,4 +43,17 @@ PATH** — use `/opt/homebrew/bin/pnpm`.
 - Tune a particle cloud by **percentiles across the whole cloud**, never the nominal
   particle — a cone's upper edge launches at `elevation + coneAngle`, so the on-axis
   number can look flat while the cloud climbs.
+- Tune the mist **in screen space, through `RITUAL_YAW`**, for both length and angle.
+  The yaw foreshortens the plume's forward travel to `sin(0.55) ≈ 0.52`, so a screen
+  length of 0.86 bottle needs roughly double that in local space, and the launch angle
+  the eye reads is `atan(tan(elevation) / sin(RITUAL_YAW))` — **very nearly double** the
+  local elevation. `elevationAngle: 0.34` read as 34° on screen, not 19.5°, which is why
+  "too much upwards" came back twice. **The user settled on `elevationAngle: 0.0`** — a
+  level launch — so anything above ~0.10 local is now a regression. Simulation scripts
+  live in `scripts/` (`mist-profile-sim.mjs`, `mist-uniforms-test.mjs`).
+- The mist is a **mid warm grey haze** (`mix(vec3(0.66,0.64,0.61), uColor, 0.26)`), not a
+  white one. The parchment is `--paper: #f3ece0`, already 0.95 in red, so a pale cloud has
+  nowhere to go — at 0.87 it sat ~8% below the page and was invisible ("barely visible").
+  Contrast has to win over hue fidelity here. Visibility levers, in order of softness:
+  `peakOpacity` (0.58), then the colour base, then `dotSize` (0.045).
 - Comments in this codebase are long-form and explain *why*. Match that when editing.
