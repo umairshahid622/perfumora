@@ -16,6 +16,7 @@ import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
 import { useBottleUncap } from "./useBottleUncap";
+import { AddToBagBottleBridge } from "./AddToBagBottleBridge";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -318,6 +319,7 @@ export default function BottleScene({
         }}
       >
         <StudioEnvironment intensity={0.65} />
+        <AddToBagBottleBridge refs={bottleRefs} />
 
         {/* Balanced studio ambient fill */}
         <ambientLight intensity={0.5} color="#ffffff" />

@@ -7,8 +7,8 @@ import { Eyebrow } from "../ui/Eyebrow";
 import { Price } from "./Price";
 import { SizeSelector } from "./SizeSelector";
 import { RippleButton } from "../ui/RippleButton";
-import { useCart } from "../../_lib/cart-context";
 import { useScent } from "../../_lib/scent-context";
+import { useAddToBagAnimation } from "../../_lib/add-to-bag-context";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { defaultSize, offeredSizes, quotedSize, type SizeMl } from "../../_lib/variants";
 
@@ -18,7 +18,7 @@ import { defaultSize, offeredSizes, quotedSize, type SizeMl } from "../../_lib/v
  */
 export function ProductBar() {
   const { variant, index } = useScent();
-  const { addItem } = useCart();
+  const { isAddingToBag, triggerAddToBag } = useAddToBagAnimation();
   const [picked, setPicked] = useState<SizeMl | null>(null);
   const eyebrowScopeRef = useRef<HTMLSpanElement>(null);
   const firstRun = useRef(true);
@@ -64,11 +64,9 @@ export function ProductBar() {
   );
 
   const addToCart = () => {
-    // Unreachable while the button is disabled — which is exactly when `size` is
-    // null — but the guard keeps the null out of the payload rather than
-    // asserting it away.
-    if (!size) return;
-    addItem({
+    // Unreachable while the button is disabled or already animating
+    if (!size || isAddingToBag) return;
+    triggerAddToBag({
       variantId: variant.id,
       name: variant.name,
       hex: variant.hex,
@@ -102,11 +100,12 @@ export function ProductBar() {
 
       <div className="order-3 flex justify-end md:order-3">
         <RippleButton
+          id="add-to-bag-button"
           onClick={addToCart}
-          disabled={soldOut}
+          disabled={soldOut || isAddingToBag}
           aria-label={addLabel}
         >
-          {soldOut ? "Sold Out" : "Add to Bag"}
+          {soldOut ? "Sold Out" : isAddingToBag ? "Adding..." : "Add to Bag"}
         </RippleButton>
       </div>
     </div>

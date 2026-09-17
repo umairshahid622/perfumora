@@ -571,6 +571,7 @@ export function Navigation() {
             </div>
 
             <button
+              id="header-bag-icon"
               type="button"
               onClick={() => toggle("cart")}
               aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}

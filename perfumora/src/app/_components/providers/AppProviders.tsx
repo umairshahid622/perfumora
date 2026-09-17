@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { ToastProvider } from "../../_lib/toast-context";
 import { CartProvider } from "../../_lib/cart-context";
+import { AddToBagProvider } from "../../_lib/add-to-bag-context";
 import { ScentProvider } from "../../_lib/scent-context";
 import { SoundProvider } from "../../_lib/sound-context";
 import type { Variant } from "../../_lib/variants";
@@ -32,11 +33,13 @@ export function AppProviders({
     <ToastProvider>
       <SoundProvider>
         <CartProvider>
-          <ScentProvider variants={variants}>
-            <RouteTransitionProvider>
-              <SmoothScrollProvider>{children}</SmoothScrollProvider>
-            </RouteTransitionProvider>
-          </ScentProvider>
+          <AddToBagProvider>
+            <ScentProvider variants={variants}>
+              <RouteTransitionProvider>
+                <SmoothScrollProvider>{children}</SmoothScrollProvider>
+              </RouteTransitionProvider>
+            </ScentProvider>
+          </AddToBagProvider>
         </CartProvider>
       </SoundProvider>
     </ToastProvider>

@@ -18,6 +18,7 @@ interface RippleButtonProps {
   silent?: boolean;
   /** Inert and visibly so — an out-of-stock Add to Bag. The hover ripple is
    *  skipped too: a fill that still animates reads as "try me". */
+  id?: string;
   disabled?: boolean;
   "aria-label"?: string;
 }
