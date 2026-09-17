@@ -23,3 +23,5 @@ import { useSoundContext } from "../_lib/sound-context";
 export function useSoundCue() {
   return useSoundContext();
 }
+
+export { triggerAtomizerSpray } from "../_lib/sound-context";
