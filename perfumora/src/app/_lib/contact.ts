@@ -68,9 +68,10 @@ export async function sendContactInquiry(
     const resend = new Resend(apiKey);
     const fromAddress =
       process.env.RESEND_FROM_EMAIL || "Usman Zeb <onboarding@resend.dev>";
-    const toAddress = process.env.CONTACT_TO_EMAIL || "delivered@resend.dev";
+    const toAddress =
+      process.env.CONTACT_TO_EMAIL || "shahidumair622@gmail.com";
 
-    const { data, error } = await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: fromAddress,
       to: toAddress,
       replyTo: email,
