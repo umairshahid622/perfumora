@@ -534,11 +534,18 @@ export function useBottleUncap(
 
         // Zone 3: Cap Closing inside Ritual (3.9 -> 4.7 screens)
         if (hasUncapped) {
-          if (screen >= CLOSE_FROM && isScrollingDown && capLifted) {
-            // Requested, not performed. The journey says where it wants the cap;
-            // `sprayDone` says whether it is allowed to go there yet.
+          if (screen >= CLOSE_FROM && isScrollingDown) {
             closeRequested = true;
-            if (sprayDone) applyClose();
+            // If user scrolled past the Ritual window before mist fired, cancel pending spray so it never triggers elsewhere
+            if (screen >= CLOSE_TO && !sprayDone) {
+              if (activeSprayTl) {
+                activeSprayTl.kill();
+                activeSprayTl = null;
+              }
+              resetSprayState();
+              sprayDone = true;
+            }
+            if (sprayDone && capLifted) applyClose();
           } else if (isScrollingUp) {
             // Reversing out of the showcase. The close is a *timed* tween chasing
             // the journey, so a reversal used to catch it mid-glide and merely
@@ -664,6 +671,10 @@ export function useBottleUncap(
 
       return () => {
         gsap.ticker.remove(tick);
+        if (activeSprayTl) {
+          activeSprayTl.kill();
+          activeSprayTl = null;
+        }
       };
     },
     { dependencies: [enabled, ready, trigger] },

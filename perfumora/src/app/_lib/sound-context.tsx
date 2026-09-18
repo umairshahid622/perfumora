@@ -29,7 +29,7 @@ let cachedMistSampleRate: number | null = null;
 
 export function getOrCreateAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
-  if (!sharedAudioCtx) {
+  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
     const AudioCtxClass =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -187,13 +187,14 @@ export function getOrCreateMistBuffer(ctx: AudioContext): AudioBuffer {
     right[idx] *= g;
   }
 
-  // Peak normalize to -1.5 dBFS
+  // Peak normalize to a delicate, soft luxury cosmetic level (0.30 peak, ~ -10.5 dBFS)
   let peak = 0;
   for (let i = 0; i < numSamples; i++) {
     if (Math.abs(left[i]) > peak) peak = Math.abs(left[i]);
     if (Math.abs(right[i]) > peak) peak = Math.abs(right[i]);
   }
-  const norm = peak > 0 ? 0.85 / peak : 1.0;
+  const targetPeak = 0.30;
+  const norm = peak > 0 ? targetPeak / peak : targetPeak;
   for (let i = 0; i < numSamples; i++) {
     left[i] *= norm;
     right[i] *= norm;
@@ -232,7 +233,10 @@ export async function triggerAtomizerSpray(
   customDestination?: AudioNode,
   customCtx?: AudioContext,
 ): Promise<AudioContext | null> {
-  const ctx = customCtx ?? getOrCreateAudioContext();
+  const ctx =
+    customCtx ??
+    (customDestination?.context as AudioContext | undefined) ??
+    getOrCreateAudioContext();
   if (!ctx) return null;
 
   if (ctx.state === "suspended") {
@@ -251,11 +255,19 @@ export async function triggerAtomizerSpray(
   const source = ctx.createBufferSource();
   source.buffer = buffer;
 
-  const destination = customDestination ?? ctx.destination;
-  source.connect(destination);
+  const destination =
+    customDestination && customDestination.context === ctx
+      ? customDestination
+      : ctx.destination;
 
-  const t0 = ctx.currentTime;
-  source.start(t0);
+  try {
+    source.connect(destination);
+    const t0 = ctx.currentTime;
+    source.start(t0);
+  } catch (err) {
+    console.warn("[SoundContext] triggerAtomizerSpray error:", err);
+    return null;
+  }
 
   source.onended = () => {
     try {
@@ -272,7 +284,10 @@ export function triggerTactileClick(
   customDestination?: AudioNode,
   customCtx?: AudioContext,
 ): void {
-  const ctx = customCtx ?? getOrCreateAudioContext();
+  const ctx =
+    customCtx ??
+    (customDestination?.context as AudioContext | undefined) ??
+    getOrCreateAudioContext();
   if (!ctx || ctx.state === "suspended") return;
 
   const t0 = ctx.currentTime;
@@ -287,12 +302,19 @@ export function triggerTactileClick(
   gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.02);
   gain.gain.linearRampToValueAtTime(0, t0 + 0.025);
 
-  const destination = customDestination ?? ctx.destination;
-  osc.connect(gain);
-  gain.connect(destination);
+  const destination =
+    customDestination && customDestination.context === ctx
+      ? customDestination
+      : ctx.destination;
 
-  osc.start(t0);
-  osc.stop(t0 + 0.03);
+  try {
+    osc.connect(gain);
+    gain.connect(destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.03);
+  } catch (err) {
+    console.warn("[SoundContext] triggerTactileClick error:", err);
+  }
 
   osc.onended = () => {
     try {
@@ -321,16 +343,21 @@ export function SoundProvider({ children }: { children: ReactNode }) {
 
   const masterGainRef = useRef<GainNode | null>(null);
   const activeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const pendingSprayRef = useRef<number | null>(null);
 
   const getMasterGain = useCallback(() => {
     const ctx = getOrCreateAudioContext();
     if (!ctx) return null;
-    if (!masterGainRef.current) {
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(isMuted ? 0 : 1, ctx.currentTime);
-      master.connect(ctx.destination);
-      masterGainRef.current = master;
+    if (!masterGainRef.current || masterGainRef.current.context !== ctx) {
+      try {
+        const master = ctx.createGain();
+        master.gain.setValueAtTime(isMuted ? 0 : 1, ctx.currentTime);
+        master.connect(ctx.destination);
+        masterGainRef.current = master;
+      } catch {
+        return null;
+      }
     }
     return masterGainRef.current;
   }, [isMuted]);
@@ -373,34 +400,54 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Unlocking listeners for browser autoplay policies
+  // Unlocking listeners for browser autoplay policies:
+  // Warms/resumes AudioContext on any user interaction gesture (touch, click, key)
   useEffect(() => {
     const unlock = () => {
       const ctx = getOrCreateAudioContext();
-      if (ctx && ctx.state === "suspended") {
-        void ctx.resume().then(() => {
-          if (pendingSprayRef.current && Date.now() - pendingSprayRef.current < 2500) {
-            pendingSprayRef.current = null;
-            fireSpray();
-          }
-        }).catch(() => {});
-      } else if (ctx && ctx.state === "running") {
-        if (pendingSprayRef.current && Date.now() - pendingSprayRef.current < 2500) {
+      if (!ctx) return;
+      if (ctx.state === "suspended") {
+        void ctx
+          .resume()
+          .then(() => {
+            if (
+              pendingSprayRef.current &&
+              Date.now() - pendingSprayRef.current < 5000
+            ) {
+              pendingSprayRef.current = null;
+              fireSpray();
+            }
+          })
+          .catch(() => {});
+      } else if (ctx.state === "running") {
+        if (
+          pendingSprayRef.current &&
+          Date.now() - pendingSprayRef.current < 5000
+        ) {
           pendingSprayRef.current = null;
           fireSpray();
         }
       }
     };
 
-    const events = ["pointerdown", "pointerup", "touchstart", "touchend", "keydown", "click"] as const;
-    events.forEach((ev) => window.addEventListener(ev, unlock, { capture: true, passive: true }));
-    window.addEventListener("wheel", unlock, { passive: true });
-    window.addEventListener("scroll", unlock, { passive: true });
+    const events = [
+      "pointerdown",
+      "pointerup",
+      "mousedown",
+      "mouseup",
+      "touchstart",
+      "touchend",
+      "click",
+      "keydown",
+    ] as const;
+    events.forEach((ev) =>
+      window.addEventListener(ev, unlock, { capture: true, passive: true }),
+    );
 
     return () => {
-      events.forEach((ev) => window.removeEventListener(ev, unlock, { capture: true }));
-      window.removeEventListener("wheel", unlock);
-      window.removeEventListener("scroll", unlock);
+      events.forEach((ev) =>
+        window.removeEventListener(ev, unlock, { capture: true }),
+      );
       if (activeTimerRef.current) {
         clearTimeout(activeTimerRef.current);
         activeTimerRef.current = null;
@@ -445,12 +492,20 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     if (!ctx) return;
     if (ctx.state === "suspended") {
       pendingSprayRef.current = Date.now();
-      void ctx.resume().then(() => {
-        if (pendingSprayRef.current) {
-          pendingSprayRef.current = null;
-          fireSpray();
-        }
-      }).catch(() => {});
+      void ctx
+        .resume()
+        .then(() => {
+          if (
+            pendingSprayRef.current &&
+            Date.now() - pendingSprayRef.current < 5000
+          ) {
+            pendingSprayRef.current = null;
+            fireSpray();
+          }
+        })
+        .catch(() => {
+          // Awaiting user gesture
+        });
       return;
     }
     fireSpray();

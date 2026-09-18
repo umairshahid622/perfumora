@@ -44,12 +44,17 @@ export function AddToBagBottleBridge({ refs }: AddToBagBottleBridgeProps) {
             },
           );
 
-          // 2. 360° spin / tilt flourish along Y axis
+          // 2. 360° spin / tilt flourish along Y axis (lands on exact full turn and resets to dead-front 0)
+          const targetY =
+            (Math.round(root.rotation.y / (Math.PI * 2)) + 1) * (Math.PI * 2);
           gsap.to(root.rotation, {
-            y: root.rotation.y + Math.PI * 2,
+            y: targetY,
             duration: 0.75,
             ease: "power2.out",
             overwrite: "auto",
+            onComplete: () => {
+              root.rotation.y = 0;
+            },
           });
         }
       },

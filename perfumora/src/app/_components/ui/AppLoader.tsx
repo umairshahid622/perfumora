@@ -1,50 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { prefersReducedMotion } from "../../_lib/motion";
+import {
+  getOrCreateAudioContext,
+  triggerTactileClick,
+} from "../../_lib/sound-context";
 
 /** The wordmark, split per glyph so it can be revealed letter by letter. */
 const WORDMARK = "PERFUMORA";
 
 /**
  * How long, at most, the curtain waits on `window.load` before lifting anyway.
- * The reveal is gated on the real load event so it never lifts onto a
- * half-painted page, but a stalled sub-resource must not strand the visitor
- * behind a dark panel — the cap guarantees the site always appears.
  */
 const LOAD_TIMEOUT_MS = 4000;
 
 /**
  * The first-load curtain (§ boot screen). A full-viewport dark panel that reveals
  * the PERFUMORA wordmark glyph by glyph, fills an accent progress line to 100,
- * then lifts away to uncover the hero.
+ * and invites the customer to enter the sensory experience.
  *
- * It is mounted at the layout root and rendered on the server, so it is already
- * painting over the page on first frame — the point of a preloader is to be there
- * before anything else is, with no flash of unstyled content behind it. Being its
- * own client boundary keeps the rest of the layout a Server Component.
- *
- * The lift is gated on `window.load` (with `LOAD_TIMEOUT_MS` as a backstop) rather
- * than a fixed delay, so the intro animation doubles as cover for the real load
- * instead of merely preceding it. On completion the panel unmounts itself — a
- * fixed full-screen layer left in the tree would keep swallowing pointer events
- * over the whole site. Reduced motion skips straight to that unmount.
- *
- * Plays on every full load by design; scoping it to once per session would be a
- * `sessionStorage` guard here and nothing else.
+ * Interacting with the loader provides the necessary browser user gesture
+ * to warm and unlock the Web Audio API context for seamless spatial sound cues.
  */
 export function AppLoader() {
   const [done, setDone] = useState(false);
+  const [readyToEnter, setReadyToEnter] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
   const countRef = useRef<HTMLSpanElement>(null);
+  const enterBtnRef = useRef<HTMLButtonElement>(null);
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Hold the page still while the curtain is up: with the panel sliding away on
-  // its own timeline, a stray scroll underneath it would desync the reveal from
-  // the hero it uncovers. Keyed on `done` so the lock lifts the moment the
-  // curtain does, and restored on unmount either way.
+  // Hold the page still while the curtain is up
   useEffect(() => {
     if (done) return;
     const html = document.documentElement;
@@ -55,21 +46,49 @@ export function AppLoader() {
     };
   }, [done]);
 
+  const handleEnter = useCallback(() => {
+    // Warm / resume AudioContext inside direct user interaction gesture
+    const ctx = getOrCreateAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      void ctx.resume().catch(() => {});
+    }
+    triggerTactileClick();
+
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+
+    const root = rootRef.current;
+    if (!root) {
+      setDone(true);
+      ScrollTrigger.refresh();
+      return;
+    }
+
+    gsap.killTweensOf(root);
+    gsap.to(root, {
+      yPercent: -100,
+      duration: 0.85,
+      ease: "power4.inOut",
+      onComplete: () => {
+        setDone(true);
+        ScrollTrigger.refresh();
+      },
+    });
+  }, []);
+
   useGSAP(
     () => {
       const root = rootRef.current;
       if (!root) return;
 
-      // Reduced motion wants the site, not the show: unmount now and let the
-      // scroll-lock effect above release on the same commit.
+      // Reduced motion skips straight to unmount
       if (prefersReducedMotion()) {
         setDone(true);
         return;
       }
 
-      // A decorative 0–100 readout, not real progress — it counts over the
-      // intro's own duration. `padStart` keeps it three glyphs wide so the
-      // tabular figures don't jitter their neighbours as they climb.
       const counter = { value: 0 };
       const paintCount = () => {
         if (countRef.current) {
@@ -79,25 +98,17 @@ export function AppLoader() {
         }
       };
 
-      // The lift, fired once both the intro has finished *and* the page has
-      // loaded — whichever lands last calls this, and `revealed` makes the race
-      // idempotent.
-      let revealed = false;
-      const reveal = () => {
-        if (revealed) return;
-        revealed = true;
-        gsap.to(root, {
-          yPercent: -100,
-          duration: 0.9,
-          ease: "power4.inOut",
-          onComplete: () => setDone(true),
-        });
-      };
-
       let introDone = false;
       let pageLoaded = document.readyState === "complete";
+
       const tryReveal = () => {
-        if (introDone && pageLoaded) reveal();
+        if (introDone && pageLoaded) {
+          setReadyToEnter(true);
+          // Graceful fallback auto-lift after 2.2s so visitor is never blocked
+          autoTimerRef.current = setTimeout(() => {
+            handleEnter();
+          }, 2200);
+        }
       };
 
       const onLoad = () => {
@@ -114,11 +125,6 @@ export function AppLoader() {
         },
       });
 
-      // Glyphs rise into place a beat apart — the same entrance the fragrance
-      // name uses, so the boot screen and the hero share a gesture. The letters
-      // ship hidden (opacity-0 in the markup) and this fromTo drives them in, so
-      // the server-rendered wordmark never flashes fully written before the
-      // intro runs.
       tl.fromTo(
         ".loader-letter",
         { yPercent: 60, opacity: 0 },
@@ -130,8 +136,7 @@ export function AppLoader() {
           ease: "power3.out",
         },
       );
-      // The line fills and the counter climbs together, overlapping the tail of
-      // the wordmark so the two reads don't run end to end.
+
       tl.fromTo(
         barRef.current,
         { scaleX: 0 },
@@ -143,6 +148,7 @@ export function AppLoader() {
         },
         "-=0.25",
       );
+
       tl.to(
         counter,
         { value: 100, duration: 1.1, ease: "power1.inOut", onUpdate: paintCount },
@@ -152,6 +158,10 @@ export function AppLoader() {
       return () => {
         window.removeEventListener("load", onLoad);
         window.clearTimeout(cap);
+        if (autoTimerRef.current) {
+          clearTimeout(autoTimerRef.current);
+          autoTimerRef.current = null;
+        }
       };
     },
     { scope: rootRef },
@@ -164,7 +174,8 @@ export function AppLoader() {
       ref={rootRef}
       role="status"
       aria-label="Loading Perfumora"
-      className="bg-bg-dark fixed inset-0 z-[100] flex flex-col items-center justify-center gap-10"
+      onClick={handleEnter}
+      className="bg-bg-dark fixed inset-0 z-[100] flex cursor-pointer flex-col items-center justify-center gap-8 md:gap-10 select-none"
     >
       <h1
         aria-hidden="true"
@@ -188,6 +199,27 @@ export function AppLoader() {
         >
           000
         </span>
+
+        {/* Enter Experience interactive trigger */}
+        <div
+          className={`transition-all duration-500 mt-2 ${
+            readyToEnter
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 translate-y-2 pointer-events-none"
+          }`}
+        >
+          <button
+            ref={enterBtnRef}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEnter();
+            }}
+            className="font-sans text-micro tracking-[0.25em] uppercase text-paper/85 hover:text-paper border border-paper/25 hover:border-paper/70 px-5 py-2 rounded-full transition-all duration-300 hover:scale-105 active:scale-95"
+          >
+            Enter Perfumora
+          </button>
+        </div>
       </div>
     </div>
   );

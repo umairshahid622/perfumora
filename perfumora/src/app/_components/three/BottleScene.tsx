@@ -154,6 +154,7 @@ export default function BottleScene({
   // given. Nothing is derived from it on the way in.
   const juice = liquidColor ?? readCssToken("--accent", "#b87333");
   const firstRun = useRef(true);
+  const targetRotY = useRef(0);
 
   const rest = isCompact ? REST_COMPACT : isTablet ? REST_TABLET : REST;
 
@@ -184,16 +185,23 @@ export default function BottleScene({
         return;
       }
 
-      // A press mid-change redirects the spin from wherever it has got to.
-      // `"auto"` (not `true`): it overwrites only the conflicting `rotation.y` of a
-      // spin still running, so a redirect works — but it leaves the idle float's
-      // `rotation.z` roll on this same object alone, which `true` would have killed.
-      const tl = gsap.timeline();
+      // Track target rotation so rapid clicks always land on an exact multiple of 2*PI (dead front).
+      // Never add to mid-turn fractional angles which would displace the nozzle.
+      targetRotY.current += spinDirection * SPIN_TURN;
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          if (!root) return;
+          // When spin settles, normalize to dead-front 0
+          root.rotation.y = 0;
+          targetRotY.current = 0;
+        },
+      });
 
       tl.to(
         root.rotation,
         {
-          y: root.rotation.y + spinDirection * SPIN_TURN,
+          y: targetRotY.current,
           duration: SPIN_DURATION,
           ease: "power2.inOut",
           overwrite: "auto",
