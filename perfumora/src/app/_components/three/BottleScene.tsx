@@ -326,29 +326,26 @@ export default function BottleScene({
           gl.toneMappingExposure = 1.05;
         }}
       >
-        <StudioEnvironment intensity={0.65} />
+        <StudioEnvironment intensity={0.80} />
         <AddToBagBottleBridge refs={bottleRefs} />
 
-        {/* Balanced studio ambient fill */}
-        <ambientLight intensity={0.5} color="#ffffff" />
+        {/* Studio ambient fill (balanced soft illumination) */}
+        <ambientLight intensity={0.30} color="#ffffff" />
 
-        {/* Soft front fill (subtle, prevents blown-out harsh specular reflections) */}
-        <directionalLight position={[0.5, 1.8, 5.0]} intensity={0.18} color="#ffffff" />
-
-        {/* Studio_BottomBounce (delicate crescent contour on bottom curve of glass) */}
-        <directionalLight position={[0, -2.0, 3.5]} intensity={0.18} color="#ffffff" />
-
-        {/* Studio_KeyLight (warm softbox from upper right, defining bottle silhouette) */}
-        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.30} color="#fffaf2" />
+        {/* Studio_KeyLight (soft key light from upper right, gentle reflection) */}
+        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.32} color="#fffaf2" />
 
         {/* Studio_FillLight (soft left fill) */}
-        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.20} color="#ffffff" />
+        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.22} color="#f4f8ff" />
 
-        {/* Studio_RimLight (back-left rim light giving authentic glass refraction edge) */}
-        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.25} color="#f2faff" />
+        {/* Studio_RimLight (back-left rim light giving subtle crystal refraction edge) */}
+        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.28} color="#eef6ff" />
 
-        {/* Studio_TopLight (overhead light defining cap bevels without blowing out shoulder) */}
-        <directionalLight position={[0, 4.5, 1.0]} intensity={0.22} color="#ffffff" />
+        {/* Studio_TopLight (overhead light defining cap bevels and shoulders) */}
+        <directionalLight position={[0, 4.5, 1.0]} intensity={0.24} color="#ffffff" />
+
+        {/* Studio_BottomBounce (gentle caustic glow on crystal base) */}
+        <directionalLight position={[0, -2.2, 3.2]} intensity={0.22} color="#fff5ea" />
 
         {/* The resting pose, set once as plain props — there is no longer a timeline
             writing this group, so React owns the transform outright and no ref is
