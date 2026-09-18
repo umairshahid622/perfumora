@@ -13,13 +13,19 @@ import {
 
 export const CLICK_CUE = "/sounds/click.mp3";
 
+export const MIST_CUE = "/sounds/mist.wav";
+
 /**
- * Modern Minimalist Spritz duration (0.60s).
- * Clean, fast, compact cosmetic burst.
+ * Authentic Luxury Perfume Atomizer Spritz (0.38s).
+ * Replicates the crisp, delicate liquid spritz of a fine-fragrance atomizer:
+ * instantaneous cosmetic actuation, pressurized liquid atomization (5.4kHz/8.8kHz),
+ * and a soft, clean airborne droplet fadeout. Zero pneumatic/brake rumble.
  */
-export const ATOMIZER_SPRAY_DURATION = 0.6;
+export const ATOMIZER_SPRAY_DURATION = 0.38;
 
 let sharedAudioCtx: AudioContext | null = null;
+let cachedMistBuffer: AudioBuffer | null = null;
+let cachedMistSampleRate: number | null = null;
 
 export function getOrCreateAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -34,11 +40,193 @@ export function getOrCreateAudioContext(): AudioContext | null {
 }
 
 /**
- * Pure Web Audio API synthesis for "Option 5: Modern Minimalist Spritz":
- * - Attack: Smooth 30ms linear rise (softened to eliminate slap/percussion click).
- * - Body: Compact 220ms sustained cosmetic spritz.
- * - Tail: Quick, clean exponential decay over 0.60s total duration.
- * - Filtering: Highpass at 1500 Hz (cuts low-end thump), Bandpass 3600 Hz -> 2400 Hz (Q=1.3), Lowpass at 7000 Hz.
+ * Generates the authentic acoustic model of a real luxury perfume atomizer:
+ * - High-frequency liquid droplet noise (pink noise + fine white shimmer)
+ * - Dual highpass at 2700 Hz (completely strips all pneumatic air brake / low rumble)
+ * - Liquid nozzle resonance (5400 Hz, Q=1.4) + airborne micro-mist shimmer (8800 Hz)
+ * - Short, crisp 0.38s cosmetic spritz envelope
+ * - Delicate cosmetic pump tap (2800 Hz, ~8ms)
+ * - 3D stereo decorrelation
+ */
+export function getOrCreateMistBuffer(ctx: AudioContext): AudioBuffer {
+  if (cachedMistBuffer && cachedMistSampleRate === ctx.sampleRate) {
+    return cachedMistBuffer;
+  }
+
+  const duration = ATOMIZER_SPRAY_DURATION;
+  const sampleRate = ctx.sampleRate;
+  const numSamples = Math.floor(duration * sampleRate);
+  const buffer = ctx.createBuffer(2, numSamples, sampleRate);
+  const left = buffer.getChannelData(0);
+  const right = buffer.getChannelData(1);
+
+  // Pink noise + fine white shimmer for liquid atomization
+  function makeNoise(n: number, seed: number): Float32Array {
+    const out = new Float32Array(n);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    let s = seed;
+    function rand() {
+      s = (s * 1664525 + 1013904223) % 4294967296;
+      return (s / 4294967296) * 2 - 1;
+    }
+
+    for (let i = 0; i < n; i++) {
+      const white = rand();
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      const pink = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.12;
+      b6 = white * 0.115926;
+      out[i] = white * 0.08 + pink * 0.45;
+    }
+    return out;
+  }
+
+  const noiseL = makeNoise(numSamples, 112233);
+  const noiseR = makeNoise(numSamples, 445566);
+
+  function makeFilter(type: "bandpass" | "highpass" | "lowpass", Q = 1.0) {
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    return {
+      step(x0: number, freq: number) {
+        const f = Math.max(80, Math.min(sampleRate * 0.48, freq));
+        const w0 = (2 * Math.PI * f) / sampleRate;
+        const alpha = Math.sin(w0) / (2 * Q);
+        const cosw0 = Math.cos(w0);
+
+        let b0: number, b1: number, b2: number, a0: number, a1: number, a2: number;
+        if (type === "bandpass") {
+          b0 = alpha; b1 = 0; b2 = -alpha;
+          a0 = 1 + alpha; a1 = -2 * cosw0; a2 = 1 - alpha;
+        } else if (type === "highpass") {
+          b0 = (1 + cosw0) / 2; b1 = -(1 + cosw0); b2 = (1 + cosw0) / 2;
+          a0 = 1 + alpha; a1 = -2 * cosw0; a2 = 1 - alpha;
+        } else {
+          b0 = (1 - cosw0) / 2; b1 = 1 - cosw0; b2 = (1 - cosw0) / 2;
+          a0 = 1 + alpha; a1 = -2 * cosw0; a2 = 1 - alpha;
+        }
+
+        b0 /= a0; b1 /= a0; b2 /= a0;
+        a1 /= a0; a2 /= a0;
+
+        const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+        x2 = x1; x1 = x0;
+        y2 = y1; y1 = y0;
+        return y0;
+      },
+    };
+  }
+
+  const hpFreq = 2700;
+  const hp1L = makeFilter("highpass", 0.7);
+  const hp1R = makeFilter("highpass", 0.7);
+  const hp2L = makeFilter("highpass", 0.7);
+  const hp2R = makeFilter("highpass", 0.7);
+
+  const bpFreq = 5400;
+  const nozzleBpL = makeFilter("bandpass", 1.4);
+  const nozzleBpR = makeFilter("bandpass", 1.4);
+
+  const sheenBpL = makeFilter("bandpass", 1.0);
+  const sheenBpR = makeFilter("bandpass", 1.0);
+
+  const lpL = makeFilter("lowpass", 0.7);
+  const lpR = makeFilter("lowpass", 0.7);
+
+  const attackTime = 0.014;
+  const sustainTime = 0.13;
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+
+    // Highpass strictly cuts anything below 2700 Hz (zero air brake mud)
+    const hpL = hp2L.step(hp1L.step(noiseL[i], hpFreq), hpFreq);
+    const hpR = hp2R.step(hp1R.step(noiseR[i], hpFreq), hpFreq);
+
+    const nL = nozzleBpL.step(hpL, bpFreq);
+    const nR = nozzleBpR.step(hpR, bpFreq * 1.02);
+
+    const sL = sheenBpL.step(hpL, 9000);
+    const sR = sheenBpR.step(hpR, 8700);
+
+    const mistL = lpL.step(nL * 0.7 + sL * 0.3, 12000);
+    const mistR = lpR.step(nR * 0.7 + sR * 0.3, 12000);
+
+    // Fast, crisp cosmetic spray envelope
+    let env = 0;
+    if (t < attackTime) {
+      env = Math.pow(t / attackTime, 1.2);
+    } else if (t < sustainTime) {
+      const p = (t - attackTime) / (sustainTime - attackTime);
+      env = 1.0 - 0.15 * p;
+    } else {
+      const p = (t - sustainTime) / (duration - sustainTime);
+      env = 0.85 * Math.exp(-6.0 * p);
+    }
+
+    // Micro cosmetic pump tap (light plastic button impulse)
+    let click = 0;
+    if (t >= 0.005 && t < 0.016) {
+      const tc = t - 0.005;
+      click = Math.sin(2 * Math.PI * 2800 * tc) * Math.exp(-tc * 700) * 0.08;
+    }
+
+    left[i] = mistL * env * 4.0 + click;
+    right[i] = mistR * env * 4.0 + click;
+  }
+
+  // Fadeout at end
+  const fadeLen = Math.floor(sampleRate * 0.02);
+  for (let i = 0; i < fadeLen; i++) {
+    const idx = numSamples - 1 - i;
+    const g = i / fadeLen;
+    left[idx] *= g;
+    right[idx] *= g;
+  }
+
+  // Peak normalize to -1.5 dBFS
+  let peak = 0;
+  for (let i = 0; i < numSamples; i++) {
+    if (Math.abs(left[i]) > peak) peak = Math.abs(left[i]);
+    if (Math.abs(right[i]) > peak) peak = Math.abs(right[i]);
+  }
+  const norm = peak > 0 ? 0.85 / peak : 1.0;
+  for (let i = 0; i < numSamples; i++) {
+    left[i] *= norm;
+    right[i] *= norm;
+  }
+
+  cachedMistBuffer = buffer;
+  cachedMistSampleRate = sampleRate;
+  return buffer;
+}
+
+/** Preload the pristine mist audio buffer from /sounds/mist.wav if available, fallback to synthesis. */
+export async function preloadMistBuffer(ctx: AudioContext): Promise<AudioBuffer> {
+  if (cachedMistBuffer && cachedMistSampleRate === ctx.sampleRate) {
+    return cachedMistBuffer;
+  }
+  try {
+    const res = await fetch(MIST_CUE);
+    if (res.ok) {
+      const arrayBuffer = await res.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(arrayBuffer);
+      cachedMistBuffer = decoded;
+      cachedMistSampleRate = decoded.sampleRate;
+      return decoded;
+    }
+  } catch {
+    // Silent fallback to procedural synthesis
+  }
+  return getOrCreateMistBuffer(ctx);
+}
+
+/**
+ * Fires the authentic luxury perfume atomizer mist spray.
+ * Instantaneous, gapless, zero-latency playback via cached AudioBuffer.
  */
 export async function triggerAtomizerSpray(
   customDestination?: AudioNode,
@@ -55,64 +243,23 @@ export async function triggerAtomizerSpray(
     }
   }
 
-  const duration = ATOMIZER_SPRAY_DURATION;
-  const sampleRate = ctx.sampleRate;
-  const buffer = ctx.createBuffer(2, Math.floor(sampleRate * duration), sampleRate);
-
-  for (let ch = 0; ch < 2; ch++) {
-    const data = buffer.getChannelData(ch);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.18;
-    }
-  }
+  const buffer =
+    cachedMistBuffer && cachedMistSampleRate === ctx.sampleRate
+      ? cachedMistBuffer
+      : getOrCreateMistBuffer(ctx);
 
   const source = ctx.createBufferSource();
   source.buffer = buffer;
 
-  const t0 = ctx.currentTime;
-
-  // Highpass: 1500 Hz cutoff strips all low-end thump
-  const hp = ctx.createBiquadFilter();
-  hp.type = "highpass";
-  hp.frequency.setValueAtTime(1500, t0);
-
-  // Bandpass: 3600 Hz down to 2400 Hz (Q=1.3)
-  const bp = ctx.createBiquadFilter();
-  bp.type = "bandpass";
-  bp.Q.setValueAtTime(1.3, t0);
-  bp.frequency.setValueAtTime(3600, t0);
-  bp.frequency.exponentialRampToValueAtTime(2400, t0 + duration);
-
-  // Lowpass: 7000 Hz cutoff
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.setValueAtTime(7000, t0);
-
-  // Envelope: 30ms rise, 220ms sustain, clean decay to 0.60s
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.linearRampToValueAtTime(0.4, t0 + 0.03);
-  gain.gain.setValueAtTime(0.36, t0 + 0.22);
-  gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
-  gain.gain.linearRampToValueAtTime(0, t0 + duration + 0.02);
-
   const destination = customDestination ?? ctx.destination;
-  source.connect(hp);
-  hp.connect(bp);
-  bp.connect(lp);
-  lp.connect(gain);
-  gain.connect(destination);
+  source.connect(destination);
 
+  const t0 = ctx.currentTime;
   source.start(t0);
-  source.stop(t0 + duration + 0.03);
 
   source.onended = () => {
     try {
       source.disconnect();
-      hp.disconnect();
-      bp.disconnect();
-      lp.disconnect();
-      gain.disconnect();
     } catch {
       // Ignored
     }
@@ -217,6 +364,14 @@ export function SoundProvider({ children }: { children: ReactNode }) {
       activeTimerRef.current = null;
     }, 35);
   }, [isMuted, getMasterGain]);
+
+  // Preload mist audio buffer on mount for instant zero-latency playback
+  useEffect(() => {
+    const ctx = getOrCreateAudioContext();
+    if (ctx) {
+      void preloadMistBuffer(ctx).catch(() => {});
+    }
+  }, []);
 
   // Unlocking listeners for browser autoplay policies
   useEffect(() => {
