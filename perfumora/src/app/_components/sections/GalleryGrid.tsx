@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { prefersReducedMotion } from "../../_lib/motion";
+import { cn } from "../../_lib/cn";
 import type { Variant } from "../../_lib/variants";
 import { Container } from "../ui/Container";
 import { Eyebrow } from "../ui/Eyebrow";
@@ -12,6 +13,13 @@ import { RevealHeading } from "../ui/RevealHeading";
 import { GalleryCard } from "./GalleryCard";
 
 gsap.registerPlugin(ScrollTrigger);
+
+const CATEGORY_TABS = [
+  { key: "all", label: "All" },
+  { key: "male", label: "Male" },
+  { key: "female", label: "Female" },
+  { key: "unisex", label: "Unisex" },
+] as const;
 
 /**
  * The fragrance showcase grid, shared by the home teaser (<Gallery>, four cards)
@@ -34,12 +42,29 @@ export function GalleryGrid({
   variants,
   eyebrow,
   title,
+  showFilter = false,
 }: {
   variants: readonly Variant[];
   eyebrow: string;
   title: string;
+  showFilter?: boolean;
 }) {
   const scope = useRef<HTMLDivElement>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  const displayVariants = useMemo(() => {
+    if (!showFilter || selectedCategory === "all") return variants;
+    return variants.filter((v) => {
+      const cat = (v.categoryId || v.category || "").toLowerCase();
+      return cat === selectedCategory.toLowerCase();
+    });
+  }, [variants, showFilter, selectedCategory]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      ScrollTrigger.refresh();
+    }
+  }, [displayVariants]);
 
   useGSAP(
     () => {
@@ -175,17 +200,51 @@ export function GalleryGrid({
           <RevealHeading className="text-section max-w-[18ch] text-balance">
             {title}
           </RevealHeading>
+
+          {showFilter && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {CATEGORY_TABS.map((tab) => {
+                const active = selectedCategory === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setSelectedCategory(tab.key)}
+                    className={cn(
+                      "rounded-full px-4 py-1.5 text-xs font-semibold tracking-wider uppercase transition-all duration-300",
+                      active
+                        ? "bg-ink text-paper shadow-sm"
+                        : "bg-ink/5 text-ink/70 hover:bg-ink/10 hover:text-ink",
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <ul className="mt-14 grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 md:mt-20 md:grid-cols-3 md:gap-y-16 lg:grid-cols-4">
-          {variants.map((v, i) => (
-            <GalleryCard
-              key={v.id}
-              variant={v}
-              position={String(i + 1).padStart(2, "0")}
-            />
-          ))}
-        </ul>
+        {displayVariants.length === 0 ? (
+          <div className="mt-14 rounded-2xl border border-ink/10 bg-bg-light/50 p-12 text-center text-muted-on-light">
+            <p className="text-base font-medium text-ink">
+              No fragrances found in this category.
+            </p>
+            <p className="mt-1 text-sm text-ink/60">
+              Try selecting another category or view all fragrances.
+            </p>
+          </div>
+        ) : (
+          <ul className="mt-14 grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 md:mt-20 md:grid-cols-3 md:gap-y-16 lg:grid-cols-4">
+            {displayVariants.map((v, i) => (
+              <GalleryCard
+                key={v.id}
+                variant={v}
+                position={String(i + 1).padStart(2, "0")}
+              />
+            ))}
+          </ul>
+        )}
       </Container>
     </div>
   );

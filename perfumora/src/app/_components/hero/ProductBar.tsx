@@ -32,7 +32,7 @@ export function ProductBar() {
   const { price, stock } = quotedSize(variant.sizes, size);
   const soldOut = stock === 0;
 
-  const text = `${variant.name} · ${variant.concentration ?? "Eau de Parfum"}`;
+  const text = `${variant.name} · ${variant.category ? `${variant.category} · ` : ""}${variant.concentration ?? "Eau de Parfum"}`;
 
   /** What the button announces. With no size selected there is none to name, so
    *  the label drops the volume rather than reading "nullml". */

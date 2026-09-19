@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { cn } from "../../_lib/cn";
@@ -22,6 +22,8 @@ interface MegaMenuProps {
   onSelect: () => void;
 }
 
+const CATEGORY_ORDER = ["Male", "Female", "Unisex"];
+
 /**
  * The "Fragrances" dropdown (§4.0): a floating, rounded dark panel that drops
  * from beneath the nav to nearly the full viewport height and nearly full width,
@@ -35,8 +37,32 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const timeline = useRef<gsap.core.Timeline | null>(null);
+
+  const categoryGroups = useMemo(() => {
+    const map = new Map<string, { variant: (typeof variants)[number]; originalIndex: number }[]>();
+
+    variants.forEach((variant, originalIndex) => {
+      const cat = variant.category || "Unisex";
+      if (!map.has(cat)) {
+        map.set(cat, []);
+      }
+      map.get(cat)!.push({ variant, originalIndex });
+    });
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        const idxA = CATEGORY_ORDER.indexOf(a);
+        const idxB = CATEGORY_ORDER.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+      })
+      .map(([category, items]) => ({ category, items }));
+  }, [variants]);
+
 
   useGSAP(
     () => {
@@ -56,7 +82,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         // the calc's numeric terms from 0, so this still animates from height 0.
         .to(
           panelRef.current,
-          { height: "calc(100dvh - 4.75rem - 0.75rem)", autoAlpha: 1, duration: 0.55 },          
+          { height: "calc(100dvh - 4.75rem - 0.75rem)", autoAlpha: 1, duration: 0.55 },
           0,
         )
         .from(
@@ -119,6 +145,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Fragrances"
+        data-lenis-prevent
         className={cn(
           "bg-bg-dark text-paper fixed inset-x-3 top-19 z-50 overflow-hidden rounded-3xl md:inset-x-6",
           open ? "pointer-events-auto" : "pointer-events-none",
@@ -192,46 +219,59 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
             </div>
           </div>
 
-          <ul
-            ref={listRef}
-            onMouseLeave={() => setHovered(null)}
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node))
-                setHovered(null);
-            }}
-            className="grid min-h-0 grid-cols-1 content-start gap-2 self-stretch overflow-y-auto sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {variants.map((variant, i) => (
-              <li key={variant.id}>
-                <button
-                  type="button"
-                  onClick={() => choose(i)}
-                  onMouseEnter={() => setHovered(i)}
-                  onFocus={() => setHovered(i)}
-                  className={cn(
-                    "group flex w-full items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors",
-                    "hover:bg-white/5",
-                    i === index && "bg-white/5",
-                  )}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="border-hairline-on-dark size-9 shrink-0 rounded-full border"
-                    // Product swatch colour is variant data, not a design token.
-                    style={{ backgroundColor: variant.hex }}
-                  />
-                  <span className="flex flex-col">
-                    <span className="text-paper text-lg leading-tight font-medium">
-                      {variant.name}
+          <div className="flex min-h-0 flex-1 flex-col self-stretch">
+            {/* Grouped Fragrance Sections */}
+            <div
+              ref={listRef}
+              onMouseLeave={() => setHovered(null)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node))
+                  setHovered(null);
+              }}
+              className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-2"
+            >
+              {categoryGroups.map(({ category, items }) => (
+                <div key={category} className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 border-b border-white/5 pb-1.5">
+                    <span className="font-display text-xs uppercase tracking-[0.16em] text-accent-on-dark">
+                      {category}
                     </span>
-                    <span className="text-micro text-muted-on-dark font-medium uppercase">
-                      {String(i + 1).padStart(2, "0")} / {variant.concentration ?? "Eau de Parfum"}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+                    <span className="text-micro text-white/40">({items.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {items.map(({ variant, originalIndex }) => (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() => choose(originalIndex)}
+                        onMouseEnter={() => setHovered(originalIndex)}
+                        onFocus={() => setHovered(originalIndex)}
+                        className={cn(
+                          "group flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors",
+                          "hover:bg-white/5",
+                          originalIndex === index && "bg-white/5",
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="border-hairline-on-dark size-8 shrink-0 rounded-full border"
+                          style={{ backgroundColor: variant.hex }}
+                        />
+                        <span className="flex flex-col">
+                          <span className="text-paper text-base leading-tight font-medium">
+                            {variant.name}
+                          </span>
+                          <span className="text-micro text-muted-on-dark font-medium uppercase">
+                            {String(originalIndex + 1).padStart(2, "0")} / {variant.concentration ?? "Eau de Parfum"}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

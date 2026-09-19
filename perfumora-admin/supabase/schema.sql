@@ -80,6 +80,22 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- categories — fragrance gender classifications (Male, Female, Unisex).
+-- ---------------------------------------------------------------------------
+
+create table if not exists categories (
+  id         text        primary key,
+  name       text        not null,
+  created_at timestamptz not null default now()
+);
+
+insert into categories (id, name) values
+  ('male', 'Male'),
+  ('female', 'Female'),
+  ('unisex', 'Unisex')
+on conflict (id) do update set name = excluded.name;
+
+-- ---------------------------------------------------------------------------
 -- fragrances — one row per SKU.
 -- ---------------------------------------------------------------------------
 
@@ -90,11 +106,13 @@ create table if not exists fragrances (
   color         text        not null default '#8c6a4a',
   description   text        not null default '',
   concentration text        not null default 'Eau de Parfum',
+  category_id   text        references categories(id) on delete set null,
   active        boolean     not null default true,
   created_at    timestamptz not null default now()
 );
 
 alter table fragrances add column if not exists concentration text not null default 'Eau de Parfum';
+alter table fragrances add column if not exists category_id text references categories(id) on delete set null;
 
 -- ---------------------------------------------------------------------------
 -- fragrance_sizes — price + stock per size.
@@ -209,12 +227,14 @@ create index if not exists order_items_order_id_idx on order_items (order_id);
 create index if not exists orders_status_idx         on orders (status);
 create index if not exists orders_created_at_idx     on orders (created_at desc);
 create index if not exists orders_user_id_idx        on orders (user_id, created_at desc);
-create index if not exists fragrances_active_idx     on fragrances (active);
+create index if not exists fragrances_active_idx      on fragrances (active);
+create index if not exists fragrances_category_id_idx on fragrances (category_id);
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 
+alter table categories      enable row level security;
 alter table fragrances      enable row level security;
 alter table fragrance_sizes enable row level security;
 alter table orders          enable row level security;
@@ -224,6 +244,10 @@ alter table user_roles      enable row level security;
 -- Admin: full control, granted by `is_admin()` rather than by the bare fact of
 -- holding a session. That distinction is the point of this whole section — a
 -- customer carries an `authenticated` token too.
+drop policy if exists "admin full access" on categories;
+create policy "admin full access" on categories
+  for all to authenticated using (is_admin()) with check (is_admin());
+
 drop policy if exists "admin full access" on fragrances;
 create policy "admin full access" on fragrances
   for all to authenticated using (is_admin()) with check (is_admin());
@@ -279,6 +303,10 @@ create policy "admin manage roles" on user_roles
 drop policy if exists "public read active fragrances" on fragrances;
 create policy "public read active fragrances" on fragrances
   for select to anon, authenticated using (active = true);
+
+drop policy if exists "public read categories" on categories;
+create policy "public read categories" on categories
+  for select to anon, authenticated using (true);
 
 drop policy if exists "public read active fragrance sizes" on fragrance_sizes;
 create policy "public read active fragrance sizes" on fragrance_sizes

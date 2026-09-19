@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Fragrance } from "../lib/types";
+import type { Category, Fragrance } from "../lib/types";
+import { DEFAULT_CATEGORIES } from "../lib/types";
 import {
   deleteFragrance,
+  fetchCategories,
   fetchFragrances,
   setFragranceActive,
+  updateFragranceCategory,
   upsertFragrance,
 } from "../lib/api";
 import { errorMessage } from "../lib/errors";
@@ -19,24 +22,27 @@ import { FragrancesContext, type FragrancesContextValue } from "./context";
 
 export function FragrancesProvider({ children }: { children: ReactNode }) {
   const [fragrances, setFragrances] = useState<Fragrance[]>([]);
+  const [categories, setCategories] = useState<Category[]>([...DEFAULT_CATEGORIES]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(
-    () =>
-      fetchFragrances().then(
-        (rows) => {
-          setFragrances(rows);
-          setError(null);
-          setLoading(false);
-        },
-        (err: unknown) => {
-          setError(errorMessage(err, "Could not load fragrances."));
-          setLoading(false);
-        },
-      ),
-    [],
-  );
+  const refresh = useCallback(async () => {
+    try {
+      const [fragranceRows, categoryRows] = await Promise.all([
+        fetchFragrances(),
+        fetchCategories(),
+      ]);
+      setFragrances(fragranceRows);
+      if (categoryRows && categoryRows.length > 0) {
+        setCategories(categoryRows);
+      }
+      setError(null);
+      setLoading(false);
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Could not load fragrances."));
+      setLoading(false);
+    }
+  }, []);
 
   // First load. State only changes inside the promise callbacks above.
   useEffect(() => {
@@ -46,6 +52,7 @@ export function FragrancesProvider({ children }: { children: ReactNode }) {
   const value = useMemo<FragrancesContextValue>(
     () => ({
       fragrances,
+      categories,
       loading,
       error,
       refresh,
@@ -91,8 +98,32 @@ export function FragrancesProvider({ children }: { children: ReactNode }) {
           return false;
         }
       },
+
+      setCategory: async (id, categoryId) => {
+        const cat = categories.find((c) => c.id === categoryId);
+        setFragrances((prev) =>
+          prev.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  categoryId,
+                  categoryName: cat?.name ?? categoryId,
+                }
+              : f,
+          ),
+        );
+        try {
+          await updateFragranceCategory(id, categoryId);
+          setError(null);
+          return true;
+        } catch (err) {
+          setError(errorMessage(err, "Could not update fragrance category."));
+          await refresh();
+          return false;
+        }
+      },
     }),
-    [fragrances, loading, error, refresh],
+    [fragrances, categories, loading, error, refresh],
   );
 
   return <FragrancesContext value={value}>{children}</FragrancesContext>;

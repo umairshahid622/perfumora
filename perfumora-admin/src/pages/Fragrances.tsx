@@ -9,7 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FragranceForm } from "./FragranceForm";
 import { useFragrances } from "../fragrances/context";
 import { formatPrice } from "../lib/format";
-import type { Fragrance } from "../lib/types";
+import type { Category, Fragrance } from "../lib/types";
 import { LOW_STOCK_THRESHOLD, offeredSizes } from "../lib/types";
 import { cn } from "../lib/cn";
 
@@ -22,10 +22,13 @@ import { cn } from "../lib/cn";
    version if a write is refused.
 --------------------------------------------------------------------------- */
 
-type Filter = "all" | "low-stock" | "inactive";
+type Filter = "all" | "male" | "female" | "unisex" | "low-stock" | "inactive";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "male", label: "Male" },
+  { key: "female", label: "Female" },
+  { key: "unisex", label: "Unisex" },
   { key: "low-stock", label: "Low stock" },
   { key: "inactive", label: "Inactive" },
 ];
@@ -41,8 +44,17 @@ const minStock = (f: Fragrance) =>
   Math.min(...offeredSizes(f.sizes).map(({ variant }) => variant.stock));
 
 export function Fragrances() {
-  const { fragrances, loading, error, refresh, save, remove, setActive } =
-    useFragrances();
+  const {
+    fragrances,
+    categories,
+    loading,
+    error,
+    refresh,
+    save,
+    remove,
+    setActive,
+    setCategory,
+  } = useFragrances();
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -59,6 +71,9 @@ export function Fragrances() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return fragrances.filter((f) => {
+      if (filter === "male" && f.categoryId !== "male") return false;
+      if (filter === "female" && f.categoryId !== "female") return false;
+      if (filter === "unisex" && f.categoryId !== "unisex") return false;
       if (filter === "low-stock" && minStock(f) > LOW_STOCK_THRESHOLD) return false;
       if (filter === "inactive" && f.active) return false;
       if (q && !f.name.toLowerCase().includes(q)) return false;
@@ -170,6 +185,8 @@ export function Fragrances() {
             <FragranceCard
               key={f.id}
               frag={f}
+              categories={categories}
+              onCategoryChange={(catId) => void setCategory(f.id, catId)}
               onEdit={() => openEdit(f)}
               onToggle={() => void setActive(f.id, !f.active)}
               onDelete={() => setToDelete(f)}
@@ -223,11 +240,15 @@ export function Fragrances() {
 /* ---- Single fragrance card ---- */
 function FragranceCard({
   frag,
+  categories,
+  onCategoryChange,
   onEdit,
   onToggle,
   onDelete,
 }: {
   frag: Fragrance;
+  categories: Category[];
+  onCategoryChange: (categoryId: string) => void;
   onEdit: () => void;
   onToggle: () => void;
   onDelete: () => void;
@@ -282,13 +303,20 @@ function FragranceCard({
 
       {/* Body */}
       <div className="flex flex-1 flex-col p-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-slate-900">{frag.name}</h3>
-          {frag.concentration && (
-            <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-slate-600 border border-slate-200">
-              {frag.concentration}
-            </span>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-1">
+            {frag.categoryName && (
+              <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-800 border border-amber-200/70">
+                {frag.categoryName}
+              </span>
+            )}
+            {frag.concentration && (
+              <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-slate-600 border border-slate-200">
+                {frag.concentration}
+              </span>
+            )}
+          </div>
         </div>
         <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">
           {frag.description}
@@ -327,6 +355,29 @@ function FragranceCard({
           {sizes.length === 0 && (
             <p className="text-sm text-rose-600">No sizes set — edit to add one.</p>
           )}
+        </div>
+
+        {/* Quick Category Changer Dropdown */}
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 border border-slate-100">
+          <label
+            htmlFor={`category-${frag.id}`}
+            className="text-[11px] font-medium text-slate-500"
+          >
+            Category:
+          </label>
+          <select
+            id={`category-${frag.id}`}
+            aria-label={`Change category for ${frag.name}`}
+            value={frag.categoryId || "unisex"}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:border-slate-300 focus:border-slate-900 focus:outline-none"
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Actions */}

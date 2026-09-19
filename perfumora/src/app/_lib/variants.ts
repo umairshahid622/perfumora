@@ -54,6 +54,10 @@ export interface Variant {
   imageUrl?: string | null;
   /** Concentration tier (e.g. Eau de Cologne, Eau de Toilette, Eau de Parfum, Extrait de Parfum). */
   concentration?: string;
+  /** Category classification (e.g. Male, Female, Unisex). */
+  category?: string;
+  /** Category ID (e.g. 'male', 'female', 'unisex'). */
+  categoryId?: string;
   /** Price + stock per size sold. Never empty: `getCatalogue` drops fragrances
    *  with no size rows, since they have no price and cannot be bought. */
   sizes: SizeMap;

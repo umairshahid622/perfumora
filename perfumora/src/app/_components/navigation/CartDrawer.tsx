@@ -84,6 +84,7 @@ export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Shopping cart"
+        data-lenis-prevent
         className={cn(
           "bg-bg-light text-ink fixed inset-y-0 right-0 z-[80] flex w-full max-w-md flex-col",
           open ? "pointer-events-auto" : "pointer-events-none",

@@ -54,6 +54,17 @@ export const FRAGRANCE_CONCENTRATIONS: readonly FragranceConcentration[] = [
   "Extrait de Parfum",
 ];
 
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export const DEFAULT_CATEGORIES: readonly Category[] = [
+  { id: "male", name: "Male" },
+  { id: "female", name: "Female" },
+  { id: "unisex", name: "Unisex" },
+];
+
 export interface Fragrance {
   id: string;
   name: string;
@@ -64,6 +75,10 @@ export interface Fragrance {
   description: string;
   /** Concentration tier (e.g. Eau de Parfum, Extrait de Parfum). */
   concentration: FragranceConcentration;
+  /** Category ID (e.g. 'male', 'female', 'unisex') */
+  categoryId?: string;
+  /** Category display name (e.g. 'Male', 'Female', 'Unisex') */
+  categoryName?: string;
   /** Hidden from the storefront when false, without deleting the record. */
   active: boolean;
   /** At least one size — a fragrance with none is unbuyable. See SizeMap. */

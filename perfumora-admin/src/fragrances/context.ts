@@ -1,11 +1,12 @@
 import { createContext, useContext } from "react";
-import type { Fragrance } from "../lib/types";
+import type { Category, Fragrance } from "../lib/types";
 
 /* Context object + consumer hook for the catalog, in a non-component module so
    the provider file exports only its component (satisfies Fast Refresh). */
 
 export interface FragrancesContextValue {
   fragrances: Fragrance[];
+  categories: Category[];
   /** True during the first load only. */
   loading: boolean;
   /** Last read or write failure, ready to show. Null when everything's fine. */
@@ -16,6 +17,7 @@ export interface FragrancesContextValue {
   save: (fragrance: Fragrance) => Promise<boolean>;
   remove: (id: string) => Promise<boolean>;
   setActive: (id: string, active: boolean) => Promise<boolean>;
+  setCategory: (id: string, categoryId: string) => Promise<boolean>;
 }
 
 export const FragrancesContext = createContext<FragrancesContextValue | null>(null);

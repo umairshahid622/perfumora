@@ -291,8 +291,10 @@ export function Navigation() {
     const preventBackgroundScroll = (e: TouchEvent | WheelEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      const scrollable = target.closest(".overflow-y-auto, .overflow-auto");
-      if (!scrollable) {
+      const isInsideOverlay = target.closest(
+        "[role='dialog'], [data-lenis-prevent], .overflow-y-auto, .overflow-auto"
+      );
+      if (!isInsideOverlay) {
         if (e.cancelable) {
           e.preventDefault();
         }

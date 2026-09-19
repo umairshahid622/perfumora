@@ -28,6 +28,7 @@ export default async function CollectionPage() {
           variants={variants}
           eyebrow="The Collection"
           title="Every fragrance we make"
+          showFilter
         />
       </div>
     </main>
