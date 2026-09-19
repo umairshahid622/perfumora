@@ -9,7 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { FragranceForm } from "./FragranceForm";
 import { useFragrances } from "../fragrances/context";
 import { formatPrice } from "../lib/format";
-import type { Category, Fragrance } from "../lib/types";
+import type { Fragrance } from "../lib/types";
 import { LOW_STOCK_THRESHOLD, offeredSizes } from "../lib/types";
 import { cn } from "../lib/cn";
 
@@ -46,14 +46,12 @@ const minStock = (f: Fragrance) =>
 export function Fragrances() {
   const {
     fragrances,
-    categories,
     loading,
     error,
     refresh,
     save,
     remove,
     setActive,
-    setCategory,
   } = useFragrances();
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -185,8 +183,6 @@ export function Fragrances() {
             <FragranceCard
               key={f.id}
               frag={f}
-              categories={categories}
-              onCategoryChange={(catId) => void setCategory(f.id, catId)}
               onEdit={() => openEdit(f)}
               onToggle={() => void setActive(f.id, !f.active)}
               onDelete={() => setToDelete(f)}
@@ -200,7 +196,8 @@ export function Fragrances() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editing ? "Edit fragrance" : "Add fragrance"}
-        maxWidth="max-w-2xl"
+        maxWidth="max-w-5xl"
+        bodyClassName="p-0"
       >
         <FragranceForm
           initial={editing ?? undefined}
@@ -240,15 +237,11 @@ export function Fragrances() {
 /* ---- Single fragrance card ---- */
 function FragranceCard({
   frag,
-  categories,
-  onCategoryChange,
   onEdit,
   onToggle,
   onDelete,
 }: {
   frag: Fragrance;
-  categories: Category[];
-  onCategoryChange: (categoryId: string) => void;
   onEdit: () => void;
   onToggle: () => void;
   onDelete: () => void;
@@ -357,28 +350,6 @@ function FragranceCard({
           )}
         </div>
 
-        {/* Quick Category Changer Dropdown */}
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 border border-slate-100">
-          <label
-            htmlFor={`category-${frag.id}`}
-            className="text-[11px] font-medium text-slate-500"
-          >
-            Category:
-          </label>
-          <select
-            id={`category-${frag.id}`}
-            aria-label={`Change category for ${frag.name}`}
-            value={frag.categoryId || "unisex"}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:border-slate-300 focus:border-slate-900 focus:outline-none"
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
 
         {/* Actions */}
         <div className="mt-4 flex items-center gap-1 border-t border-slate-100 pt-3">

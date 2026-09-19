@@ -6,6 +6,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { cn } from "../../_lib/cn";
+import { useSoundCue } from "../../_hooks/useSoundCue";
 import type { Variant } from "../../_lib/variants";
 import { Container } from "../ui/Container";
 import { Eyebrow } from "../ui/Eyebrow";
@@ -50,7 +51,24 @@ export function GalleryGrid({
   showFilter?: boolean;
 }) {
   const scope = useRef<HTMLDivElement>(null);
+  const filterContainerRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+  const tabsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const gridRef = useRef<HTMLUListElement>(null);
+  const isFirstRender = useRef(true);
+  const { play } = useSoundCue();
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: variants.length };
+    variants.forEach((v) => {
+      const cat = (v.categoryId || v.category || "").toLowerCase();
+      if (cat) {
+        counts[cat] = (counts[cat] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [variants]);
 
   const displayVariants = useMemo(() => {
     if (!showFilter || selectedCategory === "all") return variants;
@@ -59,6 +77,81 @@ export function GalleryGrid({
       return cat === selectedCategory.toLowerCase();
     });
   }, [variants, showFilter, selectedCategory]);
+
+  const updateIndicator = (animate = true) => {
+    const tabEl = tabsRef.current.get(selectedCategory);
+    const container = filterContainerRef.current;
+    const indicator = indicatorRef.current;
+    if (!tabEl || !container || !indicator) return;
+
+    const tabRect = tabEl.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    const left = tabRect.left - containerRect.left;
+    const top = tabRect.top - containerRect.top;
+    const width = tabRect.width;
+    const height = tabRect.height;
+
+    if (!animate || prefersReducedMotion()) {
+      gsap.set(indicator, {
+        x: left,
+        y: top,
+        width,
+        height,
+        autoAlpha: 1,
+      });
+    } else {
+      gsap.to(indicator, {
+        x: left,
+        y: top,
+        width,
+        height,
+        autoAlpha: 1,
+        duration: 0.38,
+        ease: "power3.out",
+        overwrite: "auto",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      updateIndicator(false);
+      return;
+    }
+    updateIndicator(true);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    const handleResize = () => updateIndicator(false);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [selectedCategory]);
+
+  // Staggered card entrance on category filter change
+  useEffect(() => {
+    if (!gridRef.current || prefersReducedMotion()) return;
+    const cards = gridRef.current.children;
+    if (!cards || cards.length === 0) return;
+
+    gsap.fromTo(
+      cards,
+      { autoAlpha: 0, y: 22, scale: 0.96 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        scale: 1,
+        duration: 0.45,
+        stagger: 0.04,
+        ease: "power2.out",
+        overwrite: "auto",
+        onComplete: () => {
+          ScrollTrigger.refresh();
+        },
+      },
+    );
+  }, [selectedCategory]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -178,7 +271,7 @@ export function GalleryGrid({
           );
       });
     },
-    { scope },
+    { scope, dependencies: [displayVariants] },
   );
 
   return (
@@ -202,25 +295,60 @@ export function GalleryGrid({
           </RevealHeading>
 
           {showFilter && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {CATEGORY_TABS.map((tab) => {
-                const active = selectedCategory === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setSelectedCategory(tab.key)}
-                    className={cn(
-                      "rounded-full px-4 py-1.5 text-xs font-semibold tracking-wider uppercase transition-all duration-300",
-                      active
-                        ? "bg-ink text-paper shadow-sm"
-                        : "bg-ink/5 text-ink/70 hover:bg-ink/10 hover:text-ink",
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
+            <div className="mt-6 flex items-center">
+              <div className="max-w-full overflow-x-auto scrollbar-none py-1">
+                <div
+                  ref={filterContainerRef}
+                  className="relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] p-1.5 backdrop-blur-md"
+                >
+                  {/* Smooth sliding active indicator pill */}
+                  <span
+                    ref={indicatorRef}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-0 left-0 rounded-full bg-ink shadow-md will-change-transform"
+                    style={{ opacity: 0 }}
+                  />
+
+                  {CATEGORY_TABS.map((tab) => {
+                    const active = selectedCategory === tab.key;
+                    const count = categoryCounts[tab.key] ?? 0;
+                    return (
+                      <button
+                        key={tab.key}
+                        ref={(el) => {
+                          if (el) tabsRef.current.set(tab.key, el);
+                          else tabsRef.current.delete(tab.key);
+                        }}
+                        type="button"
+                        onClick={() => {
+                          if (selectedCategory !== tab.key) {
+                            play();
+                            setSelectedCategory(tab.key);
+                          }
+                        }}
+                        className={cn(
+                          "relative z-10 flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold tracking-wider uppercase transition-colors duration-200 active:scale-95",
+                          active
+                            ? "text-paper"
+                            : "text-ink/65 hover:text-ink",
+                        )}
+                      >
+                        <span>{tab.label}</span>
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-mono leading-none transition-colors duration-200",
+                            active
+                              ? "bg-white/20 text-paper"
+                              : "bg-ink/5 text-ink/50",
+                          )}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -235,7 +363,10 @@ export function GalleryGrid({
             </p>
           </div>
         ) : (
-          <ul className="mt-14 grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 md:mt-20 md:grid-cols-3 md:gap-y-16 lg:grid-cols-4">
+          <ul
+            ref={gridRef}
+            className="mt-14 grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 md:mt-20 md:grid-cols-3 md:gap-y-16 lg:grid-cols-4"
+          >
             {displayVariants.map((v, i) => (
               <GalleryCard
                 key={v.id}

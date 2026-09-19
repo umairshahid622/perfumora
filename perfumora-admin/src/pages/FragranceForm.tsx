@@ -133,277 +133,320 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
   };
 
   return (
-    <form id="fragrance-form" onSubmit={submit} className="space-y-5">
-      {/* Image + color */}
-      <div className="flex gap-4">
-        <div className="shrink-0">
-          <label className="mb-1.5 block text-sm font-medium text-slate-700">
-            Image
-          </label>
-          <ImagePicker
-            value={draft.imageUrl}
-            color={draft.color}
-            fragranceName={draft.name}
-            onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
-          />
-        </div>
-        <div className="flex-1 space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <TextField
-              id="name"
-              label="Name"
-              placeholder="e.g. Midnight Oud"
-              required
-              value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            />
-            <SelectField
-              id="category"
-              label="Category"
-              value={draft.categoryId || "unisex"}
-              onChange={(e) => {
-                const catId = e.target.value;
-                const catObj = categories.find((c) => c.id === catId);
-                setDraft((d) => ({
-                  ...d,
-                  categoryId: catId,
-                  categoryName: catObj?.name ?? catId,
-                }));
-              }}
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField
-              id="concentration"
-              label="Concentration"
-              value={draft.concentration || "Eau de Parfum"}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  concentration: e.target.value as FragranceConcentration,
-                }))
-              }
-            >
-              {FRAGRANCE_CONCENTRATIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </SelectField>
-          </div>
-          <div>
-            <label
-              htmlFor="color"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-            >
-              Accent color
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                id="color"
-                type="color"
-                value={draft.color}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, color: e.target.value }))
-                }
-                className="h-10 w-12 cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
-              />
-              <TextField
-                aria-label="Hex color"
-                value={draft.color}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, color: e.target.value }))
-                }
-                className="font-mono"
-              />
-              {typeof window !== "undefined" && "EyeDropper" in window && (
-                <button
-                  type="button"
-                  title="Sample color directly from screen or bottle image"
-                  onClick={async () => {
-                    try {
-                      const eyeDropper = new (window as any).EyeDropper();
-                      const res = await eyeDropper.open();
-                      if (res?.sRGBHex) {
-                        setDraft((d) => ({ ...d, color: res.sRGBHex }));
-                      }
-                    } catch {
-                      // user cancelled eyedropper
-                    }
-                  }}
-                  className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 active:scale-95"
-                >
-                  <Icon name="droplet" className="h-3.5 w-3.5 text-accent" />
-                  Eyedropper
-                </button>
-              )}
-            </div>
-            {/* Dynamic AI Color Presets extracted from bottle */}
-            <div className="mt-2.5 rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
-                  <Icon name="sparkles" className="h-3 w-3 text-amber-500" />
-                  AI Presets ({aiPresets.length})
-                  {extractingPresets && (
-                    <span className="text-[10px] font-normal text-slate-400 animate-pulse">
-                      · Extracting from bottle...
-                    </span>
-                  )}
-                </span>
+    <form id="fragrance-form" onSubmit={submit} className="flex flex-col min-h-full">
+      {/* 2. Editor Grid */}
+      <div className="flex-1 p-6">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          {/* Left Column (5 cols): Bottle Media, Swatch & Studio Controls */}
+          <div className="space-y-5 lg:col-span-5">
+            {/* Bottle Image Section */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-slate-800">
+                  Bottle Imagery
+                </label>
                 {draft.imageUrl && (
+                  <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    Uploaded
+                  </span>
+                )}
+              </div>
+              <ImagePicker
+                value={draft.imageUrl}
+                color={draft.color}
+                fragranceName={draft.name}
+                onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
+              />
+            </div>
+
+            {/* Accent Color & AI Presets */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+              <label htmlFor="color" className="block text-sm font-semibold text-slate-800">
+                Accent Color
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="color"
+                  type="color"
+                  value={draft.color}
+                  onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))}
+                  className="h-10 w-12 cursor-pointer rounded-lg border border-slate-300 bg-white p-1"
+                />
+                <TextField
+                  aria-label="Hex color"
+                  value={draft.color}
+                  onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))}
+                  className="font-mono flex-1"
+                />
+                {typeof window !== "undefined" && "EyeDropper" in window && (
                   <button
                     type="button"
-                    title="Rescan image to regenerate color presets"
-                    onClick={() => {
-                      setExtractingPresets(true);
-                      extractColorPresetsFromImage(draft.imageUrl)
-                        .then((presets) => setAiPresets(presets))
-                        .finally(() => setExtractingPresets(false));
+                    title="Sample color directly from screen or bottle image"
+                    onClick={async () => {
+                      try {
+                        const eyeDropper = new (window as any).EyeDropper();
+                        const res = await eyeDropper.open();
+                        if (res?.sRGBHex) {
+                          setDraft((d) => ({ ...d, color: res.sRGBHex }));
+                        }
+                      } catch {}
                     }}
-                    className="flex items-center gap-1 text-[11px] text-slate-400 transition hover:text-slate-700"
+                    className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95"
                   >
-                    <span>↻</span> Rescan
+                    <Icon name="droplet" className="h-3.5 w-3.5 text-accent" />
+                    Eyedropper
                   </button>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {aiPresets.map((swatch, idx) => {
-                  const isSelected = draft.color.toLowerCase() === swatch.hex.toLowerCase();
-                  return (
+              {/* AI Presets */}
+              <div className="rounded-lg border border-slate-200/80 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                    <Icon name="sparkles" className="h-3.5 w-3.5 text-amber-500" />
+                    AI Color Presets ({aiPresets.length})
+                    {extractingPresets && (
+                      <span className="text-[10px] font-normal text-slate-400 animate-pulse">
+                        · Extracting...
+                      </span>
+                    )}
+                  </span>
+                  {draft.imageUrl && (
                     <button
-                      key={`${swatch.hex}-${idx}`}
                       type="button"
-                      title={`${swatch.name} (${swatch.hex}) — ${swatch.description}`}
-                      onClick={() => setDraft((d) => ({ ...d, color: swatch.hex }))}
-                      className={`group relative flex items-center gap-1.5 rounded-md border px-2 py-1 transition-all ${
-                        isSelected
-                          ? "border-accent bg-white shadow-sm ring-2 ring-accent/30"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      title="Rescan image to regenerate color presets"
+                      onClick={() => {
+                        setExtractingPresets(true);
+                        extractColorPresetsFromImage(draft.imageUrl)
+                          .then((presets) => setAiPresets(presets))
+                          .finally(() => setExtractingPresets(false));
+                      }}
+                      className="flex items-center gap-1 text-[11px] text-slate-500 transition hover:text-slate-800"
+                    >
+                      <span>↻</span> Rescan
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {aiPresets.map((swatch, idx) => {
+                    const isSelected = draft.color.toLowerCase() === swatch.hex.toLowerCase();
+                    return (
+                      <button
+                        key={`${swatch.hex}-${idx}`}
+                        type="button"
+                        title={`${swatch.name} (${swatch.hex}) — ${swatch.description}`}
+                        onClick={() => setDraft((d) => ({ ...d, color: swatch.hex }))}
+                        className={`group relative flex items-center gap-1.5 rounded-md border px-2 py-1 transition-all ${
+                          isSelected
+                            ? "border-accent bg-amber-50/60 shadow-2xs ring-2 ring-accent/30 font-medium"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span
+                          className="h-3.5 w-3.5 rounded-full border border-black/10 shrink-0 shadow-inner"
+                          style={{ backgroundColor: swatch.hex }}
+                        />
+                        <span className="text-[11px] text-slate-700">
+                          {swatch.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (7 cols): Information, Scent Notes, Sizes & Pricing, Storefront Visibility */}
+          <div className="space-y-5 lg:col-span-7">
+            {/* Fragrance Details */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-slate-800">
+                Fragrance Details
+              </h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <TextField
+                  id="name"
+                  label="Name"
+                  placeholder="e.g. Midnight Oud"
+                  required
+                  value={draft.name}
+                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                />
+                <SelectField
+                  id="category"
+                  label="Category"
+                  value={draft.categoryId || "unisex"}
+                  onChange={(e) => {
+                    const catId = e.target.value;
+                    const catObj = categories.find((c) => c.id === catId);
+                    setDraft((d) => ({
+                      ...d,
+                      categoryId: catId,
+                      categoryName: catObj?.name ?? catId,
+                    }));
+                  }}
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField
+                  id="concentration"
+                  label="Concentration"
+                  value={draft.concentration || "Eau de Parfum"}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      concentration: e.target.value as FragranceConcentration,
+                    }))
+                  }
+                >
+                  {FRAGRANCE_CONCENTRATIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+
+              <TextAreaField
+                id="description"
+                label="Description & Scent Notes"
+                rows={3}
+                placeholder="Deep, smoky, warm notes with amber and Madagascar vanilla."
+                value={draft.description}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, description: e.target.value }))
+                }
+              />
+            </div>
+
+            {/* Bottle Sizes & Pricing */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Bottle Sizes & Pricing
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Toggle sizes to offer. At least one size is required.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                  {offered.length} active
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {SIZE_KEYS.map((size) => {
+                  const variant = draft.sizes[size];
+                  const sold = Boolean(variant);
+                  return (
+                    <div
+                      key={size}
+                      className={`grid grid-cols-[2.75rem_3.5rem_1fr_1fr] items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        sold ? "border-slate-200 bg-white shadow-2xs" : "border-slate-200/60 bg-slate-100/60"
                       }`}
                     >
-                      <span
-                        className="h-3.5 w-3.5 rounded-full border border-black/10 shrink-0 shadow-inner"
-                        style={{ backgroundColor: swatch.hex }}
+                      <Toggle
+                        checked={sold}
+                        onChange={(v) => toggleSize(size, v)}
+                        aria-label={`Sell ${size}`}
+                        small
                       />
-                      <span className="text-[11px] font-medium text-slate-700">
-                        {swatch.name}
+                      <span
+                        className={`text-sm font-bold ${
+                          sold ? "text-slate-800" : "text-slate-400"
+                        }`}
+                      >
+                        {size}
                       </span>
-                    </button>
+                      <label className="flex items-center gap-1.5 text-sm">
+                        <span className={sold ? "text-slate-500 font-medium" : "text-slate-300"}>Rs</span>
+                        <input
+                          type="number"
+                          min={1}
+                          required={sold}
+                          disabled={!sold}
+                          value={variant?.price || ""}
+                          onChange={(e) => setSize(size, "price", Number(e.target.value))}
+                          placeholder={sold ? "Price" : "—"}
+                          className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1.5 text-sm">
+                        <span className={sold ? "text-slate-500 font-medium" : "text-slate-300"}>Qty</span>
+                        <input
+                          type="number"
+                          min={0}
+                          required={sold}
+                          disabled={!sold}
+                          value={variant?.stock ?? ""}
+                          onChange={(e) => setSize(size, "stock", Number(e.target.value))}
+                          placeholder={sold ? "Stock" : "—"}
+                          className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </label>
+                    </div>
                   );
                 })}
               </div>
+              {offered.length === 0 && (
+                <p role="alert" className="text-xs font-medium text-rose-600">
+                  Switch on at least one size — a fragrance with none cannot be saved.
+                </p>
+              )}
             </div>
+
+            {/* Storefront Visibility Card */}
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-4 transition-colors hover:bg-slate-50">
+              <div>
+                <span className="block text-sm font-semibold text-slate-800">
+                  Storefront Visibility
+                </span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  {draft.active ? "Visible to customers on the site" : "Hidden from catalog and search"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${draft.active ? "text-emerald-600" : "text-slate-400"}`}>
+                  {draft.active ? "Active" : "Inactive"}
+                </span>
+                <Toggle
+                  checked={draft.active}
+                  onChange={(v) => setDraft((d) => ({ ...d, active: v }))}
+                />
+              </div>
+            </label>
           </div>
         </div>
       </div>
 
-      <TextAreaField
-        id="description"
-        label="Description"
-        rows={2}
-        placeholder="Deep, smoky, warm."
-        value={draft.description}
-        onChange={(e) =>
-          setDraft((d) => ({ ...d, description: e.target.value }))
-        }
-      />
-
-      {/* Per-size price + stock. A size that isn't sold is switched off here
-          rather than left at zero, so the storefront can hide it entirely. */}
-      <div>
-        <p className="mb-1 text-sm font-medium text-slate-700">Sizes sold</p>
-        <p className="mb-2 text-xs text-slate-500">
-          Switch off a size you don&apos;t sell. At least one is required.
-        </p>
-        <div className="space-y-2">
-          {SIZE_KEYS.map((size) => {
-            const variant = draft.sizes[size];
-            const sold = Boolean(variant);
-            return (
-              <div
-                key={size}
-                className={`grid grid-cols-[2.75rem_3rem_1fr_1fr] items-center gap-3 rounded-lg border p-2.5 transition-colors ${
-                  sold ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-slate-100/60"
-                }`}
-              >
-                <Toggle
-                  checked={sold}
-                  onChange={(v) => toggleSize(size, v)}
-                  aria-label={`Sell ${size}`}
-                  small
-                />
-                <span
-                  className={`text-sm font-semibold ${
-                    sold ? "text-slate-700" : "text-slate-400"
-                  }`}
-                >
-                  {size}
-                </span>
-                <label className="flex items-center gap-1.5 text-sm">
-                  <span className={sold ? "text-slate-400" : "text-slate-300"}>Rs</span>
-                  <input
-                    type="number"
-                    min={1}
-                    required={sold}
-                    disabled={!sold}
-                    value={variant?.price || ""}
-                    onChange={(e) => setSize(size, "price", Number(e.target.value))}
-                    placeholder={sold ? "Price" : "—"}
-                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </label>
-                <label className="flex items-center gap-1.5 text-sm">
-                  <span className={sold ? "text-slate-400" : "text-slate-300"}>Qty</span>
-                  <input
-                    type="number"
-                    min={0}
-                    required={sold}
-                    disabled={!sold}
-                    value={variant?.stock ?? ""}
-                    onChange={(e) => setSize(size, "stock", Number(e.target.value))}
-                    placeholder={sold ? "Stock" : "—"}
-                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </label>
-              </div>
-            );
-          })}
+      {/* 3. Footer */}
+      <div className="sticky bottom-0 z-20 flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50/90 backdrop-blur-md px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          {offered.length === 0 ? (
+            <span className="font-semibold text-rose-600">
+              Configure at least one size before saving.
+            </span>
+          ) : (
+            <span>
+              Ready to save · {draft.name || "Untitled fragrance"}
+            </span>
+          )}
         </div>
-        {offered.length === 0 && (
-          <p role="alert" className="mt-2 text-xs text-rose-600">
-            Switch on at least one size — a fragrance with none can&apos;t be sold.
-          </p>
-        )}
-      </div>
-
-      {/* Active toggle */}
-      <label className="flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 p-3">
-        <span>
-          <span className="block text-sm font-medium text-slate-700">
-            Active
-          </span>
-          <span className="block text-xs text-slate-500">
-            Visible on the storefront
-          </span>
-        </span>
-        <Toggle
-          checked={draft.active}
-          onChange={(v) => setDraft((d) => ({ ...d, active: v }))}
-        />
-      </label>
-
-      <div className="flex justify-end gap-3 pt-1">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={offered.length === 0}>
-          {initial ? "Save changes" : "Add fragrance"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={offered.length === 0}>
+            {initial ? "Save changes" : "Add fragrance"}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -614,9 +657,9 @@ function ImagePicker({
   return (
     <div className="space-y-2">
       {/* Upload Tile */}
-      <div className="w-36">
+      <div className="w-full">
         <label
-          className="group relative flex h-36 w-36 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 transition-all hover:border-accent hover:shadow-sm"
+          className="group relative flex h-48 w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 transition-all hover:border-accent hover:shadow-sm"
           style={
             isPreviewable
               ? { backgroundColor: color }
@@ -710,7 +753,7 @@ function ImagePicker({
 
       {/* Mode switch between Cutout and Original (when raw file is present) */}
       {rawFile && (
-        <div className="w-48 grid grid-cols-2 gap-1 rounded-lg bg-slate-200/70 p-0.5 text-xs">
+        <div className="w-full grid grid-cols-2 gap-1 rounded-lg bg-slate-200/70 p-0.5 text-xs">
           <button
             type="button"
             onClick={() => void switchMode("cutout")}
@@ -738,7 +781,7 @@ function ImagePicker({
 
       {/* Refinement controls once an image is available */}
       {isPreviewable && (
-        <div className="w-48 space-y-2 pt-0.5 text-xs">
+        <div className="w-full space-y-2 pt-0.5 text-xs">
           {/* Floor reflection trimmer toggle */}
           {activeMode === "cutout" && (
             <div>
@@ -809,6 +852,7 @@ function ImagePicker({
           onClose={() => setShowCardModal(false)}
           title="Storefront Card Preview"
           maxWidth="max-w-xs"
+          zIndex="z-[110]"
         >
           <div className="p-4">
             <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[#faf6ee] shadow-xl">
