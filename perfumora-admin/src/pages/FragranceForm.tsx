@@ -19,6 +19,7 @@ import {
 } from "../lib/colorExtractor";
 import { Button } from "../components/Button";
 import { TextField, TextAreaField, SelectField } from "../components/Field";
+import { NumericInput } from "../components/NumericInput";
 import { Icon } from "../components/Icon";
 import { Modal } from "../components/Modal";
 
@@ -124,8 +125,22 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (offered.length === 0) return; // Submit is disabled, but belt and braces.
+
+    // Ensure all numeric fields are cleanly cast numbers
+    const sanitizedSizes: SizeMap = {};
+    for (const size of SIZE_KEYS) {
+      const v = draft.sizes[size];
+      if (v) {
+        sanitizedSizes[size] = {
+          price: Number(v.price) || 0,
+          stock: Math.max(0, Number(v.stock) || 0),
+        };
+      }
+    }
+
     onSubmit({
       ...draft,
+      sizes: sanitizedSizes,
       // New records need an id; existing ones keep theirs.
       id: draft.id || `frag_${Date.now().toString(36)}`,
       name: draft.name.trim(),
@@ -367,28 +382,30 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
                       </span>
                       <label className="flex items-center gap-1.5 text-sm">
                         <span className={sold ? "text-slate-500 font-medium" : "text-slate-300"}>Rs</span>
-                        <input
-                          type="number"
+                        <NumericInput
                           min={1}
                           required={sold}
                           disabled={!sold}
-                          value={variant?.price || ""}
-                          onChange={(e) => setSize(size, "price", Number(e.target.value))}
+                          value={variant?.price}
+                          allowZero={false}
+                          onChange={(v) => setSize(size, "price", v)}
                           placeholder={sold ? "Price" : "—"}
                           className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                          aria-label={`${size} price`}
                         />
                       </label>
                       <label className="flex items-center gap-1.5 text-sm">
                         <span className={sold ? "text-slate-500 font-medium" : "text-slate-300"}>Qty</span>
-                        <input
-                          type="number"
+                        <NumericInput
                           min={0}
                           required={sold}
                           disabled={!sold}
-                          value={variant?.stock ?? ""}
-                          onChange={(e) => setSize(size, "stock", Number(e.target.value))}
+                          value={variant?.stock}
+                          allowZero={true}
+                          onChange={(v) => setSize(size, "stock", v)}
                           placeholder={sold ? "Stock" : "—"}
                           className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                          aria-label={`${size} quantity`}
                         />
                       </label>
                     </div>
