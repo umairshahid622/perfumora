@@ -126,7 +126,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
 
   return (
     <div ref={rootRef} aria-hidden={!open}>
-      {/* Scrim */}
+      {/* Dimming scrim — sits above the header (z-60) so the navigation bar is covered and non-interactive while open */}
       <button
         ref={scrimRef}
         type="button"
@@ -134,7 +134,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]",
+          "fixed inset-0 z-[70] bg-black/60 backdrop-blur-[3px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -147,7 +147,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         aria-label="Fragrances"
         data-lenis-prevent
         className={cn(
-          "bg-bg-dark text-paper fixed inset-x-3 top-19 z-50 overflow-hidden rounded-3xl md:inset-x-6",
+          "bg-bg-dark text-paper fixed inset-x-3 top-19 z-[80] overflow-hidden rounded-3xl md:inset-x-6",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       >

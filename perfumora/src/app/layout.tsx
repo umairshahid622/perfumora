@@ -52,6 +52,40 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       } as React.CSSProperties}
       suppressHydrationWarning
     >
+      <head>
+        {/* Silence unhandled runtime errors from third-party browser extensions (e.g. MetaMask inpage.js) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function isExtensionError(e) {
+                  var msg = (e && (e.message || (e.reason && e.reason.message))) || "";
+                  var file = (e && e.filename) || "";
+                  var stack = (e && (e.error && e.error.stack || (e.reason && e.reason.stack))) || "";
+                  return (
+                    file.indexOf("chrome-extension://") !== -1 ||
+                    stack.indexOf("chrome-extension://") !== -1 ||
+                    msg.indexOf("MetaMask") !== -1 ||
+                    msg.indexOf("failed to connect to MetaMask") !== -1
+                  );
+                }
+                window.addEventListener("error", function(e) {
+                  if (isExtensionError(e)) {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                  }
+                }, true);
+                window.addEventListener("unhandledrejection", function(e) {
+                  if (isExtensionError(e)) {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                  }
+                }, true);
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className="bg-bg-light text-ink flex min-h-full flex-col"
         suppressHydrationWarning

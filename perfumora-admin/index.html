@@ -5,6 +5,33 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>perfumora-admin</title>
+    <script>
+      (function() {
+        function isExtensionError(e) {
+          var msg = (e && (e.message || (e.reason && e.reason.message))) || "";
+          var file = (e && e.filename) || "";
+          var stack = (e && (e.error && e.error.stack || (e.reason && e.reason.stack))) || "";
+          return (
+            file.indexOf("chrome-extension://") !== -1 ||
+            stack.indexOf("chrome-extension://") !== -1 ||
+            msg.indexOf("MetaMask") !== -1 ||
+            msg.indexOf("failed to connect to MetaMask") !== -1
+          );
+        }
+        window.addEventListener("error", function(e) {
+          if (isExtensionError(e)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+        window.addEventListener("unhandledrejection", function(e) {
+          if (isExtensionError(e)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

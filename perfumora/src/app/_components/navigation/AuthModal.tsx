@@ -266,12 +266,12 @@ export function AuthModal({
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]",
+          "fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
 
-      <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center p-4">
+      <div className="pointer-events-none fixed inset-0 z-[80] grid place-items-center p-4">
         <div
           ref={cardRef}
           role="dialog"

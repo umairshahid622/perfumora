@@ -18,6 +18,7 @@ import {
 import { prefersReducedMotion } from "../../_lib/motion";
 import { scrollToSection } from "../../_lib/scroll-to";
 import { SECTION_IDS } from "../../_lib/sections";
+import { cn } from "../../_lib/cn";
 import { useRouteTransition } from "../providers/RouteTransition";
 import { useLenis } from "../providers/SmoothScroll";
 import { AccountMenu } from "./AccountMenu";
@@ -481,7 +482,12 @@ export function Navigation() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[60] h-[4.75rem]">
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-[60] h-[4.75rem] transition-opacity duration-300",
+          panel !== null && "pointer-events-none",
+        )}
+      >
         <nav
           ref={navRef}
           className="text-ink mx-auto flex h-full max-w-[110rem] items-center justify-between px-4 sm:px-6 md:px-16"
