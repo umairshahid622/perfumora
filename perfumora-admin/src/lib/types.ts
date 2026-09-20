@@ -59,11 +59,6 @@ export interface Category {
   name: string;
 }
 
-export const DEFAULT_CATEGORIES: readonly Category[] = [
-  { id: "male", name: "Male" },
-  { id: "female", name: "Female" },
-  { id: "unisex", name: "Unisex" },
-];
 
 export interface Fragrance {
   id: string;

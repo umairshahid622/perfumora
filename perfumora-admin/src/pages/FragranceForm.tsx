@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import type { Fragrance, SizeKey, SizeMap, SizeVariant, FragranceConcentration } from "../lib/types";
-import { SIZE_KEYS, offeredSizes, FRAGRANCE_CONCENTRATIONS, DEFAULT_CATEGORIES } from "../lib/types";
+import { SIZE_KEYS, offeredSizes, FRAGRANCE_CONCENTRATIONS } from "../lib/types";
 import { useFragrances } from "../fragrances/context";
 import { uploadFragranceImage } from "../lib/api";
 import { errorMessage } from "../lib/errors";
@@ -44,19 +44,20 @@ const emptyDraft = (): Fragrance => ({
   color: "#8c6a4a",
   description: "",
   concentration: "Eau de Parfum",
-  categoryId: "unisex",
-  categoryName: "Unisex",
+  categoryId: undefined,
+  categoryName: undefined,
   active: true,
   sizes: { "30ml": { ...NEW_VARIANT }, "50ml": { ...NEW_VARIANT } },
 });
 
 export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
-  const { categories = DEFAULT_CATEGORIES } = useFragrances();
+  const { categories } = useFragrances();
   const [draft, setDraft] = useState<Fragrance>(() => ({
     ...emptyDraft(),
     ...(initial ?? {}),
     concentration: initial?.concentration || "Eau de Parfum",
-    categoryId: initial?.categoryId || "unisex",
+    categoryId: initial?.categoryId ?? (categories.length > 0 ? categories[0]!.id : undefined),
+    categoryName: initial?.categoryName ?? (categories.length > 0 ? categories[0]!.name : undefined),
   }));
 
   // Dynamic AI color presets extracted from the perfume bottle image
@@ -292,17 +293,20 @@ export function FragranceForm({ initial, onSubmit, onCancel }: Props) {
                 <SelectField
                   id="category"
                   label="Category"
-                  value={draft.categoryId || "unisex"}
+                  value={draft.categoryId ?? ""}
                   onChange={(e) => {
                     const catId = e.target.value;
                     const catObj = categories.find((c) => c.id === catId);
                     setDraft((d) => ({
                       ...d,
-                      categoryId: catId,
-                      categoryName: catObj?.name ?? catId,
+                      categoryId: catId || undefined,
+                      categoryName: catObj?.name,
                     }));
                   }}
                 >
+                  {categories.length === 0 && (
+                    <option value="">No categories loaded</option>
+                  )}
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}

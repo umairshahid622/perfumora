@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import type { Category, Fragrance, Order, OrderStatus, SizeKey, SizeMap } from "./types";
-import { DEFAULT_CATEGORIES, SIZE_KEYS, offeredSizes } from "./types";
+import { SIZE_KEYS, offeredSizes } from "./types";
 
 /* ---------------------------------------------------------------------------
    Data access layer.
@@ -77,25 +77,9 @@ function toSizes(rows: SizeRow[]): SizeMap {
   return sizes;
 }
 
-/**
- * Deterministically assigns a random category for a fragrance when not yet set in DB.
- * Stable across re-renders for the same ID.
- */
-function deterministicCategory(id: string): { id: string; name: string } {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  return DEFAULT_CATEGORIES[hash % DEFAULT_CATEGORIES.length]!;
-}
-
 function toFragrance(row: FragranceRow): Fragrance {
-  const fallback = deterministicCategory(row.id);
-  const categoryId = row.category_id || row.categories?.id || fallback.id;
-  const categoryName =
-    row.categories?.name ||
-    DEFAULT_CATEGORIES.find((c) => c.id === categoryId)?.name ||
-    fallback.name;
+  const categoryId = row.category_id || row.categories?.id || undefined;
+  const categoryName = row.categories?.name || undefined;
 
   return {
     id: row.id,
@@ -147,10 +131,9 @@ function toOrder(row: OrderRow): Order {
 export async function fetchCategories(): Promise<Category[]> {
   const res = await supabase.from("categories").select("id, name").order("name");
   if (res.error) {
-    // If categories table does not exist yet, return defaults
-    return [...DEFAULT_CATEGORIES];
+    throw new Error(`Could not load categories: ${res.error.message}`);
   }
-  return res.data && res.data.length > 0 ? (res.data as Category[]) : [...DEFAULT_CATEGORIES];
+  return (res.data ?? []) as Category[];
 }
 
 /* ----------------------------- fragrances ------------------------------- */
@@ -158,45 +141,12 @@ export async function fetchCategories(): Promise<Category[]> {
 // Nested select: one round trip brings each fragrance, its category, and its size rows.
 const FRAGRANCE_SELECT_WITH_CATEGORY =
   "id, name, image_url, color, description, concentration, category_id, categories ( id, name ), active, fragrance_sizes ( size, price, stock )";
-const FRAGRANCE_SELECT_WITH_CONCENTRATION =
-  "id, name, image_url, color, description, concentration, active, fragrance_sizes ( size, price, stock )";
-const FRAGRANCE_SELECT =
-  "id, name, image_url, color, description, active, fragrance_sizes ( size, price, stock )";
 
 export async function fetchFragrances(): Promise<Fragrance[]> {
-  let res: { data: any; error: any } = await supabase
+  const res = await supabase
     .from("fragrances")
     .select(FRAGRANCE_SELECT_WITH_CATEGORY)
     .order("name");
-
-  // If categories relation or category_id doesn't exist yet, fall back to concentration-only
-  if (
-    res.error &&
-    (res.error.code === "PGRST200" ||
-      res.error.code === "PGRST202" ||
-      res.error.code === "42703" ||
-      res.error.code === "PGRST205" ||
-      res.error.message?.includes("categories") ||
-      res.error.message?.includes("category_id"))
-  ) {
-    res = await supabase
-      .from("fragrances")
-      .select(FRAGRANCE_SELECT_WITH_CONCENTRATION)
-      .order("name");
-  }
-
-  // If concentration column also doesn't exist yet, fall back to legacy select
-  if (
-    res.error &&
-    (res.error.code === "PGRST202" ||
-      res.error.code === "42703" ||
-      res.error.message?.includes("concentration"))
-  ) {
-    res = await supabase
-      .from("fragrances")
-      .select(FRAGRANCE_SELECT)
-      .order("name");
-  }
 
   if (res.error) throw new Error(`Could not load fragrances: ${res.error.message}`);
   // The client has no generated Database type, so rows arrive untyped.
@@ -231,30 +181,13 @@ export async function upsertFragrance(fragrance: Fragrance): Promise<void> {
     color: fragrance.color,
     description: fragrance.description,
     concentration: fragrance.concentration || "Eau de Parfum",
-    category_id: fragrance.categoryId || "unisex",
+    category_id: fragrance.categoryId || null,
     active: fragrance.active,
   };
 
-  let { error: fragranceError } = await supabase
+  const { error: fragranceError } = await supabase
     .from("fragrances")
     .upsert(fragrancePayload);
-
-  // If Postgres doesn't have the category_id column yet, retry without it
-  if (
-    fragranceError &&
-    (fragranceError.message?.includes("category_id") || fragranceError.code === "42703")
-  ) {
-    delete fragrancePayload.category_id;
-    const retry = await supabase.from("fragrances").upsert(fragrancePayload);
-    fragranceError = retry.error;
-  }
-
-  // If Postgres doesn't have the concentration column yet, retry without it
-  if (fragranceError && fragranceError.message?.includes("concentration")) {
-    delete fragrancePayload.concentration;
-    const retry = await supabase.from("fragrances").upsert(fragrancePayload);
-    fragranceError = retry.error;
-  }
 
   if (fragranceError) {
     throw new Error(`Could not save ${fragrance.name}: ${fragranceError.message}`);
@@ -311,14 +244,6 @@ export async function updateFragranceCategory(id: string, categoryId: string): P
     .eq("id", id);
 
   if (error) {
-    if (
-      error.code === "PGRST204" ||
-      error.code === "42703" ||
-      error.message?.includes("category_id")
-    ) {
-      console.warn("category_id column not found in database yet. Run migration SQL.", error.message);
-      return;
-    }
     throw new Error(`Could not update category: ${error.message}`);
   }
 }

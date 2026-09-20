@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Category, Fragrance } from "../lib/types";
-import { DEFAULT_CATEGORIES } from "../lib/types";
 import {
   deleteFragrance,
   fetchCategories,
@@ -22,7 +21,7 @@ import { FragrancesContext, type FragrancesContextValue } from "./context";
 
 export function FragrancesProvider({ children }: { children: ReactNode }) {
   const [fragrances, setFragrances] = useState<Fragrance[]>([]);
-  const [categories, setCategories] = useState<Category[]>([...DEFAULT_CATEGORIES]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,9 +32,7 @@ export function FragrancesProvider({ children }: { children: ReactNode }) {
         fetchCategories(),
       ]);
       setFragrances(fragranceRows);
-      if (categoryRows && categoryRows.length > 0) {
-        setCategories(categoryRows);
-      }
+      setCategories(categoryRows);
       setError(null);
       setLoading(false);
     } catch (err: unknown) {

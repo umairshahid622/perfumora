@@ -39,7 +39,7 @@ export function MobileMenu({
     const map = new Map<string, { variant: (typeof variants)[number]; originalIndex: number }[]>();
 
     variants.forEach((variant, originalIndex) => {
-      const cat = variant.category || "Unisex";
+      const cat = variant.category || "Uncategorized";
       if (!map.has(cat)) {
         map.set(cat, []);
       }

@@ -42,24 +42,6 @@ const SIZE_FROM_DB: Record<string, SizeMl> = { "30ml": 30, "50ml": 50 };
  *  crossing still happens in exactly one module. */
 export const SIZE_TO_DB: Record<SizeMl, string> = { 30: "30ml", 50: "50ml" };
 
-const DEFAULT_CATEGORIES = [
-  { id: "male", name: "Male" },
-  { id: "female", name: "Female" },
-  { id: "unisex", name: "Unisex" },
-];
-
-/**
- * Deterministically assigns a random category for a fragrance when not yet set in DB.
- * Stable across server and client renders for the same ID to prevent hydration mismatches.
- */
-function deterministicCategory(id: string): { id: string; name: string } {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  return DEFAULT_CATEGORIES[hash % DEFAULT_CATEGORIES.length]!;
-}
-
 /**
  * Collapse the `fragrance_sizes` rows into the sparse map the UI works in — see
  * `SizeMap` for why absent beats zero-filled. An unrecognised enum value is
@@ -77,12 +59,12 @@ function toSizes(rows: SizeRow[]): SizeMap {
 }
 
 function toVariant(row: FragranceRow): Variant {
-  const fallback = deterministicCategory(row.id);
-  const categoryId = row.category_id || row.categories?.id || fallback.id;
+  const categoryId = row.category_id || row.categories?.id || undefined;
   const category =
     row.categories?.name ||
-    DEFAULT_CATEGORIES.find((c) => c.id === categoryId)?.name ||
-    fallback.name;
+    (row.category_id
+      ? row.category_id.charAt(0).toUpperCase() + row.category_id.slice(1)
+      : undefined);
 
   return {
     id: row.id,
@@ -103,10 +85,6 @@ function toVariant(row: FragranceRow): Variant {
 // Nested select: one round trip brings each fragrance, its category, and its size rows.
 const FRAGRANCE_SELECT_WITH_CATEGORY =
   "id, name, color, image_url, concentration, category_id, categories ( id, name ), fragrance_sizes ( size, price, stock )";
-const FRAGRANCE_SELECT_WITH_CONCENTRATION =
-  "id, name, color, image_url, concentration, fragrance_sizes ( size, price, stock )";
-const FRAGRANCE_SELECT_LEGACY =
-  "id, name, color, image_url, fragrance_sizes ( size, price, stock )";
 
 /**
  * Every fragrance the shop currently sells, in the order the catalogue was built.
@@ -125,45 +103,15 @@ const FRAGRANCE_SELECT_LEGACY =
  * express intent at the call site, and it costs nothing to say it out loud.
  */
 export const getCatalogue = cache(async (): Promise<Variant[]> => {
-  let res: { data: any; error: any } = await supabase
+  const { data, error } = await supabase
     .from("fragrances")
     .select(FRAGRANCE_SELECT_WITH_CATEGORY)
     .eq("active", true)
     .order("created_at");
 
-  // Fallback gracefully if categories table or category_id column doesn't exist yet
-  if (
-    res.error &&
-    (res.error.code === "PGRST200" ||
-      res.error.code === "PGRST202" ||
-      res.error.code === "42703" ||
-      res.error.code === "PGRST205" ||
-      res.error.message?.includes("categories") ||
-      res.error.message?.includes("category_id"))
-  ) {
-    res = await supabase
-      .from("fragrances")
-      .select(FRAGRANCE_SELECT_WITH_CONCENTRATION)
-      .eq("active", true)
-      .order("created_at");
+  if (error) {
+    throw new Error(`Could not load the catalogue from database: ${error.message}`);
   }
-
-  // Fallback gracefully if concentration column doesn't exist yet in Supabase
-  if (
-    res.error &&
-    (res.error.code === "PGRST202" ||
-      res.error.code === "42703" ||
-      res.error.message?.includes("concentration"))
-  ) {
-    res = await supabase
-      .from("fragrances")
-      .select(FRAGRANCE_SELECT_LEGACY)
-      .eq("active", true)
-      .order("created_at");
-  }
-
-  const { data, error } = res;
-  if (error) throw new Error(`Could not load the catalogue: ${error.message}`);
 
   // A fragrance with no size rows has no price and cannot be bought — it is the
   // "No sizes set" state the panel warns about, and the case schema.sql's own
