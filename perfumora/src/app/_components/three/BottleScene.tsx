@@ -1,22 +1,35 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
+import { ContactShadows } from "@react-three/drei";
+import { StudioEnvironment } from "./StudioEnvironment";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { AgXToneMapping, Color } from "three";
+import { ACESFilmicToneMapping, Color, SRGBColorSpace } from "three";
 import { readCssToken } from "../../_lib/css-token";
 import { prefersReducedMotion } from "../../_lib/motion";
 import { SECTION_IDS } from "../../_lib/sections";
 import { useMediaQuery } from "../../_hooks/useMediaQuery";
-import { BottleGltf } from "./BottleGltf";
+import { BottleGltf, normalizeLiquidColor } from "./BottleGltf";
 import { BottleMist } from "./BottleMist";
-import { StudioEnvironment } from "./StudioEnvironment";
 import { useBottleRefs } from "./useBottleRefs";
 import { useBottleFloat } from "./useBottleFloat";
 import { useBottleUncap } from "./useBottleUncap";
 import { AddToBagBottleBridge } from "./AddToBagBottleBridge";
+
+/**
+ * Resolution scale of the glass refraction buffer, the single biggest performance
+ * factor of real-time transmission. Dynamically tuned based on device viewport.
+ */
+function TransmissionQuality({ scale }: { scale: number }) {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.transmissionResolutionScale = scale;
+  }, [gl, scale]);
+  return null;
+}
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -176,12 +189,12 @@ export default function BottleScene({
 
       if (firstRun.current) {
         firstRun.current = false;
-        material?.color.set(juice);
+        material?.color.copy(normalizeLiquidColor(juice));
         return;
       }
 
       if (prefersReducedMotion()) {
-        material?.color.set(juice);
+        material?.color.copy(normalizeLiquidColor(juice));
         return;
       }
 
@@ -210,11 +223,8 @@ export default function BottleScene({
       );
 
       if (material) {
-        // `Color` applies three's sRGB → linear-sRGB conversion, matching the
-        // working space `material.color` already holds, so the channels
-        // interpolate in linear light — a touch brighter through the midpoint
-        // than lerping the gamma-encoded values would be.
-        const target = new Color(juice);
+        // Normalizes deep tones so every fragrance stays consistently translucent
+        const target = normalizeLiquidColor(juice);
         tl.to(
           material.color,
           {
@@ -314,56 +324,66 @@ export default function BottleScene({
            `demand` once it has scrolled away, so an invisible WebGL surface
            stops competing with the page's own scroll for GPU time. */
         frameloop={frameloop}
-        /* 1.5, not 2: the vessel is glass over parchment on a transparent canvas
-           — a soft-edged, low-contrast subject, where the extra pixel doubling of
-           dpr 2 (4× the fill) buys no visible fidelity but a real frame cost on
-           integrated GPUs. Compact keeps the original 1.6 (its canvas is small). */
-        dpr={[1, isCompact ? 1.6 : 1.5]}
-        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+        /* DPR capped at 2 on desktop, 1.5 on compact devices for optimal transmission perf */
+        dpr={[1, isCompact ? 1.5 : 2]}
+        gl={{
+          alpha: true,
+          antialias: true,
+          premultipliedAlpha: true,
+          powerPreference: "high-performance",
+        }}
         camera={{ position: [0, 0, 7.2], fov: 24, near: 0.1, far: 40 }}
         onCreated={({ gl }) => {
-          gl.toneMapping = AgXToneMapping;
-          gl.toneMappingExposure = 1.05;
+          gl.setClearColor(0x000000, 0);
+          gl.toneMapping = ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.0;
+          gl.outputColorSpace = SRGBColorSpace;
         }}
       >
-        <StudioEnvironment intensity={0.80} />
+        <TransmissionQuality scale={isCompact ? 0.5 : 0.75} />
         <AddToBagBottleBridge refs={bottleRefs} />
 
+        <StudioEnvironment intensity={1.1} />
+
         {/* Studio ambient fill (balanced soft illumination) */}
-        <ambientLight intensity={0.30} color="#ffffff" />
+        <ambientLight intensity={0.35} color="#ffffff" />
 
         {/* Studio_KeyLight (soft key light from upper right, gentle reflection) */}
-        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.32} color="#fffaf2" />
+        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.45} color="#fffaf2" />
 
         {/* Studio_FillLight (soft left fill) */}
-        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.22} color="#f4f8ff" />
+        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.25} color="#f4f8ff" />
 
         {/* Studio_RimLight (back-left rim light giving subtle crystal refraction edge) */}
-        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.28} color="#eef6ff" />
+        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.35} color="#eef6ff" />
 
         {/* Studio_TopLight (overhead light defining cap bevels and shoulders) */}
-        <directionalLight position={[0, 4.5, 1.0]} intensity={0.24} color="#ffffff" />
+        <directionalLight position={[0, 4.5, 1.0]} intensity={0.3} color="#ffffff" />
 
         {/* Studio_BottomBounce (gentle caustic glow on crystal base) */}
-        <directionalLight position={[0, -2.2, 3.2]} intensity={0.22} color="#fff5ea" />
+        <directionalLight position={[0, -2.2, 3.2]} intensity={0.25} color="#fff5ea" />
 
-        {/* The resting pose, set once as plain props — there is no longer a timeline
-            writing this group, so React owns the transform outright and no ref is
-            needed. Still a group rather than posing the model directly: it wraps the
-            model's own suspense boundary, kept in here so the download cannot suspend
-            the canvas itself, which would tear the WebGL context and the environment
-            map down with it and rebuild both. */}
+        {/* The resting pose group */}
         <group position={[0, rest.y, 0]} scale={rest.scale}>
+          {/* Soft contact shadow beneath the bottle on transparent ground */}
+          <ContactShadows
+            position={[0, -1.202, 0]}
+            scale={2.4}
+            far={0.8}
+            blur={2.5}
+            opacity={0.22}
+            color="#3b2a20"
+            resolution={isCompact ? 256 : 512}
+            frames={isCompact ? (ready ? 1 : 0) : Infinity}
+          />
+
           {/* Tilt group for scroll-driven showcase pose and bottle tilt */}
           <group ref={tiltGroupRef}>
             <Suspense fallback={null}>
               <BottleGltf refs={bottleRefs} liquidColor={juice} onReady={handleReady} />
             </Suspense>
 
-            {/* The spray, a sibling of the model so it shares its framed space
-                without being turned by the variant spin — and outside the suspense
-                boundary, so its handles are wired from the first commit rather than
-                when the download lands. */}
+            {/* The spray mist */}
             <BottleMist refs={bottleRefs} color={juice} />
           </group>
         </group>

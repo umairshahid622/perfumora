@@ -1,9 +1,17 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useLoader, useThree, type ThreeElements } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Box3, Mesh, MeshPhysicalMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
+import {
+  Box3,
+  Color,
+  FrontSide,
+  Mesh,
+  MeshPhysicalMaterial,
+  Vector3,
+  type WebGLProgramParametersWithUniforms,
+} from "three";
 import type { BottleRefs } from "./useBottleRefs";
 import {
   useLiquidPhysics,
@@ -16,98 +24,147 @@ const MODEL_URL = "/perfume_bottle.glb";
 
 /**
  * World-space height the model is normalised to, so the framing survives the
- * asset being re-exported at a different scale. 2.4 fills roughly three
- * quarters of the scene's 24° frame at the camera's distance.
+ * asset being re-exported at a different scale.
  */
 const FRAMED_HEIGHT = 2.4;
 
 /**
- * The glTF node names this component reads — the contract with the asset. If an
- * export renames them, the wiring below silently finds nothing.
+ * The glTF node names this component reads — the contract with the asset.
  */
 const NODE = {
   glass: "bottle",
-  /** The clear sleeve around the cap — a child of `cap`, whose own material is
-   *  the opaque dark one. Both ship as glass from Blender. */
   capGlass: "capOutside",
   liquid: "liquid",
   dipTube: "pipe",
   cap: "cap",
-  /** The pump's press button, which the closure above hides until it lifts. */
   pumpButton: "automizerButton",
-  /** The nozzle orifice node */
   nozzle: "nozzle",
 } as const;
 
 /**
- * Draw order inside three's transparent pass, which sorts on `renderOrder`
- * before depth: the fragrance has to be laid down before the glass that blends
- * over it, or the glass covers it instead.
+ * Draw order inside three's transparent pass:
+ * dipTube (0) -> liquid (1) -> glass flacon (2)
  */
-const RENDER_ORDER = { dipTube: 0, liquid: 1, glass: 2 } as const;
+const RENDER_ORDER = { dipTube: 0, liquid: 1, glass: 2, rest: 3 } as const;
 
 /**
- * The liquid's shading, in two parts.
- *
- * **The slosh** (vertex): counter-tilt displacement driven by the damped
- * oscillator in `useLiquidPhysics`, plus a normal adjustment so the specular
- * travels across the surface as it moves.
- *
- * **The volume** (fragment): what actually makes it read as liquid rather than a
- * flat fill. A uniform alpha carries no depth cue at all — the eye gets a single
- * flat tone and reads paint. Real perfume gives two:
- *
- *   - *Beer-Lambert*. The column is densest where the light path through it is
- *     longest, so the liquid deepens toward the bottom and pales just under the
- *     surface. Modelled as a vertical gradient over the mesh's own extent,
- *     measured from its bounding box rather than hardcoded, so a re-exported
- *     model keeps the same read.
- *   - *The meniscus*. Surface tension pulls the liquid up the inside of the
- *     glass, and that curve catches the key light — so a bright band sits right
- *     at the top of the column. It is the strongest single cue that the top of
- *     the fill is a surface and not just where the colour stops.
- *
- * Both are measured against the *undeformed* `position.y`, so the gradient stays
- * anchored to the glass while the surface above it sloshes.
+ * The nozzle's horizontal offset from the pump button it hangs off.
  */
-function applyLiquidSloshShader(
+const NOZZLE_OFFSET = { x: 0.151, z: -1.134 } as const;
+
+/**
+ * Yaw that puts the pump's spout straight at the camera.
+ */
+const NOZZLE_YAW = Math.PI + Math.atan2(NOZZLE_OFFSET.x, -NOZZLE_OFFSET.z);
+
+/**
+ * Crystal-clear luxury glass flacon shader:
+ * - Subtle studio softbox reflections on curved flanks
+ * - Dark inner shade band defining the glass wall thickness
+ * - Solid crystal base ("culot") internal refraction at Y in [-1.741, -1.226]
+ * - Grazing chromatic split at silhouette
+ */
+function applyGlassShader(
+  material: MeshPhysicalMaterial,
+  innerShade: number = 0.45,
+  cacheKey: string = "glass_edge_crystal_v21",
+): void {
+  material.customProgramCacheKey = () => cacheKey;
+  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    shader.vertexShader =
+      `varying vec3 vModelPos;\n` +
+      shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>\nvModelPos = position;`,
+      );
+
+    shader.fragmentShader =
+      `varying vec3 vModelPos;\n` +
+      shader.fragmentShader.replace(
+        "#include <dithering_fragment>",
+        `#include <dithering_fragment>
+  {
+    float cosTheta = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+    float grazing = 1.0 - cosTheta;
+
+    // Normalised key light direction [3.2, 2.4, 4.2]
+    vec3 keyDir = vec3(0.5517, 0.4138, 0.7241);
+    float lit = smoothstep(-0.35, 0.85, dot(normalize(vNormal), keyDir));
+
+    // 1. Broad soft studio halo
+    float halo = pow(grazing, 2.2) * 0.22 * mix(0.4, 1.0, lit);
+    gl_FragColor.rgb += vec3(halo) * vec3(0.99, 0.98, 0.96);
+
+    // 2. Chromatic contour split
+    float rimR = pow(grazing, 4.6);
+    float rimG = pow(grazing, 5.6);
+    float rimB = pow(grazing, 6.6);
+    vec3 split = vec3(rimR, rimG, rimB) * 0.28 * mix(1.0, 0.7, lit);
+    vec3 dispersion = mix(vec3(0.92, 0.97, 1.06), vec3(1.04, 0.98, 0.90), lit);
+    gl_FragColor.rgb += split * dispersion;
+
+    // 3. Inner shade: dark refractive band showing wall thickness
+    float band = pow(grazing, 2.2) * (1.0 - pow(grazing, 9.0));
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.38, 0.38, 0.40), band * ${innerShade.toFixed(2)});
+
+    // 4. Solid crystal glass base beneath cavity (Y between -1.741 and -1.226)
+    float isBase = smoothstep(-1.20, -1.25, vModelPos.y);
+    if (isBase > 0.001) {
+      float baseCorner = (1.0 - smoothstep(-1.741, -1.68, vModelPos.y)) * 0.35;
+      float baseInternal = smoothstep(-1.70, -1.26, vModelPos.y) * pow(grazing, 1.6) * 0.22;
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.35, 0.35, 0.38), isBase * (baseCorner + baseInternal));
+      gl_FragColor.a = clamp(gl_FragColor.a + isBase * 0.16, 0.0, 0.70);
+    }
+
+    // 5. Alpha gathers toward edges, leaving center clear
+    gl_FragColor.a = clamp(gl_FragColor.a + pow(grazing, 2.6) * 0.42, 0.0, 0.65);
+  }`,
+      );
+  };
+  material.needsUpdate = true;
+}
+
+/**
+ * Advanced liquid shader matching reference photo:
+ * - Real-time slosh physics
+ * - High-definition top meniscus line with specular glint
+ * - Crisp refractive inner side walls
+ * - Rounded bottom bowl with concentric caustic rings
+ * - Pure water clarity for clear fragrances, rich translucency for colored fragrances
+ */
+function applyLiquidShader(
   material: MeshPhysicalMaterial,
   uniforms: LiquidUniforms,
-  bodyBottom: number,
-  bodyTop: number,
+  bodyBottom: number = -1.226,
+  bodyTop: number = 0.785,
+  cacheKey: string = "liquid_water_photo_v33",
 ): void {
-  material.customProgramCacheKey = () => "liquid_slosh_shader_v35";
+  material.customProgramCacheKey = () => cacheKey;
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
-    // Bind uniforms to shader
     shader.uniforms.uSlosh = uniforms.uSlosh;
     shader.uniforms.uWaveTime = uniforms.uWaveTime;
     shader.uniforms.uWaveIntensity = uniforms.uWaveIntensity;
     shader.uniforms.uBodyBottom = { value: bodyBottom };
     shader.uniforms.uBodyTop = { value: bodyTop };
 
-    // 1. Declare uniforms and the body-height varying in the vertex shader
+    // Vertex displacement for real-time slosh physics
     shader.vertexShader =
-      `uniform vec2 uSlosh;\nuniform float uWaveTime;\nuniform float uWaveIntensity;\nvarying float vBodyY;\n` +
+      `uniform vec2 uSlosh;\nuniform float uWaveTime;\nuniform float uWaveIntensity;\nvarying float vBodyY;\nvarying vec3 vModelPos;\n` +
       shader.vertexShader;
 
-    // 2. Displace vertices in vertex shader for slosh counter-tilt oscillation
     shader.vertexShader = shader.vertexShader.replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
   {
-    // Slosh counter-tilt displacement: 0 at curved bottom bowl, transitions to full at upper meniscus
     float hFactor = smoothstep(-0.2, 1.15, transformed.y);
     float sloshTilt = clamp((position.x * uSlosh.x + position.z * uSlosh.y) * hFactor, -0.22, 0.22);
-
-    // Silky-smooth counter-tilt fluid motion without high-frequency vertex shivering or vibration
     transformed.y += sloshTilt;
 
-    // The undeformed height, which is what the depth gradient is anchored to.
     vBodyY = position.y;
+    vModelPos = position;
   }`,
     );
 
-    // 3. Normal adjustment for accurate specular reflections on sloshing liquid
     shader.vertexShader = shader.vertexShader.replace(
       "#include <defaultnormal_vertex>",
       `#include <defaultnormal_vertex>
@@ -121,155 +178,82 @@ function applyLiquidSloshShader(
   }`,
     );
 
-    // 4. The volume: depth gradient and meniscus, injected in output space so
-    //    they sit on top of the material's own lighting and tone mapping.
+    // Fragment shader
     shader.fragmentShader =
-      `uniform float uBodyBottom;\nuniform float uBodyTop;\nvarying float vBodyY;\n` +
+      `uniform float uBodyBottom;\nuniform float uBodyTop;\nvarying float vBodyY;\nvarying vec3 vModelPos;\n` +
       shader.fragmentShader;
 
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
   {
-    float bodyT = clamp(
-      (vBodyY - uBodyBottom) / max(0.0001, uBodyTop - uBodyBottom),
-      0.0, 1.0
-    );
+    float normY = clamp((vBodyY - uBodyBottom) / max(0.0001, uBodyTop - uBodyBottom), 0.0, 1.0);
 
-    // Beer-Lambert volume density: deeper absorption toward bottom
-    float density = (1.0 - bodyT) * (1.0 - bodyT);
-
-    // Rich saturated jewel-toned color vibrance
-    vec3 luma = vec3(dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114)));
-    vec3 jewel = mix(luma, gl_FragColor.rgb, 1.30);
-
-    // Subtle internal liquid translucency (soft backlight illumination)
-    vec3 keyDir = vec3(0.5517, 0.4138, 0.7241);
-    float backScatter = max(0.0, -dot(normalize(vNormal), keyDir)) * 0.18;
-
-    // Glowing translucent liquid body: sheer, rich jewel tone throughout, deepening toward base
-    gl_FragColor.rgb = jewel * (1.02 + backScatter) * mix(1.0, 0.88, density);
-
-    // Meniscus surface tension glint (subtle, delicate catchlight)
-    float meniscus = smoothstep(0.93, 0.99, bodyT);
-    gl_FragColor.rgb += vec3(0.18, 0.16, 0.14) * meniscus;
-
-    // Sheer, radiant translucent perfume fluid: allows background elements & internal reflections to filter through
-    gl_FragColor.a = clamp(0.36 + density * 0.20 + meniscus * 0.12, 0.18, 0.65);
-  }`,
-    );
-  };
-  material.needsUpdate = true;
-}
-
-/**
- * Glass edge shader — "liquid glass".
- *
- * Builds the read of a *lens* rather than a pane. The reference is the Apple
- * material of that name: a clear middle, and an edge that gathers light and
- * splits it. Four layers, in the order they matter:
- *
- *   1. **A broad halo.** This is what makes the vessel visible, and it is
- *      deliberately wide and dim. The single most important thing learned here
- *      is that a *narrow* falloff at *high* intensity reads as a drawn line
- *      (that was the glare), while a *wide* one at low intensity reads as glass.
- *      Visibility comes from the halo, not from the contour.
- *   2. **A thin chromatic contour.** Each channel peaks at a slightly different
- *      grazing angle — which is exactly what a lens does — so the edge separates
- *      into warm and cool instead of going to plain white. That split is the
- *      signature of this material.
- *   3. **An inner shade.** A soft darkening just inside the contour reads as the
- *      thickness of the glass, and is what stops the silhouette floating. Bounded
- *      so it never reaches the outline itself.
- *   4. **A gather in alpha** that rises toward the edge but never becomes opaque,
- *      leaving the centre genuinely clear.
- *
- * Nothing in this scene refracts — the canvas is transparent and the DOM type
- * behind it is not in the scene, so `transmission` cannot see it. That is why
- * the lens is *described* rather than simulated: the dispersion and the
- * thickness are the cues the eye actually reads, and both survive without a
- * backdrop to bend.
- *
- * The rim is directional throughout — the camera is fixed and unrotated, so view
- * space and world space share directions and the key light's position can be
- * used directly. Warm where the key hits, cool opposite.
- */
-function applyGlassEdge(
-  material: MeshPhysicalMaterial,
-  rimStrength: number = 0.24,
-  alphaGather: number = 0.35,
-  baseAlpha: number = 0.02,
-  cacheKey: string = "glass_edge_liquid_v35",
-): void {
-  material.customProgramCacheKey = () => cacheKey;
-  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
-    // 1. Pass local vertex position to fragment shader for heavy base and shoulder detection
-    shader.vertexShader = `varying vec3 vGlassPos;\n` + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace(
-      "#include <begin_vertex>",
-      `#include <begin_vertex>\n  vGlassPos = position;\n`,
-    );
-
-    // 2. Liquid Glass fragment shader
-    shader.fragmentShader = `varying vec3 vGlassPos;\n` + shader.fragmentShader;
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <dithering_fragment>",
-      `#include <dithering_fragment>
-  {
     float cosTheta = abs(dot(normalize(vNormal), normalize(vViewPosition)));
     float grazing = 1.0 - cosTheta;
 
-    // Direct key light vector [3.2, 2.4, 4.2]
-    vec3 keyDir = vec3(0.5517, 0.4138, 0.7241);
-    float lit = smoothstep(-0.25, 0.85, dot(normalize(vNormal), keyDir));
+    // Detect whether liquid is clear water or colored fragrance
+    float maxC = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b));
+    float minC = min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b));
+    float sat = (maxC - minC) / max(maxC, 0.001);
+    float isClear = 1.0 - smoothstep(0.04, 0.10, sat);
 
-    // 1. Soft vertical studio softbox reflection stripes (subtle silky sheen, not blinding glare)
-    // Delicate key softbox ribbon along right curved flank of the bottle cylinder
-    float keyStripe = smoothstep(0.50, 0.75, vNormal.x) * smoothstep(0.94, 0.75, vNormal.x);
-    float keySoftbox = pow(keyStripe, 2.0) * 0.28;
+    // =========================================================================
+    // 1. TOP MENISCUS (surface line across bottle at normY ~0.97 - 0.99)
+    // Razor-sharp dark refractive horizon line with glistening specular highlight
+    // =========================================================================
+    float climb = pow(grazing, 2.2) * 0.012;
+    float curvedNormY = clamp(normY - climb, 0.0, 1.0);
+    float meniscusDark = smoothstep(0.972, 0.984, curvedNormY) * (1.0 - smoothstep(0.984, 0.996, curvedNormY)) * 2.8;
+    float meniscusSpec = pow(smoothstep(0.978, 0.988, curvedNormY) * (1.0 - smoothstep(0.988, 0.997, curvedNormY)), 2.0) * 1.2;
 
-    // Delicate fill softbox ribbon along left curved flank
-    float fillStripe = smoothstep(-0.48, -0.72, vNormal.x) * smoothstep(-0.92, -0.72, vNormal.x);
-    float fillSoftbox = pow(fillStripe, 2.0) * 0.18;
+    // =========================================================================
+    // 2. INNER LIQUID SIDE WALLS
+    // Dark refractive boundary where liquid touches inner glass wall (grazing angle)
+    // =========================================================================
+    float sideWall = pow(grazing, 2.5) * smoothstep(0.06, 0.14, normY) * (1.0 - smoothstep(0.94, 0.98, normY)) * 1.1;
 
-    // 2. Delicate Prismatic Chromatic Dispersion along outer curved boundary
-    float rimR = pow(grazing, 3.2);
-    float rimG = pow(grazing, 3.8);
-    float rimB = pow(grazing, 4.6);
-    vec3 chromaticSplit = vec3(rimR, rimG, rimB) * ${rimStrength.toFixed(2)};
-    vec3 dispersionTint = mix(vec3(0.92, 0.96, 1.15), vec3(1.15, 1.04, 0.90), lit);
+    // =========================================================================
+    // 3. ROUNDED BOTTOM BOWL & CONCENTRIC CAUSTIC RINGS
+    // The concave bowl at the bottom of the perfume liquid matching reference photo
+    // =========================================================================
+    // 3D curved silhouette of the rounded bowl down to the apex (smooth U-curve, no flat bar)
+    float isBowl = 1.0 - smoothstep(-1.226, -1.030, vModelPos.y);
+    float bowlCurvedSilhouette = isBowl * pow(grazing, 1.8) * 1.4;
 
-    // 3. Heavy Solid Crystal Base ("Culot" / Ice Base) - soft internal caustic glow
-    float isBase = smoothstep(-0.80, -1.28, vGlassPos.y);
-    float baseCaustic = 0.0;
-    if (isBase > 0.001) {
-      baseCaustic = pow(grazing, 1.8) * isBase * 0.25;
-    }
+    // Soft apex shadow at the lowest point of the bowl
+    float bowlApexShade = (1.0 - smoothstep(-1.226, -1.160, vModelPos.y)) * 0.45;
 
-    // 4. Subtle curved flacon shoulder glint
-    float isShoulder = smoothstep(0.32, 0.58, vGlassPos.y) * smoothstep(0.92, 0.58, vGlassPos.y);
-    float shoulderGlint = 0.0;
-    if (isShoulder > 0.001) {
-      vec3 halfVec = normalize(keyDir + normalize(vViewPosition));
-      shoulderGlint = pow(max(0.0, dot(normalize(vNormal), halfVec)), 28.0) * isShoulder * 0.16 * lit;
-    }
+    // Concentric caustic rings in the curved bowl (central and outer rings centered on dip tube)
+    float r = length(vModelPos.xz);
+    float normR = clamp(r / 1.134, 0.0, 1.0);
+    float centralRing = smoothstep(0.20, 0.30, normR) * (1.0 - smoothstep(0.30, 0.42, normR));
+    float outerRing = smoothstep(0.55, 0.65, normR) * (1.0 - smoothstep(0.65, 0.78, normR));
+    float causticRings = isBowl * (centralRing * 1.3 + outerRing * 0.8) * 0.45;
 
-    // Add optical liquid glass elements to RGB
-    gl_FragColor.rgb += vec3(keySoftbox + fillSoftbox + shoulderGlint + baseCaustic);
-    gl_FragColor.rgb += chromaticSplit * dispersionTint;
+    float bottomBowl = clamp(bowlCurvedSilhouette + bowlApexShade + causticRings, 0.0, 1.0);
 
-    // 5. Alpha dynamics for crystal clarity without excessive shine/opacity:
-    // Crystal clear at normal incidence (baseAlpha ~0.02), gently rising on softbox stripes,
-    // grazing edges, and crystal base.
-    float edgeAlpha = pow(grazing, 2.6) * ${alphaGather.toFixed(2)};
-    float softboxAlpha = (keySoftbox + fillSoftbox + shoulderGlint) * 0.50;
-    float baseAlpha = isBase * 0.16;
+    // =========================================================================
+    // 4. COMBINED REFRACTIVE CONTOURS & COLOR COMPOSITING
+    // Consistent optical behavior across all fragrances (colored and crystal water)
+    // =========================================================================
+    float refractContours = clamp(meniscusDark + sideWall + bottomBowl, 0.0, 1.0);
 
-    gl_FragColor.a = clamp(
-      ${baseAlpha.toFixed(2)} + edgeAlpha + softboxAlpha + baseAlpha,
-      0.0,
-      0.62
-    );
+    // Deep refractive contour tone derived from the liquid's own body color
+    vec3 darkRefract = mix(gl_FragColor.rgb * 0.32, vec3(0.26, 0.26, 0.28), 0.35);
+
+    // Blend refractive contours into RGB
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, darkRefract, refractContours * 0.72);
+    // Add specular glint to meniscus and caustic rings
+    gl_FragColor.rgb += vec3(meniscusSpec) + vec3(causticRings * 0.15);
+
+    // Beer-Lambert depth density (richer body toward the curved bottom bowl)
+    float density = (1.0 - normY) * (1.0 - normY);
+    gl_FragColor.rgb *= mix(1.0, 0.88, density * 0.65);
+
+    // Consistent translucent depth across all fragrances
+    float baseAlpha = 0.28;
+    gl_FragColor.a = clamp(baseAlpha + refractContours * 0.42 + meniscusSpec * 0.35, 0.0, 0.86);
   }`,
     );
   };
@@ -277,21 +261,29 @@ function applyGlassEdge(
 }
 
 /**
- * The nozzle's horizontal offset from the pump button it hangs off, read from the
- * asset (`nozzle.translation`). The spout runs along that offset, so it is not
- * quite parallel to the model's own -Z — hence the trim in the yaw below.
+ * Derives color for liquid: clear water (#ffffff) for near-white/colorless fragrances,
+ * or authentic rich fragrance hex for colored fragrances.
  */
-const NOZZLE_OFFSET = { x: 0.151, z: -1.134 } as const;
+export function getFragranceLiquidColor(hex?: string): Color {
+  const col = new Color(hex || "#ffffff");
+  const hsl = { h: 0, s: 0, l: 0 };
+  col.getHSL(hsl);
 
-/**
- * Yaw that puts the pump's spout straight at the camera.
- *
- * `PI` turns the model's -Z (the spout, see the group below) to face front;
- * `atan2` then takes out the few degrees the nozzle's own sideways offset leaves
- * in it, so the spout lands on +Z exactly rather than 7.6° off it.
- */
-const NOZZLE_YAW =
-  Math.PI + Math.atan2(NOZZLE_OFFSET.x, -NOZZLE_OFFSET.z);
+  // Clear / colorless fragrances (e.g. #e5e5e5, #ffffff, s < 0.06 or l > 0.88 with low s)
+  if (hsl.s < 0.06 || (hsl.s < 0.12 && hsl.l > 0.85)) {
+    return new Color(0xffffff);
+  }
+
+  // Lift extremely dark hues slightly so depth is rich rather than opaque pitch-black
+  if (hsl.l < 0.22) {
+    col.setHSL(hsl.h, hsl.s, 0.28);
+  }
+
+  return col;
+}
+
+// Backward compatibility alias
+export const normalizeLiquidColor = getFragranceLiquidColor;
 
 interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
   refs: BottleRefs;
@@ -300,17 +292,13 @@ interface BottleGltfProps extends Omit<ThreeElements["group"], "ref"> {
    */
   liquidColor?: string;
   /**
-   * Fired once the refs below are wired. The glTF resolves long after first
-   * render, inside a `<Suspense>`, and that resolution does not re-run the
-   * caller's motion hooks on its own — this is how they learn there is finally a
-   * `refs.root` to animate.
+   * Fired once the refs below are wired.
    */
   onReady?: () => void;
 }
 
 /**
- * The product itself, loaded from the supplied glTF rather than modelled in
- * code, so the silhouette and authored materials are exactly the ones set in Blender.
+ * The product itself, rendered directly using the materials authored in Blender.
  */
 export function BottleGltf({
   refs,
@@ -327,10 +315,7 @@ export function BottleGltf({
 
   /**
    * Uniform scale to `FRAMED_HEIGHT`, plus the offset that puts the model's
-   * bounding-box centre on the origin so a spin turns about the product's own
-   * axis. Measured during render, while the loaded scene is still unparented —
-   * once it is mounted inside the scaled group below, `Box3.setFromObject`
-   * would report the already-scaled size.
+   * bounding-box centre on the origin.
    */
   const fit = useMemo(() => {
     const bounds = new Box3().setFromObject(gltf.scene);
@@ -343,114 +328,169 @@ export function BottleGltf({
     };
   }, [gltf]);
 
-  useLayoutEffect(() => {
-    const glass = gltf.nodes[NODE.glass] as Mesh;
-    const capGlass = gltf.nodes[NODE.capGlass] as Mesh;
-    const liquid = gltf.nodes[NODE.liquid] as Mesh;
-    const dipTube = gltf.nodes[NODE.dipTube] as Mesh;
-
-    glass.visible = true;
-    liquid.visible = true;
-
-    dipTube.renderOrder = RENDER_ORDER.dipTube;
-    liquid.renderOrder = RENDER_ORDER.liquid;
-    glass.renderOrder = RENDER_ORDER.glass;
-    capGlass.renderOrder = RENDER_ORDER.glass;
-
-    // Refined Liquid Glass physical material definition:
-    // Gentle clearcoat and subtle microscopic roughness eliminate harsh mirror glare.
-    const configureGlassMaterial = (mat: MeshPhysicalMaterial, opacity: number = 0.02) => {
-      mat.transparent = true;
-      mat.depthWrite = false;
-      mat.transmission = 0;
-      mat.opacity = opacity;
-      mat.roughness = 0.035;
-      mat.metalness = 0.0;
-      mat.clearcoat = 0.60;
-      mat.clearcoatRoughness = 0.05;
-      mat.ior = 1.52;
-      mat.reflectivity = 0.45;
-      mat.color.set(0x000000);
-    };
-
-    // The bottle flacon wall keeps crystal clarity with heavy crystal base
-    configureGlassMaterial(glass.material as MeshPhysicalMaterial, 0.02);
-    configureGlassMaterial(capGlass.material as MeshPhysicalMaterial, 0.04);
-
-    // Liquid Glass optical edge shaders (softened studio sheen, delicate chromatic rim)
-    applyGlassEdge(glass.material as MeshPhysicalMaterial, 0.24, 0.35, 0.02, "glass_edge_bottle_v35");
-    applyGlassEdge(capGlass.material as MeshPhysicalMaterial, 0.26, 0.30, 0.03, "glass_edge_cap_v35");
-
-    // Luminous luxury fragrance liquid — sheer translucent clarity
-    const liquidMat = liquid.material as MeshPhysicalMaterial;
-    liquidMat.transparent = true;
-    liquidMat.depthWrite = false;
-    liquidMat.transmission = 0;
-    liquidMat.opacity = 0.45;
-    liquidMat.roughness = 0.02;
-    liquidMat.metalness = 0.0;
-    liquidMat.clearcoat = 0.70;
-    liquidMat.clearcoatRoughness = 0.03;
-    liquidMat.ior = 1.333;
-    liquidMat.reflectivity = 0.70;
-
-    // Translucent dip tube, submerged within liquid
-    const tubeMat = dipTube.material as MeshPhysicalMaterial;
-    tubeMat.transparent = true;
-    tubeMat.depthWrite = false;
-    tubeMat.transmission = 0;
-    tubeMat.opacity = 0.22;
-    tubeMat.color.set(0xffffff);
-    tubeMat.roughness = 0.04;
-    tubeMat.clearcoat = 0.5;
-
-    // The liquid's own vertical extent, so the depth gradient and the meniscus
-    // are measured against the model rather than hardcoded.
-    liquid.geometry.computeBoundingBox();
-    const body = liquid.geometry.boundingBox;
-    applyLiquidSloshShader(
-      liquidMat,
-      liquidUniformsRef.current,
-      body ? body.min.y : 0,
-      body ? body.max.y : 1,
+/**
+ * Subtle edge shader for the dip tube:
+ * Highlights the cylindrical flanks of the plastic straw so it is clearly
+ * visible through both clear water and rich translucent perfume.
+ */
+function applyDipTubeShader(material: MeshPhysicalMaterial, cacheKey: string = "tube_shader_v3") {
+  material.customProgramCacheKey = () => cacheKey;
+  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <dithering_fragment>",
+      `#include <dithering_fragment>
+  {
+    float cosTheta = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+    float grazing = 1.0 - cosTheta;
+    float edgeHighlight = pow(grazing, 2.0) * 0.35;
+    gl_FragColor.rgb += vec3(edgeHighlight);
+    gl_FragColor.a = clamp(gl_FragColor.a + edgeHighlight * 0.25, 0.0, 0.95);
+  }`,
     );
+  };
+  material.needsUpdate = true;
+}
 
-    // Keep dynamic liquid color
-    if (liquidColor) {
-      liquidMat.color.set(liquidColor);
+  // Dedicated dip tube material (thin plastic inside liquid)
+  // Follows user's exact specification:
+  // - tubeColor derived from liquidColor (lerped with #ffffff, lower saturation)
+  // - transparent: true, roughness: 0.35
+  const tubeMat = useMemo(() => {
+    const mat = new MeshPhysicalMaterial({
+      roughness: 0.35,
+      metalness: 0,
+      clearcoat: 0.40,
+      clearcoatRoughness: 0.08,
+      depthWrite: false,
+      transparent: true,
+      side: FrontSide,
+    });
+    applyDipTubeShader(mat, "tube_init_v3");
+    return mat;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      tubeMat.dispose();
+    };
+  }, [tubeMat]);
+
+  // Update tube color in-place when liquidColor changes
+  useLayoutEffect(() => {
+    const norm = getFragranceLiquidColor(liquidColor);
+    const hsl = { h: 0, s: 0, l: 0 };
+    norm.getHSL(hsl);
+
+    // Uniformly derive the clear plastic dip tube color for all fragrances:
+    // Lighter, desaturated plastic with soft sheen and subtle emissive lift
+    const tubeColor = new Color();
+    const s = hsl.s * 0.45;
+    const l = Math.min(0.88, Math.max(0.72, hsl.l + 0.30));
+    tubeColor.setHSL(hsl.h, s, l);
+
+    tubeMat.color.copy(tubeColor);
+    tubeMat.emissive.copy(tubeColor).multiplyScalar(0.25);
+    tubeMat.opacity = 0.65;
+    invalidate();
+  }, [liquidColor, tubeMat, invalidate]);
+
+  useLayoutEffect(() => {
+    const glass = gltf.scene.getObjectByName(NODE.glass) as Mesh | undefined;
+    const capGlass = gltf.scene.getObjectByName(NODE.capGlass) as Mesh | undefined;
+    const liquid = gltf.scene.getObjectByName(NODE.liquid) as Mesh | undefined;
+    const dipTube = gltf.scene.getObjectByName(NODE.dipTube) as Mesh | undefined;
+    const cap = gltf.scene.getObjectByName(NODE.cap);
+    const pumpButton = gltf.scene.getObjectByName(NODE.pumpButton);
+    const nozzle = gltf.scene.getObjectByName(NODE.nozzle) ?? null;
+
+    // Set draw order so transmissive inner objects render before the outer glass
+    gltf.scene.traverse((o) => {
+      if ((o as Mesh).isMesh) {
+        (o as Mesh).renderOrder = RENDER_ORDER.rest;
+      }
+    });
+
+    if (dipTube) {
+      dipTube.material = tubeMat;
+      dipTube.renderOrder = RENDER_ORDER.dipTube;
     }
 
-    refs.glass.current = glass;
-    refs.liquid.current = liquid;
-    refs.liquidMaterial.current = liquidMat;
-    refs.dipTube.current = dipTube;
-    refs.cap.current = gltf.nodes[NODE.cap];
-    refs.pumpButton.current = gltf.nodes[NODE.pumpButton];
-    refs.nozzle.current = gltf.nodes[NODE.nozzle] ?? gltf.scene.getObjectByName(NODE.nozzle) ?? null;
+    if (liquid) {
+      liquid.renderOrder = RENDER_ORDER.liquid;
+      const liquidMat = liquid.material as MeshPhysicalMaterial;
+      liquidMat.transparent = true;
+      liquidMat.depthWrite = false;
+      liquidMat.transmission = 0;
+      liquidMat.roughness = 0.02;
+      liquidMat.metalness = 0;
+      liquidMat.clearcoat = 0.75;
+      liquidMat.clearcoatRoughness = 0.03;
+      liquidMat.ior = 1.333;
+      liquidMat.reflectivity = 0.8;
+
+      if (liquidColor) {
+        liquidMat.color.copy(getFragranceLiquidColor(liquidColor));
+      }
+
+      applyLiquidShader(
+        liquidMat,
+        liquidUniformsRef.current,
+        -1.226,
+        0.785,
+        "liquid_water_photo_v33",
+      );
+    }
+
+    if (glass) {
+      glass.renderOrder = RENDER_ORDER.glass;
+      const glassMat = glass.material as MeshPhysicalMaterial;
+      glassMat.transparent = true;
+      glassMat.depthWrite = false;
+      glassMat.transmission = 0;
+      glassMat.opacity = 0.06;
+      glassMat.roughness = 0.02;
+      glassMat.metalness = 0;
+      glassMat.clearcoat = 0.85;
+      glassMat.clearcoatRoughness = 0.01;
+      glassMat.ior = 1.5;
+      glassMat.reflectivity = 0.8;
+      glassMat.color.set(0xffffff);
+
+      applyGlassShader(glassMat, 0.45, "glass_edge_crystal_bottle_v22");
+    }
+
+    if (capGlass) {
+      capGlass.renderOrder = RENDER_ORDER.glass;
+      const capMat = capGlass.material as MeshPhysicalMaterial;
+      capMat.transparent = true;
+      capMat.depthWrite = false;
+      capMat.transmission = 0;
+      capMat.opacity = 0.18;
+      capMat.roughness = 0.02;
+      capMat.metalness = 0;
+      capMat.clearcoat = 0.85;
+      capMat.clearcoatRoughness = 0.01;
+      capMat.ior = 1.5;
+      capMat.reflectivity = 0.8;
+      capMat.color.set(0xffffff);
+
+      applyGlassShader(capMat, 0.35, "glass_edge_crystal_cap_v22");
+    }
+
+    refs.glass.current = glass ?? null;
+    refs.liquid.current = liquid ?? null;
+    refs.liquidMaterial.current = (liquid?.material as MeshPhysicalMaterial) ?? null;
+    refs.dipTube.current = dipTube ?? null;
+    refs.cap.current = cap ?? null;
+    refs.pumpButton.current = pumpButton ?? null;
+    refs.nozzle.current = nozzle;
 
     invalidate();
-    // Last, so the motion hooks that react to this only ever see fully wired refs.
     onReady?.();
-  }, [gltf, refs, invalidate, onReady, liquidColor]);
+  }, [gltf, refs, invalidate, onReady, liquidColor, tubeMat]);
 
   return (
     <group ref={refs.root} {...groupProps}>
-      {/*
-       * Bottle orientation.
-       *
-       * `NOZZLE_YAW` is chosen for the *nozzle*. The asset's spout runs along the
-       * model's own **-Z**: the `nozzle` node sits at `z = -1.134` relative to
-       * `automizerButton`, and the orifice sphere is the `z[-1.158..-0.794]` end of
-       * that button's geometry. The yaw turns that to world **+Z** — straight at
-       * the camera — so the pump faces the customer and the mist has somewhere
-       * sensible to go.
-       *
-       * It used to be `-PI/2`, which was chosen for the dip tube's curve and sent
-       * the spout to world **+X**: hard right, a full quarter turn off front, which
-       * is what read as the nozzle pointing sideways. The tube's curve is now on
-       * the other side; the bottle is otherwise symmetric, so that is the only
-       * cost.
-       */}
       <group scale={fit.scale} position={fit.offset} rotation-y={NOZZLE_YAW}>
         <primitive object={gltf.scene} />
       </group>
