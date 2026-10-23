@@ -18,6 +18,7 @@ import {
   createLiquidUniforms,
   type LiquidUniforms,
 } from "./useLiquidPhysics";
+import { OilBubbles } from "./OilBubbles";
 
 /** The supplied product model, served from `public/`. */
 const MODEL_URL = "/perfume_bottle.glb";
@@ -137,19 +138,22 @@ function applyLiquidShader(
   uniforms: LiquidUniforms,
   bodyBottom: number = -1.226,
   bodyTop: number = 0.785,
-  cacheKey: string = "liquid_water_photo_v33",
+  cacheKey: string = "liquid_tornado_v37",
 ): void {
   material.customProgramCacheKey = () => cacheKey;
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.uniforms.uSlosh = uniforms.uSlosh;
     shader.uniforms.uWaveTime = uniforms.uWaveTime;
     shader.uniforms.uWaveIntensity = uniforms.uWaveIntensity;
+    shader.uniforms.uVortexStrength = uniforms.uVortexStrength;
+    shader.uniforms.uVortexPhase = uniforms.uVortexPhase;
+    shader.uniforms.uVortexDirection = uniforms.uVortexDirection;
     shader.uniforms.uBodyBottom = { value: bodyBottom };
     shader.uniforms.uBodyTop = { value: bodyTop };
 
-    // Vertex displacement for real-time slosh physics
+    // Vertex displacement for real-time slosh physics and dynamic tornado vortex
     shader.vertexShader =
-      `uniform vec2 uSlosh;\nuniform float uWaveTime;\nuniform float uWaveIntensity;\nvarying float vBodyY;\nvarying vec3 vModelPos;\n` +
+      `uniform vec2 uSlosh;\nuniform float uWaveTime;\nuniform float uWaveIntensity;\nuniform float uVortexStrength;\nuniform float uVortexPhase;\nuniform float uVortexDirection;\nvarying float vBodyY;\nvarying vec3 vModelPos;\nvarying float vNormR;\nvarying float vVortexFunnel;\n` +
       shader.vertexShader;
 
     shader.vertexShader = shader.vertexShader.replace(
@@ -158,8 +162,22 @@ function applyLiquidShader(
   {
     float hFactor = smoothstep(-0.2, 1.15, transformed.y);
     float sloshTilt = clamp((position.x * uSlosh.x + position.z * uSlosh.y) * hFactor, -0.22, 0.22);
-    transformed.y += sloshTilt;
 
+    // Radial distance from central axis (dip tube center at x=0, z=0)
+    float r = length(position.xz);
+    float normR = clamp(r / 1.134, 0.0, 1.0);
+    vNormR = normR;
+
+    // 1. TORNADO SURFACE VORTEX FUNNEL:
+    // Parabolic surface depression: central core dips down around the dip tube, perimeter climbs up the glass walls
+    float surfaceTaper = smoothstep(-0.15, 0.82, position.y);
+    float funnelShape = (normR * normR * 1.75 - 0.70); // Parabolic profile conserving fluid volume
+    float coreEye = (1.0 - smoothstep(0.0, 0.35, normR)) * 0.40;
+    float vortexDepression = (funnelShape - coreEye) * uVortexStrength * 0.24 * surfaceTaper;
+
+    transformed.y += sloshTilt + vortexDepression;
+
+    vVortexFunnel = uVortexStrength * surfaceTaper;
     vBodyY = position.y;
     vModelPos = position;
   }`,
@@ -175,12 +193,23 @@ function applyLiquidShader(
       transformedNormal.y,
       transformedNormal.z - uSlosh.y * 0.5 * normFactor
     ));
+
+    // Tornado funnel slope normal: sloping inward toward central vortex core
+    float rNorm = clamp(length(position.xz) / 1.134, 0.0, 1.0);
+    if (rNorm > 0.001) {
+      vec2 rDir = normalize(position.xz);
+      float surfaceTaper = smoothstep(-0.15, 0.82, position.y);
+      float slope = (1.0 - rNorm * 0.4) * uVortexStrength * 0.65 * surfaceTaper;
+      transformedNormal.x -= rDir.x * slope;
+      transformedNormal.z -= rDir.y * slope;
+      transformedNormal = normalize(transformedNormal);
+    }
   }`,
     );
 
     // Fragment shader
     shader.fragmentShader =
-      `uniform float uBodyBottom;\nuniform float uBodyTop;\nvarying float vBodyY;\nvarying vec3 vModelPos;\n` +
+      `uniform float uBodyBottom;\nuniform float uBodyTop;\nuniform float uVortexStrength;\nuniform float uVortexPhase;\nuniform float uVortexDirection;\nvarying float vBodyY;\nvarying vec3 vModelPos;\nvarying float vNormR;\nvarying float vVortexFunnel;\n` +
       shader.fragmentShader;
 
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -234,18 +263,38 @@ function applyLiquidShader(
     float bottomBowl = clamp(bowlCurvedSilhouette + bowlApexShade + causticRings, 0.0, 1.0);
 
     // =========================================================================
+    // 3.5. TORNADO VORTEX FUNNEL & SWIRLING SPIRAL CAUSTICS
+    // Active while the bottle rotates, creating a physical whirlpool / tornado
+    // =========================================================================
+    // Dynamic tornado spiral arms winding inward around the dip tube
+    float polarAngle = atan(vModelPos.z, vModelPos.x);
+    float spiralArms1 = sin(polarAngle * 2.0 - vNormR * 7.5 + uVortexPhase * 3.2);
+    float spiralArms2 = sin(polarAngle * 2.0 - vNormR * 7.5 + uVortexPhase * 3.2 + 3.14159);
+    float spiralIntensity = max(spiralArms1, spiralArms2);
+    spiralIntensity = pow(clamp(spiralIntensity, 0.0, 1.0), 3.0) * uVortexStrength * smoothstep(0.08, 0.95, normY);
+
+    // Tornado funnel eye: conical core narrowing from top surface down toward the base
+    float funnelRadius = mix(0.12, 0.44, normY);
+    float distToFunnel = abs(vNormR - funnelRadius);
+    float funnelWall = smoothstep(0.15, 0.02, distToFunnel) * uVortexStrength * smoothstep(0.12, 0.95, normY);
+
+    // Glistening highlight on the spinning tornado funnel rim
+    float funnelHighlight = pow(funnelWall, 1.8) * pow(grazing, 1.4) * 1.6;
+    float tornadoEffect = clamp(spiralIntensity * 0.65 + funnelWall * 0.75, 0.0, 1.0);
+
+    // =========================================================================
     // 4. COMBINED REFRACTIVE CONTOURS & COLOR COMPOSITING
     // Consistent optical behavior across all fragrances (colored and crystal water)
     // =========================================================================
-    float refractContours = clamp(meniscusDark + sideWall + bottomBowl, 0.0, 1.0);
+    float refractContours = clamp(meniscusDark + sideWall + bottomBowl + tornadoEffect * 0.65, 0.0, 1.0);
 
     // Deep refractive contour tone derived from the liquid's own body color
     vec3 darkRefract = mix(gl_FragColor.rgb * 0.32, vec3(0.26, 0.26, 0.28), 0.35);
 
     // Blend refractive contours into RGB
     gl_FragColor.rgb = mix(gl_FragColor.rgb, darkRefract, refractContours * 0.72);
-    // Add specular glint to meniscus and caustic rings
-    gl_FragColor.rgb += vec3(meniscusSpec) + vec3(causticRings * 0.15);
+    // Add specular glint to meniscus, caustic rings, and tornado funnel
+    gl_FragColor.rgb += vec3(meniscusSpec) + vec3(causticRings * 0.15) + vec3(funnelHighlight) * 0.85 + vec3(spiralIntensity * 0.22);
 
     // Beer-Lambert depth density (richer body toward the curved bottom bowl)
     float density = (1.0 - normY) * (1.0 - normY);
@@ -253,7 +302,7 @@ function applyLiquidShader(
 
     // Consistent translucent depth across all fragrances
     float baseAlpha = 0.28;
-    gl_FragColor.a = clamp(baseAlpha + refractContours * 0.42 + meniscusSpec * 0.35, 0.0, 0.86);
+    gl_FragColor.a = clamp(baseAlpha + refractContours * 0.42 + meniscusSpec * 0.35 + funnelWall * 0.25, 0.0, 0.90);
   }`,
     );
   };
@@ -437,7 +486,7 @@ function applyDipTubeShader(material: MeshPhysicalMaterial, cacheKey: string = "
         liquidUniformsRef.current,
         -1.226,
         0.785,
-        "liquid_water_photo_v33",
+        "liquid_tornado_v37",
       );
     }
 
@@ -493,6 +542,7 @@ function applyDipTubeShader(material: MeshPhysicalMaterial, cacheKey: string = "
     <group ref={refs.root} {...groupProps}>
       <group scale={fit.scale} position={fit.offset} rotation-y={NOZZLE_YAW}>
         <primitive object={gltf.scene} />
+        <OilBubbles uniforms={liquidUniformsRef.current} liquidColor={liquidColor} />
       </group>
     </group>
   );

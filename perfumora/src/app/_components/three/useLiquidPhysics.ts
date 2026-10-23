@@ -9,6 +9,9 @@ export interface LiquidUniforms {
   uSlosh: { value: Vector2 };
   uWaveTime: { value: number };
   uWaveIntensity: { value: number };
+  uVortexStrength: { value: number };
+  uVortexPhase: { value: number };
+  uVortexDirection: { value: number };
 }
 
 /**
@@ -19,6 +22,9 @@ export function createLiquidUniforms(): LiquidUniforms {
     uSlosh: { value: new Vector2(0, 0) },
     uWaveTime: { value: 0 },
     uWaveIntensity: { value: 0 },
+    uVortexStrength: { value: 0 },
+    uVortexPhase: { value: 0 },
+    uVortexDirection: { value: 1 },
   };
 }
 
@@ -31,7 +37,7 @@ const POINTER_INERTIA = 0.004; // Micro-kick from mouse movement (eliminating an
 const MAX_SLOSH = 0.20; // Safe maximum tilt in radians (~11.5 deg) to prevent glass clipping
 
 /**
- * Real-time 2D damped harmonic oscillator for fluid slosh physics in the perfume bottle.
+ * Real-time 2D damped harmonic oscillator for fluid slosh and tornado vortex physics in the perfume bottle.
  * Drives vertex displacement and surface wave ripples in the liquid shader.
  */
 export function useLiquidPhysics(
@@ -43,6 +49,12 @@ export function useLiquidPhysics(
   const velocity = useRef({ x: 0, z: 0 });
   const smoothedImpulse = useRef({ x: 0, z: 0 });
   const waveTime = useRef(0);
+
+  // Tornado vortex fluid physics state (rotational shear, momentum, and spiral phase)
+  const vortexOmega = useRef(0);
+  const vortexStrength = useRef(0);
+  const vortexPhase = useRef(0);
+  const vortexDirection = useRef(1);
 
   // Previous frame tracking for angular velocity & scroll velocity
   const prevUp = useRef<Vector3 | null>(null);
@@ -84,22 +96,70 @@ export function useLiquidPhysics(
       impulseX = -dUpX * INERTIA_STRENGTH;
       impulseZ = -dUpZ * INERTIA_STRENGTH;
 
-      // Spin rate of change around local Y axis (e.g. variant change spin)
+      // Spin rate of change around local Y axis (e.g. variant change spin or scroll yaw)
       invQuat.current.copy(currentQuat.current).invert();
       localPrevForward.current
         .copy(prevForward.current)
         .applyQuaternion(invQuat.current);
-      // Local x displacement of the previous forward vector gives -dTheta
-      omegaY = -localPrevForward.current.x / dt;
+      // Exact angle delta around Y using atan2 for robust handling across rapid 360 spins
+      const dTheta = Math.atan2(localPrevForward.current.x, localPrevForward.current.z);
+      omegaY = -dTheta / dt;
+
       // Rotational inertia kicks fluid along local X axis and diagonal
-      impulseX += -omegaY * 0.015;
-      impulseZ += Math.abs(omegaY) * 0.006;
+      impulseX += -omegaY * 0.012;
+      impulseZ += Math.abs(omegaY) * 0.005;
     } else {
       prevUp.current = new Vector3();
       prevForward.current = new Vector3();
     }
     prevUp.current.copy(bottleUp.current);
     prevForward.current.copy(bottleForward.current);
+
+    // =========================================================================
+    // TORNADO VORTEX FLUID PHYSICS SIMULATION
+    // Real fluid vortex in a rotating vessel:
+    // - Sheared spin-up as bottle walls accelerate the fluid
+    // - Rotational fluid inertia & momentum carrying the vortex forward
+    // - Viscous drag causing realistic exponential decay after rotation stops
+    // =========================================================================
+    const targetVortexOmega = omegaY;
+    if (Math.abs(targetVortexOmega) > Math.abs(vortexOmega.current)) {
+      // Rapid spin-up: fluid catches up smoothly to bottle rotation (~0.25s)
+      vortexOmega.current += (targetVortexOmega - vortexOmega.current) * Math.min(1.0, dt * 7.5);
+    } else {
+      // Viscous decay: fluid vortex momentum decays gracefully over ~1.5s
+      vortexOmega.current += (targetVortexOmega - vortexOmega.current) * Math.min(1.0, dt * 1.9);
+    }
+
+    // Optional interactive pointer swirl if user moves mouse in circles around bottle
+    if (state.pointer && prevPointer.current) {
+      const px = state.pointer.x;
+      const py = state.pointer.y;
+      const ppx = prevPointer.current.x;
+      const ppy = prevPointer.current.y;
+      const r2 = px * px + py * py;
+      if (r2 > 0.02 && r2 < 1.8) {
+        const cross = px * (py - ppy) - py * (px - ppx);
+        const pointerOmega = (cross / r2) / dt;
+        vortexOmega.current += pointerOmega * 0.03;
+      }
+    }
+
+    if (Math.abs(vortexOmega.current) > 0.05) {
+      vortexDirection.current = Math.sign(vortexOmega.current);
+    } else if (Math.abs(vortexOmega.current) < 0.005 && Math.abs(targetVortexOmega) < 0.005) {
+      vortexOmega.current = 0;
+    }
+
+    // Centrifugal vortex funnel strength [0, 1] (non-linear response to angular velocity)
+    const targetStrength = Math.min(1.0, Math.pow(Math.abs(vortexOmega.current) / 6.0, 1.35));
+    vortexStrength.current += (targetStrength - vortexStrength.current) * Math.min(1.0, dt * 8.0);
+    if (vortexStrength.current < 0.002 && targetStrength < 0.002) {
+      vortexStrength.current = 0;
+    }
+
+    // Dynamic rotation angle phase for spiral ribbons and vortex shear
+    vortexPhase.current += vortexOmega.current * dt;
 
     // Dynamic scroll velocity tracking: liquid oscillation scales directly with scroll speed
     let scrollVel = 0;
@@ -169,7 +229,9 @@ export function useLiquidPhysics(
     // Write to shader uniforms
     uniforms.uSlosh.value.set(slosh.current.x, slosh.current.z);
     uniforms.uWaveTime.value = waveTime.current;
-    // Keep wave intensity zeroed to prevent high-frequency surface shivering
     uniforms.uWaveIntensity.value = 0;
+    uniforms.uVortexStrength.value = vortexStrength.current;
+    uniforms.uVortexPhase.value = vortexPhase.current;
+    uniforms.uVortexDirection.value = vortexDirection.current;
   });
 }
