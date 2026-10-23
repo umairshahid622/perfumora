@@ -13,6 +13,7 @@ import {
 import { ImagePlaceholder } from "../ui/ImagePlaceholder";
 import { RippleButton } from "../ui/RippleButton";
 import { SizeSelector } from "../hero/SizeSelector";
+import { cn } from "../../_lib/cn";
 
 /**
  * One fragrance in the showcase grid — a self-contained product card built on the
@@ -164,7 +165,7 @@ export function GalleryCard({
               <RippleButton
                 onClick={add}
                 disabled={soldOut}
-                className="w-full"
+                className={cn("w-full", soldOut && "opacity-45")}
                 aria-label={addLabel}
               >
                 {soldOut ? "Sold Out" : "Add to Bag"}

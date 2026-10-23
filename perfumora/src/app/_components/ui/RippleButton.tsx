@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useRef, useCallback, type ReactNode } from "react";
 import gsap from "gsap";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
@@ -60,41 +60,77 @@ export function RippleButton({
   const labelRef = useRef<HTMLSpanElement>(null);
   const restingColor = useRef("");
 
-  // The shared interaction cue (§1). `silent` opts the nav-panel CTAs (cart,
-  // auth) out — they simply skip `play()` — while every other CTA sounds from
-  // one place.
   const { play } = useSoundCue();
-  const handleClick = () => {
+
+  const collapseRipple = useCallback(
+    (instant = false, exitPoint?: { x: number; y: number }) => {
+      const el = ref.current;
+      const fill = fillRef.current;
+      const label = labelRef.current;
+      if (!el || !fill || !label) return;
+
+      gsap.killTweensOf([fill, label]);
+
+      if (instant || prefersReducedMotion()) {
+        gsap.set(fill, { scale: 0 });
+        gsap.set(label, { clearProps: "color" });
+        return;
+      }
+
+      if (exitPoint) {
+        gsap.set(fill, {
+          x: exitPoint.x,
+          y: exitPoint.y,
+        });
+      }
+
+      gsap.to(fill, {
+        scale: 0,
+        duration: COLLAPSE_DURATION,
+        ease: "power2.in",
+        overwrite: true,
+      });
+
+      const targetColor =
+        restingColor.current ||
+        getComputedStyle(el).getPropertyValue("--accent-contrast").trim();
+
+      if (targetColor) {
+        gsap.to(label, {
+          color: targetColor,
+          duration: LABEL_DURATION,
+          ease: "power2.out",
+          overwrite: true,
+          onComplete: () => gsap.set(label, { clearProps: "color" }),
+        });
+      } else {
+        gsap.set(label, { clearProps: "color" });
+      }
+    },
+    [],
+  );
+
+  const isHoveredRef = useRef(false);
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
     if (!silent) play();
     onClick?.();
   };
 
-  // No `useGSAP` here: every tween targets a child of this button and is created
-  // by a DOM event, so it dies with the element it animates — there is nothing
-  // for a context to revert that unmounting does not already take care of.
   const handleEnter = (event: React.MouseEvent<HTMLButtonElement>) => {
+    isHoveredRef.current = true;
     const el = ref.current;
     const fill = fillRef.current;
     const label = labelRef.current;
-    // `disabled` is checked here, not left to the browser: the spec only
-    // suppresses *click* on a disabled control, and Firefox still delivers the
-    // hover pair.
-    if (!el || !fill || !label || disabled || prefersReducedMotion()) return;
+    if (!el || !fill || !label || prefersReducedMotion()) return;
 
-    // Take the resting label colour from the element's own computed `color`,
-    // with any inline colour a previous leave left behind cleared first, rather
-    // than from `--accent-contrast`: the token holds `var(--ink)`/`var(--paper)`
-    // per variant, while the computed value is that decision already resolved.
     gsap.set(label, { clearProps: "color" });
     restingColor.current = getComputedStyle(label).color;
 
     const rect = el.getBoundingClientRect();
 
     gsap.set(fill, {
-      // Radius = the button's diagonal, so the circle reaches every corner from
-      // any point inside it. That is also what lets the leave handler re-centre
-      // it on the exit point without a visible jump: at full scale it still
-      // covers the button from there.
       width: Math.hypot(rect.width, rect.height) * 2,
       height: Math.hypot(rect.width, rect.height) * 2,
       x: event.clientX - rect.left,
@@ -112,7 +148,6 @@ export function RippleButton({
     });
 
     gsap.to(label, {
-      // `--accent` is written as a literal hex, so it needs no resolving.
       color: getComputedStyle(el).getPropertyValue("--accent").trim(),
       duration: LABEL_DURATION,
       delay: LABEL_DELAY,
@@ -122,34 +157,21 @@ export function RippleButton({
   };
 
   const handleLeave = (event: React.MouseEvent<HTMLButtonElement>) => {
+    isHoveredRef.current = false;
     const el = ref.current;
-    const fill = fillRef.current;
-    const label = labelRef.current;
-    if (!el || !fill || !label || disabled || prefersReducedMotion()) return;
-
+    if (!el) return;
     const rect = el.getBoundingClientRect();
-    gsap.set(fill, {
+    collapseRipple(false, {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     });
+  };
 
-    gsap.to(fill, {
-      scale: 0,
-      duration: COLLAPSE_DURATION,
-      ease: "power2.in",
-      overwrite: true,
-    });
-
-    gsap.to(label, {
-      color: restingColor.current,
-      duration: LABEL_DURATION,
-      ease: "power2.out",
-      overwrite: true,
-      // Hand the colour back to `text-accent-contrast` once it matches again,
-      // so the label follows the token the next time the variant changes
-      // instead of holding the previous variant's contrast inline.
-      onComplete: () => gsap.set(label, { clearProps: "color" }),
-    });
+  const handleBlur = () => {
+    // Only collapse if the cursor/arrow is not currently hovering over the button
+    // (when clicking disables the button, the browser fires blur even though the arrow is still on it).
+    if (isHoveredRef.current || ref.current?.matches(":hover")) return;
+    collapseRipple(false);
   };
 
   return (
@@ -160,6 +182,8 @@ export function RippleButton({
       onClick={handleClick}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
+      onPointerLeave={handleLeave}
+      onBlur={handleBlur}
       className={cn(
         // `ring-accent` is invisible at rest — it sits on a fill of the same
         // colour — and costs nothing until the fill changes under it. It earns its
@@ -170,9 +194,9 @@ export function RippleButton({
         "bg-accent text-accent-contrast ring-1 ring-accent relative inline-flex items-center justify-center overflow-hidden rounded-full",
         "px-4 md:px-9 py-3 md:py-4 text-[0.8rem] font-semibold uppercase tracking-widest",
         "select-none",
-        // The same fade and cursor the sold-out size pill uses, so the two halves
-        // of an out-of-stock SKU read as one state.
-        disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer",
+        // When disabled, keep cursor as not-allowed without altering the button's background
+        // or text colors so buttons on sending/submitting retain their full vibrant color.
+        disabled ? "cursor-not-allowed" : "cursor-pointer",
         className,
       )}
       {...rest}

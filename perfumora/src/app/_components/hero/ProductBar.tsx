@@ -103,6 +103,7 @@ export function ProductBar() {
           id="add-to-bag-button"
           onClick={addToCart}
           disabled={soldOut || isAddingToBag}
+          className={soldOut ? "opacity-45" : undefined}
           aria-label={addLabel}
         >
           {soldOut ? "Sold Out" : isAddingToBag ? "Adding..." : "Add to Bag"}
