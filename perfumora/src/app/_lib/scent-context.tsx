@@ -91,14 +91,17 @@ export function ScentProvider({
     if (!variant) return;
     const root = document.documentElement;
     const accent = readableAccent(variant.hex);
+    const glow = accentGlow(variant.hex, 0.28);
+
+    root.style.setProperty("--primary", accent);
+    root.style.setProperty("--primary-hover", accent);
+    root.style.setProperty("--primary-glow", glow);
+    root.style.setProperty("--primary-foreground", "#ffffff");
     root.style.setProperty("--accent", accent);
-    root.style.setProperty("--accent-contrast", "var(--paper)");
-    root.style.setProperty("--accent-glow", accentGlow(variant.hex));
-    // Legible-on-parchment accent for text/borders; fills + glow keep the floored accent.
+    root.style.setProperty("--accent-contrast", "#ffffff");
+    root.style.setProperty("--accent-glow", glow);
     root.style.setProperty("--accent-on-light", accent);
-    // The same foreground over the near-black sections, where the on-light form is
-    // the dimmest thing in a row of paper-white text.
-    root.style.setProperty("--accent-on-dark", readableAccentOnDark(variant.hex));
+    root.style.setProperty("--accent-on-dark", accent);
   }, [variant]);
 
   const value = useMemo<ScentContextValue>(

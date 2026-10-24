@@ -82,13 +82,14 @@ export function GalleryCard({
   const cardVars = {
     "--accent": accent,
     "--accent-on-light": accent,
-    "--accent-contrast": "var(--paper)",
+    "--accent-contrast": "#ffffff",
+    "--primary-foreground": "#ffffff",
   } as CSSProperties;
 
   return (
     <li className="g-item">
       <div className="g-item-inner will-change-transform" style={cardVars}>
-        <article className="border-hairline-on-light relative overflow-hidden rounded-[1.75rem] border bg-[#faf6ee] shadow-[0_18px_44px_-26px_rgba(27,23,18,0.5)]">
+        <article className="border-border relative overflow-hidden rounded-[1.75rem] border bg-surface shadow-[0_18px_44px_-26px_rgba(0,0,0,0.85)]">
           {/* Colour panel — the fragrance's own hue, floored for depth (§3.3).
               The card clips the top corners; the future transparent bottle PNG
               drops straight in here and pops. */}

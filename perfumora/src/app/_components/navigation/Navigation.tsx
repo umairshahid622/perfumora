@@ -19,6 +19,7 @@ import { prefersReducedMotion } from "../../_lib/motion";
 import { scrollToSection } from "../../_lib/scroll-to";
 import { SECTION_IDS } from "../../_lib/sections";
 import { cn } from "../../_lib/cn";
+import { readCssToken } from "../../_lib/css-token";
 import { useRouteTransition } from "../providers/RouteTransition";
 import { useLenis } from "../providers/SmoothScroll";
 import { AccountMenu } from "./AccountMenu";
@@ -365,13 +366,10 @@ export function Navigation() {
     const midline = nav.getBoundingClientRect().height / 2;
     const duration = prefersReducedMotion() ? 0 : 0.4;
 
-    // `--ink`/`--paper` are declared as literal hexes in tokens.
-    const COLOR_PAPER = "#f3ece0";
-    const COLOR_INK = "#1b1712";
-
+    // Reads color dynamically from CSS design tokens
     const paint = (tone: string | undefined, seconds: number) =>
       gsap.to(nav, {
-        color: tone === "dark" ? COLOR_PAPER : COLOR_INK,
+        color: readCssToken("--foreground", "#1a1816"),
         duration: seconds,
         ease: "power2.out",
         overwrite: true,
@@ -402,14 +400,12 @@ export function Navigation() {
       });
     });
 
-    // The opening stage is a light composition even while later dark sections
-    // occupy the document flow behind its sticky overlays. It owns the nav tone
-    // for its entire screen range, so Craft cannot repaint the nav while Ritual
-    // is still the visible scene.
+    // The opening stage is a dark luxury composition. It owns the nav tone
+    // for its entire screen range.
     if (openingStage) {
       const setOpeningTone = (seconds: number) => {
-        paint("light", seconds);
-        setToneBehind("light");
+        paint("dark", seconds);
+        setToneBehind("dark");
       };
 
       ScrollTrigger.create({

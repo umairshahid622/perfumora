@@ -95,13 +95,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className={cn(
               "pointer-events-auto flex max-w-md items-center gap-3 rounded-full px-5 py-3 shadow-[0_20px_40px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300",
               item.type === "warning" || item.type === "error"
-                ? "border border-amber-500/30 bg-[#1b1712]/95 text-[#f3ece0]"
-                : "border border-white/10 bg-[#1b1712]/95 text-[#f3ece0]",
+                ? "border border-primary/30 bg-surface/95 text-foreground"
+                : "border border-border bg-surface/95 text-foreground",
             )}
           >
             {/* Warning pulse dot */}
             <span
-              className="flex size-2 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]"
+              className="flex size-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_var(--primary-glow)]"
               aria-hidden="true"
             />
             <p className="text-xs sm:text-sm font-medium tracking-tight">
@@ -111,7 +111,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => dismissToast(item.id)}
               aria-label="Close notification"
-              className="hover:text-amber-400 -mr-1 ml-2 grid size-5 place-items-center text-xs font-semibold text-white/50 transition-colors"
+              className="hover:text-primary -mr-1 ml-2 grid size-5 place-items-center text-xs font-semibold text-subtle transition-colors"
             >
               ✕
             </button>

@@ -13,9 +13,9 @@ import { RippleButton } from "../ui/RippleButton";
  *  that file gives for restating <AuthModal>'s: each page keeps its own copy. Plain
  *  literals rather than `cn()` — `text-body` and `text-accent-on-light` share one
  *  tailwind-merge group, so a merged string would keep only the last of them. */
-const PANEL = "border-hairline-on-light rounded-2xl border p-6";
+const PANEL = "border-border bg-surface rounded-2xl border p-6";
 const NOTICE =
-  "border-accent-on-light text-body text-accent-on-light border-l-2 pl-4";
+  "border-primary text-body text-primary border-l-2 pl-4";
 
 /**
  * The one thing this form is entitled to judge. Both boxes are ours, so comparing them
@@ -139,7 +139,7 @@ export function ResetPassword({ customer }: { customer: Customer }) {
               </RippleButton>
               <a
                 href="https://admin-perfumora-fragnance.vercel.app/login"
-                className="inline-flex items-center justify-center rounded-full border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink hover:bg-ink hover:text-white"
+                className="inline-flex items-center justify-center rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
               >
                 Go to Admin Panel
               </a>

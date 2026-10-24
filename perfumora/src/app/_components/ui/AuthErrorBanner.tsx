@@ -99,15 +99,15 @@ export function AuthErrorBanner() {
           : "-translate-y-4 opacity-0"
       }`}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-red-200 bg-white/95 shadow-xl backdrop-blur-md">
+      <div className="relative overflow-hidden rounded-2xl border border-error/30 bg-surface/95 shadow-xl backdrop-blur-md">
         {/* Top accent bar */}
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-400 via-rose-400 to-amber-400" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-error via-error to-primary" />
 
         <div className="flex items-start gap-3 px-5 pt-5 pb-4">
           {/* Icon */}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-error/10">
             <svg
-              className="h-5 w-5 text-red-500"
+              className="h-5 w-5 text-error"
               fill="none"
               viewBox="0 0 24 24"
               strokeWidth={1.5}
@@ -124,10 +124,10 @@ export function AuthErrorBanner() {
 
           {/* Content */}
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-gray-900">
+            <h3 className="text-sm font-semibold text-foreground">
               {error.title}
             </h3>
-            <p className="mt-1 text-sm leading-relaxed text-gray-600">
+            <p className="mt-1 text-sm leading-relaxed text-muted">
               {error.body}
             </p>
           </div>
@@ -140,7 +140,7 @@ export function AuthErrorBanner() {
               // Let the fade-out complete before removing from the DOM
               setTimeout(() => setError(null), 500);
             }}
-            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-subtle transition-colors hover:bg-secondary hover:text-foreground"
             aria-label="Dismiss"
           >
             <svg

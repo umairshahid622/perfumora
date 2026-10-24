@@ -134,7 +134,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-[70] bg-black/60 backdrop-blur-[3px]",
+          "fixed inset-0 z-[70] bg-backdrop backdrop-blur-[3px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -147,20 +147,17 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         aria-label="Fragrances"
         data-lenis-prevent
         className={cn(
-          "bg-bg-dark text-paper fixed inset-x-3 top-19 z-[80] overflow-hidden rounded-3xl md:inset-x-6",
+          "bg-surface text-foreground border border-border fixed inset-x-3 top-19 z-[80] overflow-hidden rounded-3xl md:inset-x-6 shadow-2xl",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
-        {/* Close button, top-right. An explicit affordance beside the scrim's
-            click-to-close. Kept out of `listRef` so the open timeline's item
-            stagger doesn't sweep it; `tabIndex`/`aria-hidden` follow the scrim so
-            it leaves the tab order while the panel is closed. */}
+        {/* Close button, top-right */}
         <button
           type="button"
           aria-label="Close menu"
           tabIndex={open ? 0 : -1}
           onClick={onClose}
-          className="border-hairline-on-dark text-paper absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full border bg-white/10 transition-colors hover:bg-white/20 md:top-6 md:right-6"
+          className="border-border text-foreground absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full border bg-secondary transition-colors hover:bg-secondary-hover md:top-6 md:right-6"
         >
           <svg
             aria-hidden="true"
@@ -232,11 +229,11 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
             >
               {categoryGroups.map(({ category, items }) => (
                 <div key={category} className="flex flex-col gap-2.5">
-                  <div className="flex items-center gap-2 border-b border-white/5 pb-1.5">
+                  <div className="flex items-center gap-2 border-b border-border-subtle pb-1.5">
                     <span className="font-display text-xs uppercase tracking-[0.16em] text-accent-on-dark">
                       {category}
                     </span>
-                    <span className="text-micro text-white/40">({items.length})</span>
+                    <span className="text-micro text-subtle">({items.length})</span>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {items.map(({ variant, originalIndex }) => (
@@ -248,8 +245,8 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
                         onFocus={() => setHovered(originalIndex)}
                         className={cn(
                           "group flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors",
-                          "hover:bg-white/5",
-                          originalIndex === index && "bg-white/5",
+                          "hover:bg-secondary",
+                          originalIndex === index && "bg-secondary",
                         )}
                       >
                         <span

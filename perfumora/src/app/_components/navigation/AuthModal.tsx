@@ -266,7 +266,7 @@ export function AuthModal({
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px]",
+          "fixed inset-0 z-[70] bg-backdrop backdrop-blur-[2px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -278,7 +278,7 @@ export function AuthModal({
           aria-modal="true"
           aria-label={copy.heading}
           className={cn(
-            "bg-bg-light text-ink relative w-full max-w-md rounded-3xl p-8 md:p-10",
+            "bg-surface text-foreground border border-border shadow-2xl relative w-full max-w-md rounded-3xl p-8 md:p-10",
             open ? "pointer-events-auto" : "pointer-events-none",
           )}
         >

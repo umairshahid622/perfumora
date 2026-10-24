@@ -73,7 +73,7 @@ export function FragranceName() {
         // on every step), so an inline `opacity` written here by GSAP has a second
         // author. The stage writes the variable on its own element, which React never
         // styles, and this stays a pure function of the variant.
-        opacity: "calc(0.055 * var(--name-presence, 1))",
+        opacity: "calc(0.075 * var(--name-presence, 1))",
       }}
       className="font-display text-ink pointer-events-none absolute inset-0 flex select-none items-center justify-center leading-none uppercase tracking-tight"
     >

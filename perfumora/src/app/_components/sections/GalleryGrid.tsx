@@ -282,7 +282,7 @@ export function GalleryGrid({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden"
       >
-        <span className="g-word text-ink/[0.055] text-[26vw] leading-none font-semibold tracking-tighter uppercase select-none">
+        <span className="g-word text-foreground/[0.05] text-[26vw] leading-none font-semibold tracking-tighter uppercase select-none">
           Perfumora
         </span>
       </div>
@@ -299,13 +299,13 @@ export function GalleryGrid({
               <div className="max-w-full overflow-x-auto scrollbar-none py-1">
                 <div
                   ref={filterContainerRef}
-                  className="relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] p-1.5 backdrop-blur-md"
+                  className="relative inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-border bg-surface-sunken p-1.5 backdrop-blur-md"
                 >
                   {/* Smooth sliding active indicator pill */}
                   <span
                     ref={indicatorRef}
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-0 left-0 rounded-full bg-ink shadow-md will-change-transform"
+                    className="pointer-events-none absolute top-0 left-0 rounded-full bg-primary shadow-md will-change-transform"
                     style={{ opacity: 0 }}
                   />
 
@@ -329,8 +329,8 @@ export function GalleryGrid({
                         className={cn(
                           "relative z-10 flex shrink-0 items-center gap-1.5 sm:gap-2 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-semibold tracking-wider uppercase transition-colors duration-200 active:scale-95",
                           active
-                            ? "text-paper"
-                            : "text-ink/65 hover:text-ink",
+                            ? "text-primary-foreground"
+                            : "text-muted hover:text-foreground",
                         )}
                       >
                         <span>{tab.label}</span>
@@ -338,8 +338,8 @@ export function GalleryGrid({
                           className={cn(
                             "rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-mono leading-none transition-colors duration-200",
                             active
-                              ? "bg-white/20 text-paper"
-                              : "bg-ink/5 text-ink/50",
+                              ? "bg-secondary text-primary-foreground"
+                              : "bg-secondary text-subtle",
                           )}
                         >
                           {count}
@@ -354,11 +354,11 @@ export function GalleryGrid({
         </div>
 
         {displayVariants.length === 0 ? (
-          <div className="mt-14 rounded-2xl border border-ink/10 bg-bg-light/50 p-12 text-center text-muted-on-light">
-            <p className="text-base font-medium text-ink">
+          <div className="mt-14 rounded-2xl border border-border bg-surface/50 p-12 text-center text-muted">
+            <p className="text-base font-medium text-foreground">
               No fragrances found in this category.
             </p>
-            <p className="mt-1 text-sm text-ink/60">
+            <p className="mt-1 text-sm text-muted">
               Try selecting another category or view all fragrances.
             </p>
           </div>

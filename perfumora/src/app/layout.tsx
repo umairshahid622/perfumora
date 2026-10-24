@@ -29,9 +29,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // fragrance list is in the first HTML rather than arriving after a spinner.
   const variants = await getCatalogue();
   const initialVariant = variants[0];
-  const initialAccent = initialVariant ? readableAccent(initialVariant.hex) : "#ae6c30";
-  const initialGlow = initialVariant ? accentGlow(initialVariant.hex) : "rgba(184, 115, 51, 0.3)";
-  const initialOnDark = initialVariant ? readableAccentOnDark(initialVariant.hex) : "#b87333";
+  const initialAccent = initialVariant ? readableAccent(initialVariant.hex) : "#9e5b22";
+  const initialGlow = initialVariant ? accentGlow(initialVariant.hex, 0.28) : "rgba(158, 91, 34, 0.28)";
 
   return (
     // Browser extensions (password managers, QuillBot, ColorZilla, …) inject
@@ -44,11 +43,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${khand.variable} ${switzer.variable} h-full antialiased`}
       style={{
+        "--primary": initialAccent,
+        "--primary-hover": initialAccent,
+        "--primary-glow": initialGlow,
+        "--primary-foreground": "#ffffff",
         "--accent": initialAccent,
-        "--accent-contrast": "var(--paper)",
+        "--accent-contrast": "#ffffff",
         "--accent-glow": initialGlow,
         "--accent-on-light": initialAccent,
-        "--accent-on-dark": initialOnDark,
+        "--accent-on-dark": initialAccent,
       } as React.CSSProperties}
       suppressHydrationWarning
     >

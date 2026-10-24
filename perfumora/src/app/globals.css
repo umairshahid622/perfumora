@@ -9,48 +9,105 @@
 --------------------------------------------------------------------------- */
 
 :root {
-  /* Surfaces */
-  --bg-light: #F9F5F0; /* warm parchment */
-  --bg-dark: #0b0b0c; /* near-black */
+  /* -------------------------------------------------------------------------
+     Surfaces & Backgrounds — Warm Cashmere Stone (Coolors Trending Luxury)
+     Light tone with rich mineral depth so clear glass bottles & white reflections POP
+  ------------------------------------------------------------------------- */
+  --background: #c9c2b8;          /* Main page background: warm cashmere stone */
+  --surface: #d8d2c8;             /* Cards, drawers, modals, elevated surfaces */
+  --surface-raised: #e5e0d7;      /* Popovers, menus, active items */
+  --surface-sunken: #b8b1a6;      /* Recessed areas, inputs, bottom bars */
+  --backdrop: rgba(30, 27, 24, 0.45);/* Modal & drawer backdrop blur overlay */
 
-  /* Text */
-  --ink: #1b1712; /* primary text on light */
-  --paper: #f3ece0; /* primary text on dark */
-  --muted-on-light: rgba(27, 23, 18, 0.35);
-  --muted-on-dark: rgba(243, 236, 224, 0.35);
+  /* -------------------------------------------------------------------------
+     Brand & Actions (Primary & Secondary)
+  ------------------------------------------------------------------------- */
+  --primary: #9e5b22;             /* Default rich bronze action (dynamic per perfume) */
+  --primary-foreground: #ffffff;  /* White contrast text on primary buttons */
+  --primary-hover: #884d1c;       /* Hover state for primary actions */
+  --primary-glow: rgba(158, 91, 34, 0.28); /* Ambient radial glow */
 
-  /* Hairlines */
-  --hairline-on-light: rgba(27, 23, 18, 0.12);
-  --hairline-on-dark: rgba(243, 236, 224, 0.12);
+  --secondary: rgba(26, 24, 22, 0.08);       /* Secondary buttons, subtle pills */
+  --secondary-foreground: #1a1816;              /* Text on secondary buttons */
+  --secondary-hover: rgba(26, 24, 22, 0.14); /* Hover state for secondary */
 
-  /* Accent — dynamic per variant; defaults to the amber SKU.
-     --accent-contrast always resolves to --ink or --paper (never a new colour):
-     it carries the per-variant contrast decision for button labels (§3.3).
-     --accent-glow is the accent at low opacity, for the Hero glow only. */
-  --accent: #b87333;
-  --accent-contrast: var(--paper);
-  --accent-glow: rgba(184, 115, 51, 0.3);
-  /* The accent floored for legibility as a foreground on the light parchment
-     (see readableAccent). Fills/glow/liquid keep --accent; only text/borders on
-     light use this. Defaults to the floored amber; swapped live per variant. */
-  --accent-on-light: #ae6c30;
-  /* The foreground accent over the near-black sections (see readableAccentOnDark).
-     Sits brighter than the on-light form, which goes quiet beside --paper text.
-     The default amber is already under the ceiling, so here it is the true accent;
-     the near-clear SKUs are the ones this pulls down. */
-  --accent-on-dark: #b87333;
+  /* -------------------------------------------------------------------------
+     Typography & Foregrounds
+  ------------------------------------------------------------------------- */
+  --foreground: #1a1816;          /* Deep luxury obsidian charcoal text */
+  --foreground-muted: rgba(26, 24, 22, 0.68); /* Subtitles, body prose */
+  --foreground-subtle: rgba(26, 24, 22, 0.44);/* Micro labels, hints, captions */
+
+  /* -------------------------------------------------------------------------
+     Borders & Dividers
+  ------------------------------------------------------------------------- */
+  --border: rgba(26, 24, 22, 0.14);        /* Hairline borders */
+  --border-subtle: rgba(26, 24, 22, 0.08); /* Soft dividers */
+  --border-strong: rgba(26, 24, 22, 0.28); /* Active/focused borders */
+
+  /* -------------------------------------------------------------------------
+     Status & Feedback
+  ------------------------------------------------------------------------- */
+  --error: #ef4444;
+  --error-foreground: #ffffff;
+  --success: #22c55e;
+  --success-foreground: #ffffff;
+
+  /* -------------------------------------------------------------------------
+     Backward-Compatible Aliases (so existing tokens link to central variables)
+  ------------------------------------------------------------------------- */
+  --bg-light: var(--background);
+  --bg-dark: var(--surface-sunken);
+  --ink: var(--foreground);
+  --paper: #faf8f5;
+  --muted-on-light: var(--foreground-muted);
+  --muted-on-dark: var(--foreground-muted);
+  --hairline-on-light: var(--border);
+  --hairline-on-dark: var(--border);
+  --accent: var(--primary);
+  --accent-contrast: #ffffff;
+  --accent-glow: var(--primary-glow);
+  --accent-on-light: var(--accent);
+  --accent-on-dark: var(--accent);
 }
 
 @theme inline {
-  /* Colour roles — components reference the role, never a raw hex */
-  --color-bg-light: var(--bg-light);
-  --color-bg-dark: var(--bg-dark);
-  --color-ink: var(--ink);
-  --color-paper: var(--paper);
-  --color-muted-on-light: var(--muted-on-light);
-  --color-muted-on-dark: var(--muted-on-dark);
-  --color-hairline-on-light: var(--hairline-on-light);
-  --color-hairline-on-dark: var(--hairline-on-dark);
+  /* General Color Tokens */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-backdrop: var(--backdrop);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-glow: var(--primary-glow);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+
+  --color-foreground: var(--foreground);
+  --color-muted: var(--foreground-muted);
+  --color-subtle: var(--foreground-subtle);
+
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-error: var(--error);
+  --color-success: var(--success);
+
+  /* Legacy Aliases & Dynamic Accents */
+  --color-bg-light: var(--background);
+  --color-bg-dark: var(--surface-sunken);
+  --color-ink: var(--foreground);
+  --color-paper: var(--foreground);
+  --color-muted-on-light: var(--foreground-muted);
+  --color-muted-on-dark: var(--foreground-muted);
+  --color-hairline-on-light: var(--border);
+  --color-hairline-on-dark: var(--border);
   --color-accent: var(--accent);
   --color-accent-contrast: var(--accent-contrast);
   --color-accent-glow: var(--accent-glow);

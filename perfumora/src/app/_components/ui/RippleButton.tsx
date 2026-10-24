@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import gsap from "gsap";
 import { cn } from "../../_lib/cn";
 import { prefersReducedMotion } from "../../_lib/motion";
@@ -11,13 +11,7 @@ interface RippleButtonProps {
   onClick?: () => void;
   type?: "button" | "submit";
   className?: string;
-  /** Opt out of the shared click cue — for the CTAs inside the navigation
-   *  panels (cart, auth) and the whole checkout flow, which the sound spec
-   *  excludes. The cue belongs to browsing the collection; a transactional
-   *  screen that fires it on every "Continue" reads as noise. */
   silent?: boolean;
-  /** Inert and visibly so — an out-of-stock Add to Bag. The hover ripple is
-   *  skipped too: a fill that still animates reads as "try me". */
   id?: string;
   disabled?: boolean;
   "aria-label"?: string;
@@ -26,26 +20,8 @@ interface RippleButtonProps {
 const EXPAND_DURATION = 0.55;
 const COLLAPSE_DURATION = 0.4;
 const LABEL_DURATION = 0.22;
-
-/**
- * The label waits for the fill to reach it rather than flipping with it: entering
- * at an edge, the circle needs about a fifth of its expansion to cover the
- * centre, and a label that changes colour before then spends a moment in the
- * fill's colour on top of the fill's colour.
- */
 const LABEL_DELAY = 0.12;
 
-/**
- * The shared CTA (§3.3 / §4.1): solid `--accent` fill with a label in
- * `--accent-contrast` (computed per variant, never hardcoded white). On hover the
- * contrast colour expands as a circle from wherever the cursor entered and the
- * label inverts to `--accent` as the circle reaches it — GSAP, not CSS
- * transitions (§1) — then collapses back toward wherever the cursor left.
- * Inverting the button's own two roles rather than introducing a third colour
- * keeps the label legible on every variant by construction: `--accent-contrast`
- * *is* the readable pairing for `--accent`. Motion is skipped under
- * `prefers-reduced-motion` (§2.7); the button still works, it just stays flat.
- */
 export function RippleButton({
   children,
   onClick,
@@ -61,69 +37,17 @@ export function RippleButton({
   const restingColor = useRef("");
 
   const { play } = useSoundCue();
-
-  const collapseRipple = useCallback(
-    (instant = false, exitPoint?: { x: number; y: number }) => {
-      const el = ref.current;
-      const fill = fillRef.current;
-      const label = labelRef.current;
-      if (!el || !fill || !label) return;
-
-      gsap.killTweensOf([fill, label]);
-
-      if (instant || prefersReducedMotion()) {
-        gsap.set(fill, { scale: 0 });
-        gsap.set(label, { clearProps: "color" });
-        return;
-      }
-
-      if (exitPoint) {
-        gsap.set(fill, {
-          x: exitPoint.x,
-          y: exitPoint.y,
-        });
-      }
-
-      gsap.to(fill, {
-        scale: 0,
-        duration: COLLAPSE_DURATION,
-        ease: "power2.in",
-        overwrite: true,
-      });
-
-      const targetColor =
-        restingColor.current ||
-        getComputedStyle(el).getPropertyValue("--accent-contrast").trim();
-
-      if (targetColor) {
-        gsap.to(label, {
-          color: targetColor,
-          duration: LABEL_DURATION,
-          ease: "power2.out",
-          overwrite: true,
-          onComplete: () => gsap.set(label, { clearProps: "color" }),
-        });
-      } else {
-        gsap.set(label, { clearProps: "color" });
-      }
-    },
-    [],
-  );
-
-  const isHoveredRef = useRef(false);
-
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = () => {
     if (disabled) return;
     if (!silent) play();
     onClick?.();
   };
 
   const handleEnter = (event: React.MouseEvent<HTMLButtonElement>) => {
-    isHoveredRef.current = true;
     const el = ref.current;
     const fill = fillRef.current;
     const label = labelRef.current;
-    if (!el || !fill || !label || prefersReducedMotion()) return;
+    if (!el || !fill || !label || disabled || prefersReducedMotion()) return;
 
     gsap.set(label, { clearProps: "color" });
     restingColor.current = getComputedStyle(label).color;
@@ -157,21 +81,46 @@ export function RippleButton({
   };
 
   const handleLeave = (event: React.MouseEvent<HTMLButtonElement>) => {
-    isHoveredRef.current = false;
     const el = ref.current;
-    if (!el) return;
+    const fill = fillRef.current;
+    const label = labelRef.current;
+    if (!el || !fill || !label || disabled || prefersReducedMotion()) return;
+
     const rect = el.getBoundingClientRect();
-    collapseRipple(false, {
+    gsap.set(fill, {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
+    });
+
+    gsap.to(fill, {
+      scale: 0,
+      duration: COLLAPSE_DURATION,
+      ease: "power2.in",
+      overwrite: true,
+    });
+
+    gsap.to(label, {
+      color: restingColor.current || "#ffffff",
+      duration: LABEL_DURATION,
+      ease: "power2.out",
+      overwrite: true,
+      onComplete: () => gsap.set(label, { clearProps: "color" }),
     });
   };
 
   const handleBlur = () => {
-    // Only collapse if the cursor/arrow is not currently hovering over the button
-    // (when clicking disables the button, the browser fires blur even though the arrow is still on it).
-    if (isHoveredRef.current || ref.current?.matches(":hover")) return;
-    collapseRipple(false);
+    if (ref.current?.matches(":hover")) return;
+    const el = ref.current;
+    const fill = fillRef.current;
+    const label = labelRef.current;
+    if (!el || !fill || !label) return;
+    gsap.to(fill, { scale: 0, duration: COLLAPSE_DURATION, overwrite: true });
+    gsap.to(label, {
+      color: restingColor.current || "#ffffff",
+      duration: LABEL_DURATION,
+      overwrite: true,
+      onComplete: () => gsap.set(label, { clearProps: "color" }),
+    });
   };
 
   return (
@@ -185,30 +134,20 @@ export function RippleButton({
       onPointerLeave={handleLeave}
       onBlur={handleBlur}
       className={cn(
-        // `ring-accent` is invisible at rest — it sits on a fill of the same
-        // colour — and costs nothing until the fill changes under it. It earns its
-        // keep on hover: `--accent-contrast` resolves to `--paper`, which is the
-        // *same hex* as `--bg-light`, so a flooded button would otherwise dissolve
-        // into the page and leave the label floating. The ring keeps the
-        // silhouette, turning the hover into filled → outlined.
-        "bg-accent text-accent-contrast ring-1 ring-accent relative inline-flex items-center justify-center overflow-hidden rounded-full",
+        "bg-accent text-white ring-1 ring-accent relative inline-flex items-center justify-center overflow-hidden rounded-full shadow-xs transition-shadow hover:shadow-md",
         "px-4 md:px-9 py-3 md:py-4 text-[0.8rem] font-semibold uppercase tracking-widest",
         "select-none",
-        // When disabled, keep cursor as not-allowed without altering the button's background
-        // or text colors so buttons on sending/submitting retain their full vibrant color.
-        disabled ? "cursor-not-allowed" : "cursor-pointer",
+        disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer",
         className,
       )}
       {...rest}
     >
-      {/* Sized and positioned per hover, so it starts life 0×0 and nothing is
-          painted before the first cursor enters — including in the SSR HTML. */}
       <span
         ref={fillRef}
         aria-hidden="true"
-        className="bg-accent-contrast pointer-events-none absolute top-0 left-0 rounded-full will-change-transform"
+        className="bg-background pointer-events-none absolute top-0 left-0 rounded-full will-change-transform"
       />
-      <span ref={labelRef} className="relative">
+      <span ref={labelRef} className="relative z-10">
         {children}
       </span>
     </button>

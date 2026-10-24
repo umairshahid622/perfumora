@@ -8,6 +8,7 @@ import {
   PMREMGenerator,
   SRGBColorSpace,
 } from "three";
+import { readCssToken } from "../../_lib/css-token";
 
 interface StudioEnvironmentProps {
   /** Overall strength of the image-based lighting. */
@@ -64,12 +65,15 @@ function paintStudioEquirect(): CanvasTexture | null {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  // High-key luxury studio backdrop matching the parchment paper aesthetic
+  const bg = readCssToken("--background", "#c9c2b8");
+  const surface = readCssToken("--surface", "#d8d2c8");
+
+  // Luxury studio backdrop derived from CSS tokens
   const base = ctx.createLinearGradient(0, 0, 0, height);
-  base.addColorStop(0, "#ffffff");
-  base.addColorStop(0.35, "#fbf8f3");
-  base.addColorStop(0.70, "#f2ecdf");
-  base.addColorStop(1, "#e6decb");
+  base.addColorStop(0, surface);
+  base.addColorStop(0.35, bg);
+  base.addColorStop(0.70, "#221f1c");
+  base.addColorStop(1, "#12100e");
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, width, height);
 

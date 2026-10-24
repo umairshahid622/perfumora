@@ -21,8 +21,8 @@ export function ImagePlaceholder({
       className={cn(
         "relative flex items-center justify-center overflow-hidden rounded-2xl border",
         tone === "light"
-          ? "border-hairline-on-light bg-black/[0.02]"
-          : "border-hairline-on-dark bg-white/[0.03]",
+          ? "border-border bg-surface-sunken"
+          : "border-border bg-secondary",
         className,
       )}
     >

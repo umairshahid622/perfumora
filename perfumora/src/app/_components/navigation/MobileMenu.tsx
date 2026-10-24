@@ -121,7 +121,7 @@ export function MobileMenu({
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-[70] bg-black/60 backdrop-blur-[4px]",
+          "fixed inset-0 z-[70] bg-backdrop backdrop-blur-[4px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -134,19 +134,19 @@ export function MobileMenu({
         aria-label="Site Navigation"
         data-lenis-prevent
         className={cn(
-          "bg-bg-dark text-paper fixed inset-x-3 top-3 z-[75] flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-white/10 shadow-2xl",
+          "bg-surface text-foreground fixed inset-x-3 top-3 z-[75] flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-border shadow-2xl",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
         {/* Drawer Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <button
             type="button"
             onClick={() => {
               onClose();
               onNavigateHomeSection(SECTION_IDS.hero);
             }}
-            className="font-display text-paper text-xl tracking-[0.02em] uppercase"
+            className="font-display text-foreground text-xl tracking-[0.02em] uppercase"
           >
             Perfumora
           </button>
@@ -155,7 +155,7 @@ export function MobileMenu({
             type="button"
             aria-label="Close menu"
             onClick={onClose}
-            className="border-hairline-on-dark text-paper flex size-10 items-center justify-center rounded-full border bg-white/10 transition-colors hover:bg-white/20 active:scale-95"
+            className="border-border text-foreground flex size-10 items-center justify-center rounded-full border bg-secondary transition-colors hover:bg-secondary-hover active:scale-95"
           >
             <CloseIcon className="size-5" />
           </button>
@@ -178,20 +178,20 @@ export function MobileMenu({
               className={cn(
                 "flex items-center justify-between rounded-xl px-3 py-3 text-left font-display text-2xl uppercase transition-colors",
                 isHome && activeSection === SECTION_IDS.hero
-                  ? "text-accent-on-dark bg-white/5 font-semibold"
-                  : "text-paper hover:text-accent-on-dark",
+                  ? "text-accent-on-dark bg-secondary font-semibold"
+                  : "text-foreground hover:text-accent-on-dark",
               )}
             >
               Home
             </button>
 
             {/* Fragrances Section with Sub-List Grouped by Categories */}
-            <div className="flex flex-col rounded-xl bg-white/[0.03] p-1">
+            <div className="flex flex-col rounded-xl bg-surface-sunken p-1">
               <button
                 type="button"
                 onClick={() => setFragrancesExpanded((prev) => !prev)}
                 aria-expanded={fragrancesExpanded}
-                className="flex items-center justify-between px-3 py-3 font-display text-2xl uppercase text-paper transition-colors hover:text-accent-on-dark"
+                className="flex items-center justify-between px-3 py-3 font-display text-2xl uppercase text-foreground transition-colors hover:text-accent-on-dark"
               >
                 <span>Fragrances</span>
                 <ChevronIcon
@@ -214,11 +214,11 @@ export function MobileMenu({
                   <div className="flex flex-col gap-3 pb-2 pt-1">
                     {categoryGroups.map(({ category, items }) => (
                       <div key={category} className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between px-3 pt-2 pb-0.5 border-b border-white/5">
+                        <div className="flex items-center justify-between px-3 pt-2 pb-0.5 border-b border-border-subtle">
                           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-on-dark">
                             {category}
                           </span>
-                          <span className="text-[10px] font-mono text-white/40">
+                          <span className="text-[10px] font-mono text-subtle">
                             ({items.length})
                           </span>
                         </div>
@@ -234,26 +234,26 @@ export function MobileMenu({
                                 className={cn(
                                   "flex items-center justify-between rounded-lg px-3 py-2 text-left transition-all active:scale-[0.98]",
                                   isSelected
-                                    ? "bg-white/10 text-paper font-medium"
-                                    : "hover:bg-white/5 text-white/75",
+                                    ? "bg-secondary text-foreground font-medium"
+                                    : "hover:bg-secondary text-muted",
                                 )}
                               >
                                 <div className="flex items-center gap-3">
                                   <span
                                     aria-hidden="true"
-                                    className="size-3.5 shrink-0 rounded-full border border-white/20"
+                                    className="size-3.5 shrink-0 rounded-full border border-border"
                                     style={{ backgroundColor: variant.hex }}
                                   />
                                   <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-paper">
+                                    <span className="text-sm font-medium text-foreground">
                                       {variant.name}
                                     </span>
-                                    <span className="text-[10px] text-white/40 font-medium uppercase">
+                                    <span className="text-[10px] text-subtle font-medium uppercase">
                                       {variant.concentration ?? "Eau de Parfum"}
                                     </span>
                                   </div>
                                 </div>
-                                <span className="text-micro font-sans uppercase text-white/40">
+                                <span className="text-micro font-sans uppercase text-subtle">
                                   {String(originalIndex + 1).padStart(2, "0")}
                                 </span>
                               </button>
@@ -276,8 +276,8 @@ export function MobileMenu({
               className={cn(
                 "flex items-center justify-between rounded-xl px-3 py-3 text-left font-display text-2xl uppercase transition-colors",
                 isCollection
-                  ? "text-accent-on-dark bg-white/5 font-semibold"
-                  : "text-paper hover:text-accent-on-dark",
+                  ? "text-accent-on-dark bg-secondary font-semibold"
+                  : "text-foreground hover:text-accent-on-dark",
               )}
             >
               Collection
@@ -285,14 +285,14 @@ export function MobileMenu({
           </nav>
 
           {/* User Quick Actions in Drawer Footer — Bag Button */}
-          <div className="border-t border-white/10 pt-4 mt-auto">
+          <div className="border-t border-border pt-4 mt-auto">
             <button
               type="button"
               onClick={() => {
                 onClose();
                 onCartOpen();
               }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-3.5 text-xs font-medium uppercase tracking-wider text-paper transition-colors hover:bg-white/10 active:scale-[0.99]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-3.5 text-xs font-medium uppercase tracking-wider text-foreground transition-colors hover:bg-secondary-hover active:scale-[0.99]"
             >
               <BagIcon className="size-4" />
               <span>View Bag ({cartCount})</span>

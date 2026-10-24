@@ -74,7 +74,7 @@ export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
           // dropdown the header stays attached to, while this is a modal surface
           // drawn over the full height of the page. Leaving the nav lit above the
           // scrim also made `aria-modal` below a lie — its icons stayed live.
-          "fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]",
+          "fixed inset-0 z-[70] bg-backdrop backdrop-blur-[2px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -86,7 +86,7 @@ export function CartDrawer({ open, onClose, onCheckout }: CartDrawerProps) {
         aria-label="Shopping cart"
         data-lenis-prevent
         className={cn(
-          "bg-bg-light text-ink fixed inset-y-0 right-0 z-[80] flex w-full max-w-md flex-col",
+          "bg-surface text-foreground fixed inset-y-0 right-0 z-[80] flex w-full max-w-md flex-col",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       >

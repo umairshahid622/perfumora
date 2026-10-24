@@ -123,7 +123,7 @@ export function totalStock(sizes: SizeMap): number {
 }
 
 /** WCAG relative luminance of an sRGB hex, 0 (black) … 1 (white). */
-function relativeLuminance(hex: string): number {
+export function relativeLuminance(hex: string): number {
   const n = hex.replace("#", "");
   const channels = [0, 1, 2].map((i) => {
     const c = parseInt(n.slice(i * 2, i * 2 + 2), 16) / 255;
@@ -134,7 +134,16 @@ function relativeLuminance(hex: string): number {
 
 /** Button label token: light `--paper` on dark accents, dark `--ink` on light. */
 export function contrastToken(hex: string): "ink" | "paper" {
-  return relativeLuminance(hex) > 0.45 ? "ink" : "paper";
+  return relativeLuminance(hex) > 0.18 ? "ink" : "paper";
+}
+
+/**
+ * Returns crisp obsidian charcoal text (`var(--foreground)`) for light/medium
+ * fragrance liquids (Boom Shell pink, Parada olive, Oud amber), and off-white (`#faf8f5`)
+ * only for ultra-deep dark liquids (Midnight Sapphire navy).
+ */
+export function getButtonContrastColor(hex: string): string {
+  return relativeLuminance(hex) > 0.18 ? "var(--foreground)" : "#faf8f5";
 }
 
 /**

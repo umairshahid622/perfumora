@@ -343,25 +343,25 @@ export default function BottleScene({
         <TransmissionQuality scale={isCompact ? 0.5 : 0.75} />
         <AddToBagBottleBridge refs={bottleRefs} />
 
-        <StudioEnvironment intensity={1.1} />
+        <StudioEnvironment intensity={1.25} />
 
         {/* Studio ambient fill (balanced soft illumination) */}
-        <ambientLight intensity={0.35} color="#ffffff" />
+        <ambientLight intensity={0.4} color="#ffffff" />
 
-        {/* Studio_KeyLight (soft key light from upper right, gentle reflection) */}
-        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.45} color="#fffaf2" />
+        {/* Studio_KeyLight (soft key light from upper right, crisp specular reflection) */}
+        <directionalLight position={[3.2, 2.4, 4.2]} intensity={0.6} color="#fffaf2" />
 
         {/* Studio_FillLight (soft left fill) */}
-        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.25} color="#f4f8ff" />
+        <directionalLight position={[-3.2, 1.4, 4.0]} intensity={0.35} color="#f4f8ff" />
 
-        {/* Studio_RimLight (back-left rim light giving subtle crystal refraction edge) */}
-        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.35} color="#eef6ff" />
+        {/* Studio_RimLight (back-left rim light giving crisp crystal refraction edge) */}
+        <directionalLight position={[-3.2, 2.4, -3.0]} intensity={0.65} color="#eef6ff" />
 
         {/* Studio_TopLight (overhead light defining cap bevels and shoulders) */}
-        <directionalLight position={[0, 4.5, 1.0]} intensity={0.3} color="#ffffff" />
+        <directionalLight position={[0, 4.5, 1.0]} intensity={0.45} color="#ffffff" />
 
         {/* Studio_BottomBounce (gentle caustic glow on crystal base) */}
-        <directionalLight position={[0, -2.2, 3.2]} intensity={0.25} color="#fff5ea" />
+        <directionalLight position={[0, -2.2, 3.2]} intensity={0.3} color="#fff5ea" />
 
         {/* The resting pose group */}
         <group position={[0, rest.y, 0]} scale={rest.scale}>
@@ -371,8 +371,8 @@ export default function BottleScene({
             scale={2.4}
             far={0.8}
             blur={2.5}
-            opacity={0.22}
-            color="#3b2a20"
+            opacity={0.45}
+            color="#000000"
             resolution={isCompact ? 256 : 512}
             frames={isCompact ? (ready ? 1 : 0) : Infinity}
           />

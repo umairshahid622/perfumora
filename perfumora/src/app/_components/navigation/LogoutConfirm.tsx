@@ -121,7 +121,7 @@ export function LogoutConfirm({
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-[70] bg-black/50 backdrop-blur-[2px]",
+          "fixed inset-0 z-[70] bg-backdrop backdrop-blur-[2px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -134,7 +134,7 @@ export function LogoutConfirm({
           aria-labelledby={`${id}-title`}
           aria-describedby={`${id}-copy`}
           className={cn(
-            "bg-bg-light text-ink relative w-full max-w-sm rounded-3xl p-8",
+            "bg-surface text-foreground border border-border shadow-2xl relative w-full max-w-sm rounded-3xl p-8",
             open ? "pointer-events-auto" : "pointer-events-none",
           )}
         >

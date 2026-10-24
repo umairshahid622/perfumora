@@ -422,20 +422,20 @@ export function Ritual() {
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
-            <div className="border-hairline-on-light bg-bg-light/95 backdrop-blur-md rounded-2xl border p-2 sm:p-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+            <div className="border-border bg-surface/95 backdrop-blur-md rounded-2xl border p-2 sm:p-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
               {/* Segmented control track with sliding active pill */}
-              <div className="relative flex rounded-xl bg-black/[0.035] p-1 border border-black/[0.04]">
+              <div className="relative flex rounded-xl bg-surface-sunken p-1 border border-border-subtle">
                 <div
                   aria-hidden="true"
                   className="absolute top-1 bottom-1 left-1 w-[calc((100%-8px)/3)] transition-transform duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
                   style={{ transform: `translateX(${activeStep * 100}%)` }}
                 >
-                  <div className="relative h-full w-full rounded-lg bg-accent-on-light shadow-xs overflow-hidden">
+                  <div className="relative h-full w-full rounded-lg bg-primary shadow-xs overflow-hidden">
                     {isAutoPlaying && isRevealed && (
-                      <div className="absolute bottom-0 left-1 right-1 h-[2px] bg-white/20 rounded-full overflow-hidden">
+                      <div className="absolute bottom-0 left-1 right-1 h-[2px] bg-secondary rounded-full overflow-hidden">
                         <div
                           key={`prog-${activeStep}-${cycleKey}`}
-                          className="h-full bg-white/90 animate-ritual-progress rounded-full"
+                          className="h-full bg-primary-foreground animate-ritual-progress rounded-full"
                           style={{ animationDuration: `${STEP_INTERVAL_MS}ms` }}
                         />
                       </div>
@@ -455,7 +455,7 @@ export function Ritual() {
                       <span
                         className={cn(
                           "font-display transition-colors duration-200",
-                          active ? "text-white/85 font-medium" : "text-accent-on-light font-normal",
+                          active ? "text-primary-foreground/90 font-medium" : "text-primary font-normal",
                         )}
                       >
                         {step.num}
@@ -463,7 +463,7 @@ export function Ritual() {
                       <span
                         className={cn(
                           "truncate transition-colors duration-200",
-                          active ? "text-white font-semibold" : "text-muted-on-light hover:text-ink font-medium",
+                          active ? "text-primary-foreground font-semibold" : "text-muted hover:text-foreground font-medium",
                         )}
                       >
                         {step.title}
