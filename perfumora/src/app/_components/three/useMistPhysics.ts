@@ -51,8 +51,8 @@ export const MIST_PHYSICS = {
    *  Note the plume still settles: `gravity` takes the cloud below the orifice over
    *  the flight, so this is level *leaving*, not level *arriving*. */
   elevationAngle: 0.0,
-  /** Lateral angle aligned straight with nozzle (0.0 = straight forward out of orifice) */
-  lateralAngle: 0.0,
+  /** Lateral angle (radians, ~12.6° toward right so plume trajectory is visible in front view) */
+  lateralAngle: 0.22,
   /** Conical spray dispersion half-angle (~15°). Deliberately *tight*, and the
    *  opposite of the earlier wide fan: the reference leaves the nozzle as a narrow
    *  speckled cone and only balloons later. That ballooning is the turbulence
@@ -65,22 +65,12 @@ export const MIST_PHYSICS = {
    *  far cloud is still on screen while it is still growing into its final soft
    *  mass, rather than dissolving the moment it arrives. */
   particleLifetime: 0.92,
-  /** Total number of simulated mist droplets. Raised: the reference's far cloud is
-   *  a smooth wash, and smoothness there is particle count, not opacity — the same
-   *  droplets over a wider cloud is what keeps it a veil rather than a lump. */
-  count: 1500,
-  /** Base droplet size factor in projection units. Raised back up from 0.038: the
-   *  reference is fine atomization, but fine is only readable when there is
-   *  contrast to read it with, and this was shrunk in the same pass that paled the
-   *  colour — two reductions in visibility at once, which is what produced the
-   *  "barely visible" report. */
-  dotSize: 0.045,
-  /** Peak global mist opacity. Carries visibility now that the colour has been
-   *  taken back down to a mid warm grey: against the `--paper: #f3ece0` ground a
-   *  pale cloud cannot read by hue alone, so density has to do it. Lower this
-   *  first if the cloud ever looks heavy again — it is the softer of the two
-   *  visibility levers. */
-  peakOpacity: 0.58,
+  /** Total number of simulated mist droplets. Raised for rich, velvety plume density. */
+  count: 1600,
+  /** Base droplet size factor in projection units. Delicate, fine atomized droplets. */
+  dotSize: 0.050,
+  /** Peak global mist opacity. Soft, balanced presence. */
+  peakOpacity: 0.50,
 } as const;
 
 export interface MistBuffers {
@@ -124,18 +114,11 @@ export function generateMistBuffers(count = MIST_PHYSICS.count): MistBuffers {
   const turbulence = new Float32Array(count * 4);
 
   // 3D nozzle trajectory axis: straight out of the orifice along the nozzle's own
-  // forward (+Z), level. The elevation term is kept rather than baked out so the
-  // launch angle stays a single knob — and at 0 it is well-behaved: the axis is
-  // (0, 0, 1), so `across` comes out pure X and `up` pure Y below, with no
-  // degenerate cross product.
-  //
-  // This is level *launch*, not a level plume. The cone's upper half still throws
-  // droplets above the axis and gravity brings the cloud back down over the flight,
-  // so the settle now comes entirely from those two instead of from a tilted axis.
+  // forward (+Z) with gentle lateral angle toward the right.
   const axis = new Vector3(
-    0.0,
+    Math.sin(MIST_PHYSICS.lateralAngle),
     Math.sin(MIST_PHYSICS.elevationAngle),
-    Math.cos(MIST_PHYSICS.elevationAngle),
+    Math.cos(MIST_PHYSICS.lateralAngle) * Math.cos(MIST_PHYSICS.elevationAngle),
   ).normalize();
 
   // Robust orthonormal basis for conical spray dispersion

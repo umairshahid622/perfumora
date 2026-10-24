@@ -90,19 +90,15 @@ const VERTEX_SHADER = /* glsl */ `
     // finely speckled cone — the reference is discrete specks there and a smooth
     // wash at the far end, and this split is what produces both.
     float ageRatio = tau / lifetime;
-    float expansion = 1.0 + 1.05 * smoothstep(0.15, 0.85, ageRatio);
+    float expansion = 1.0 + 1.15 * smoothstep(0.12, 0.85, ageRatio);
     float pSize = uBaseSize * sizeMultiplier * expansion * (300.0 / -mvPosition.z) * uPixelRatio;
-    gl_PointSize = clamp(pSize, 1.5, 7.0);
+    gl_PointSize = clamp(pSize, 1.5, 7.5);
 
     // Smooth natural alpha envelope:
     // Rapid birth fade-in as mist emerges from orifice
-    float fadeIn = smoothstep(0.0, 0.05, ageRatio);
-    // Soft, velvety dissipation, and held late. The reference's cloud is still a
-    // coherent soft mass at its furthest point, so the fade has to stay out of the
-    // way until the droplets have actually arrived and gathered. Fading from a
-    // sixth of life, as it used to, dissolved the cloud before it could form —
-    // which is part of why the far end read as a thin rope rather than a body.
-    float fadeOut = 1.0 - smoothstep(0.30, 0.95, ageRatio);
+    float fadeIn = smoothstep(0.0, 0.04, ageRatio);
+    // Soft, velvety dissipation held through full plume expansion
+    float fadeOut = 1.0 - smoothstep(0.32, 0.96, ageRatio);
     vAlpha = fadeIn * fadeOut * uGlobalOpacity;
   }
 `;
@@ -119,34 +115,17 @@ const FRAGMENT_SHADER = /* glsl */ `
     float dist = length(coord);
     if (dist > 0.5) discard;
 
-    // Soft circular droplet, and softer than it was: the halo now carries most of
-    // the weight and reaches further, so the cloud's boundary is a gradient rather
-    // than an edge. The reference's cloud is one you cannot point at the edge of —
-    // that softness lives here, in the falloff, not in the physics.
-    float core = smoothstep(0.5, 0.16, dist) * 0.75;
-    float halo = exp(-dist * 5.2);
-    float finalAlpha = mix(core, halo, 0.68) * vAlpha * 0.50;
+    // Smooth Gaussian aerosol droplet falloff — soft and luminous with zero hard dark speckles
+    float dropletShape = pow(clamp(1.0 - dist * 2.0, 0.0, 1.0), 1.6);
+    float halo = exp(-dist * 3.6);
+    float finalAlpha = mix(dropletShape, halo, 0.55) * vAlpha * 0.72;
 
     if (finalAlpha <= 0.003) discard;
 
-    // Where the cloud sits against the page, and the whole reason this is a mid
-    // grey rather than a pale white.
-    //
-    // The parchment is --paper: #f3ece0 — already 0.95 in red. A white-ish mist
-    // (this was 0.87) therefore has almost nowhere to go: it can only sit ~8%
-    // below the page, which is under the threshold anyone notices, and the cloud
-    // reads as absent. That is the "barely visible" report. The reference manages
-    // a white spray because its ground is a flat illustration; ours is a real
-    // composited page at 0.95, and on it a pale cloud simply cannot be pale *and*
-    // present. Contrast wins, so the mist is anchored well below the page and
-    // reads as a soft warm grey haze — which is also what gives the reference's
-    // cloud its volume along the shaded edge.
-    //
-    // Do not lighten this again to chase the reference's whiteness. If the cloud
-    // needs to be more present, the peakOpacity uniform is the lever; if it needs
-    // to be softer, the halo weight above is.
-    vec3 mistColor = mix(vec3(0.66, 0.64, 0.61), uColor, 0.26);
-    gl_FragColor = vec4(mistColor, finalAlpha);
+    // Warm, luminous fragrance mist tone:
+    // Carries the true fragrance hue with a warm ambient lift (soft taupe/rose, never charcoal or dark)
+    vec3 warmMist = mix(uColor * 0.82, vec3(0.56, 0.50, 0.46), 0.22);
+    gl_FragColor = vec4(warmMist, finalAlpha);
   }
 `;
 
