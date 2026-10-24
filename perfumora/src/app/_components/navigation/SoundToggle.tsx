@@ -54,7 +54,13 @@ const MUTED_SCALE = 0.12;
  * elsewhere. The dance is a one-shot's *visual* — it stops on the clip's `ended`,
  * so there is still no ambient/looping motion (§1).
  */
-export function SoundToggle({ className }: { className?: string }) {
+export function SoundToggle({
+  className,
+  tone = "light",
+}: {
+  className?: string;
+  tone?: "light" | "dark";
+}) {
   const { isMuted, toggleMute, isPlaying } = useSoundCue();
   const scopeRef = useRef<HTMLButtonElement>(null);
   const danceRef = useRef<gsap.core.Tween[]>([]);
@@ -133,7 +139,10 @@ export function SoundToggle({ className }: { className?: string }) {
         // No colour of its own: it inherits the header's, which the nav's tone
         // swap tweens between ink and paper per section. The rounded border and
         // the bars both track that currentColor, so the control reads on either.
-        "hover:text-accent-on-light hover:border-accent-on-light grid size-10 place-items-center rounded-full border border-current/25 transition-colors",
+        "grid size-10 place-items-center rounded-full border border-current/25 transition-colors",
+        tone === "dark"
+          ? "hover:text-accent-on-dark hover:border-accent-on-dark"
+          : "hover:text-accent-on-light hover:border-accent-on-light",
         className,
       )}
     >

@@ -174,7 +174,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
 
         <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-10 p-8 md:grid-cols-[1fr_1.4fr] md:grid-rows-[minmax(0,1fr)] md:p-14">
           <div className="relative flex flex-col">
-            <span className="text-micro text-muted-on-dark font-medium uppercase">
+            <span className="text-micro text-muted font-medium uppercase">
               The Collection
             </span>
 
@@ -210,7 +210,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
               <p className="font-display text-4xl leading-none uppercase">
                 {displayVariant.name}
               </p>
-              <span className="text-micro text-muted-on-dark mt-2 block font-medium uppercase">
+              <span className="text-micro text-muted mt-2 block font-medium uppercase">
                 {String(displayIndex + 1).padStart(2, "0")} / {displayVariant.concentration ?? "Eau de Parfum"}
               </span>
             </div>
@@ -230,7 +230,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
               {categoryGroups.map(({ category, items }) => (
                 <div key={category} className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2 border-b border-border-subtle pb-1.5">
-                    <span className="font-display text-xs uppercase tracking-[0.16em] text-accent-on-dark">
+                    <span className="font-display text-xs uppercase tracking-[0.16em] text-accent">
                       {category}
                     </span>
                     <span className="text-micro text-subtle">({items.length})</span>
@@ -251,14 +251,14 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
                       >
                         <span
                           aria-hidden="true"
-                          className="border-hairline-on-dark size-8 shrink-0 rounded-full border"
+                          className="border-border size-8 shrink-0 rounded-full border"
                           style={{ backgroundColor: variant.hex }}
                         />
                         <span className="flex flex-col">
-                          <span className="text-paper text-base leading-tight font-medium">
+                          <span className="text-foreground text-base leading-tight font-medium">
                             {variant.name}
                           </span>
-                          <span className="text-micro text-muted-on-dark font-medium uppercase">
+                          <span className="text-micro text-muted font-medium uppercase">
                             {String(originalIndex + 1).padStart(2, "0")} / {variant.concentration ?? "Eau de Parfum"}
                           </span>
                         </span>

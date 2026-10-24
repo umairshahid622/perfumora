@@ -366,14 +366,20 @@ export function Navigation() {
     const midline = nav.getBoundingClientRect().height / 2;
     const duration = prefersReducedMotion() ? 0 : 0.4;
 
-    // Reads color dynamically from CSS design tokens
-    const paint = (tone: string | undefined, seconds: number) =>
+    // Reads color dynamically from CSS design tokens based on section tone
+    const paint = (tone: string | undefined, seconds: number) => {
+      const isDark = tone === "dark";
+      const targetColor = readCssToken(
+        isDark ? "--paper" : "--foreground",
+        isDark ? "#faf8f5" : "#1a1816",
+      );
       gsap.to(nav, {
-        color: readCssToken("--foreground", "#1a1816"),
+        color: targetColor,
         duration: seconds,
         ease: "power2.out",
         overwrite: true,
       });
+    };
 
     // Queried off `document`, not scoped to `navRef`: the sections being watched
     // are the nav's siblings, not its children.
@@ -400,12 +406,12 @@ export function Navigation() {
       });
     });
 
-    // The opening stage is a dark luxury composition. It owns the nav tone
+    // The opening stage is a light composition on the warm stone canvas. It owns the nav tone
     // for its entire screen range.
     if (openingStage) {
       const setOpeningTone = (seconds: number) => {
-        paint("dark", seconds);
-        setToneBehind("dark");
+        paint("light", seconds);
+        setToneBehind("light");
       };
 
       ScrollTrigger.create({
@@ -434,16 +440,21 @@ export function Navigation() {
   // What Home's *colour* means. Keyed to the hero section it blinked out for the whole
   // stretch in between — nothing in the header was lit from Manifesto to Craft, since
   // those sections have no link of their own — which is the disappearance being fixed.
-  // Home reads as the page instead: lit anywhere on `/`, standing down only where
-  // Contact takes over. Its `aria-current` below stays keyed to the section, which is
-  // the place that attribute actually names.
-  const homeCurrent = atHome && !atContact;
+  // Home reads as the page instead: lit anywhere on `/`, standing down at Contact,
+  // Cta and Footer so those distinct destinations can be clear.
+  const homeCurrent =
+    atHome &&
+    !atContact &&
+    activeSection !== SECTION_IDS.cta &&
+    activeSection !== SECTION_IDS.footer;
 
   // Which form of the accent the links wear. The header only passes `[data-tone]`
   // sections on home; on the other routes `revertOnUpdate` has already handed it back
   // to `text-ink` over parchment, so the on-light form is the right one there whatever
   // the triggers last saw before the route changed.
   const accentTone = atHome ? toneBehind : "light";
+  const hoverAccent =
+    accentTone === "dark" ? "hover:text-accent-on-dark" : "hover:text-accent-on-light";
 
   // A Fragrances panel on screen is the one current thing in the header, so the other
   // three stand down — the `&& !menuVisible` at each className below is what keeps two
@@ -492,7 +503,10 @@ export function Navigation() {
           <button
             type="button"
             onClick={() => goTo(SECTION_IDS.hero)}
-            className="font-display hover:text-accent-on-light text-xl sm:text-2xl tracking-[0.02em] uppercase transition-colors"
+            className={cn(
+              "font-display text-xl sm:text-2xl tracking-[0.02em] uppercase transition-colors",
+              hoverAccent,
+            )}
           >
             Perfumora
           </button>
@@ -553,7 +567,7 @@ export function Navigation() {
                 aria-label={
                   customer ? `Account, signed in as ${customer.name}` : "Account"
                 }
-                className="hover:text-accent-on-light grid size-10 place-items-center transition-colors"
+                className={cn("grid size-10 place-items-center transition-colors", hoverAccent)}
               >
                 {customer ? (
                   <span
@@ -579,7 +593,7 @@ export function Navigation() {
               type="button"
               onClick={() => toggle("cart")}
               aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}
-              className="hover:text-accent-on-light relative grid size-10 place-items-center transition-colors"
+              className={cn("relative grid size-10 place-items-center transition-colors", hoverAccent)}
             >
               <BagIcon className="size-5" />
               {count > 0 && (
@@ -589,7 +603,7 @@ export function Navigation() {
               )}
             </button>
 
-            <SoundToggle />
+            <SoundToggle tone={accentTone} />
 
             {/* Mobile Menu Trigger (Hamburger) */}
             <button
@@ -597,7 +611,7 @@ export function Navigation() {
               onClick={() => toggle("mobileMenu")}
               aria-expanded={panel === "mobileMenu"}
               aria-label="Open navigation menu"
-              className="hover:text-accent-on-light grid size-10 place-items-center transition-colors md:hidden"
+              className={cn("grid size-10 place-items-center transition-colors md:hidden", hoverAccent)}
             >
               <MenuIcon className="size-5" />
             </button>

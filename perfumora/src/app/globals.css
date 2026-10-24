@@ -57,13 +57,13 @@
      Backward-Compatible Aliases (so existing tokens link to central variables)
   ------------------------------------------------------------------------- */
   --bg-light: var(--background);
-  --bg-dark: var(--surface-sunken);
+  --bg-dark: #0b0b0c;             /* Deep luxury black for curtain loader & dark sections */
   --ink: var(--foreground);
-  --paper: #faf8f5;
+  --paper: #faf8f5;               /* Crisp light cream text on dark surfaces */
   --muted-on-light: var(--foreground-muted);
-  --muted-on-dark: var(--foreground-muted);
+  --muted-on-dark: rgba(250, 248, 245, 0.45); /* Muted labels on dark surfaces */
   --hairline-on-light: var(--border);
-  --hairline-on-dark: var(--border);
+  --hairline-on-dark: rgba(250, 248, 245, 0.14); /* Faint tracks & borders on dark */
   --accent: var(--primary);
   --accent-contrast: #ffffff;
   --accent-glow: var(--primary-glow);
@@ -101,13 +101,13 @@
 
   /* Legacy Aliases & Dynamic Accents */
   --color-bg-light: var(--background);
-  --color-bg-dark: var(--surface-sunken);
+  --color-bg-dark: var(--bg-dark);
   --color-ink: var(--foreground);
-  --color-paper: var(--foreground);
+  --color-paper: var(--paper);
   --color-muted-on-light: var(--foreground-muted);
-  --color-muted-on-dark: var(--foreground-muted);
+  --color-muted-on-dark: var(--muted-on-dark);
   --color-hairline-on-light: var(--border);
-  --color-hairline-on-dark: var(--border);
+  --color-hairline-on-dark: var(--hairline-on-dark);
   --color-accent: var(--accent);
   --color-accent-contrast: var(--accent-contrast);
   --color-accent-glow: var(--accent-glow);

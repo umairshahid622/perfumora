@@ -37,10 +37,10 @@ import { cn } from "../../_lib/cn";
  */
 export function GalleryCard({
   variant,
-  position,
+  position: _position,
 }: {
   variant: Variant;
-  position: string;
+  position?: string;
 }) {
   const { addItem } = useCart();
   // Unlike the Hero's, this card's fragrance never changes under the selection —
@@ -104,18 +104,6 @@ export function GalleryCard({
               }}
             />
 
-            {/* Collection index — the badge anchor (top-left, where the reference
-                puts "New"). A real datum, not invented copy. */}
-            <span className="text-paper text-micro bg-paper/15 absolute top-3 left-3 z-20 rounded-full px-3 py-1 font-medium uppercase backdrop-blur-sm">
-              {position}
-            </span>
-
-            {/* Category badge */}
-            {variant.category && (
-              <span className="text-paper text-micro bg-paper/20 border border-paper/20 absolute top-3 right-3 z-20 rounded-full px-2.5 py-0.5 font-medium tracking-wider uppercase backdrop-blur-md">
-                {variant.category}
-              </span>
-            )}
 
             {/* Product — transparent bottle shot when uploaded, placeholder otherwise.
                 The drop shadow reads it as lifted off the panel. */}
