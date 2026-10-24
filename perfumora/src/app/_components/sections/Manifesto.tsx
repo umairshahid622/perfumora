@@ -5,8 +5,8 @@ import { Eyebrow } from "../ui/Eyebrow";
 import { Section } from "../ui/Section";
 
 const PARAGRAPHS = [
-  "The lift of the cap, the press to the wrist, the pause before the day begins. A fragrance is worn — but first, each morning, it is chosen.",
-  "The vessel is made for that moment: weighted in the hand, sculpted to be reached for, a small ceremony repeated at the start of each day.",
+  "A good fragrance is the easiest way to feel confident and put together. It's the final detail you put on before heading out, and the one people remember most.",
+  "We focus on quality ingredients and long-lasting formulas made for everyday wear — simple, clean, and designed to stay with you from morning to night.",
 ] as const;
 
 /**
@@ -36,7 +36,7 @@ export function Manifesto() {
           <Eyebrow>Manifesto</Eyebrow>
 
           <h2 className="font-display text-xl sm:text-2xl md:text-section mt-2 sm:mt-4 max-w-[14ch] text-balance font-semibold uppercase md:mt-6">
-            First, the ritual.
+            Made to last.
           </h2>
 
           <div className="border-hairline-on-light mt-3 sm:mt-4 border-t md:mt-8" />
