@@ -119,13 +119,32 @@ export function OpeningStage() {
             isDesktop: boolean;
           };
 
-          const slide = prefersReducedMotion() ? 0 : -80;
+          const still = prefersReducedMotion();
+          const mult = isMobile ? 0.6 : 1.0;
+          const slide = still ? 0 : -80;
 
-          // Both dissolves' start state belongs to GSAP rather than to a class.
-          gsap.set([manifestoPanelEl, ritualPanelEl], {
-            autoAlpha: 0,
-            x: slide,
-          });
+          const eyebrowEl = manifestoPanelEl.querySelector("[data-manifesto-eyebrow]");
+          const headingEl = manifestoPanelEl.querySelector("[data-manifesto-heading]");
+          const lineEl = manifestoPanelEl.querySelector("[data-manifesto-line]");
+          const pEls = manifestoPanelEl.querySelectorAll("[data-manifesto-paragraph]");
+
+          // Ritual panel retains clean slide; Manifesto container is positioned at 0 and delegates motion to layers
+          gsap.set(ritualPanelEl, { autoAlpha: 0, x: slide });
+          gsap.set(manifestoPanelEl, { autoAlpha: 0, x: 0 });
+
+          // Child elements start with layered parallax horizontal offsets
+          if (eyebrowEl) {
+            gsap.set(eyebrowEl, { x: still ? 0 : -35 * mult, opacity: 0 });
+          }
+          if (headingEl) {
+            gsap.set(headingEl, { x: still ? 0 : -65 * mult, opacity: 0 });
+          }
+          if (lineEl) {
+            gsap.set(lineEl, { x: still ? 0 : -50 * mult, scaleX: still ? 1 : 0.3, opacity: 0 });
+          }
+          if (pEls.length) {
+            gsap.set(pEls, { x: still ? 0 : -95 * mult, y: still ? 0 : 8, opacity: 0 });
+          }
 
           // The watermark's presence and the vessel's drift, as unitless progress on the
           // stage element. GSAP writes the number below; CSS owns what the number means.
@@ -157,14 +176,50 @@ export function OpeningStage() {
           const beat = { ease: "power1.inOut", duration: 1.0 };
           const quickFade = { ease: "power1.inOut", duration: 0.5 };
 
-          tl
-            // 0.0 → 1.0: Hero name leaves, Manifesto slides in and fades up to full opacity.
-            .to(manifestoPanelEl, { autoAlpha: 1, x: 0, ...beat }, 0)
-            .to(
-              stageEl,
-              { "--name-presence": 0, ...quickFade },
-              0.1,
+          // 0.0 → 1.0: Hero name leaves, Manifesto layers enter with dual-speed parallax drift
+          tl.set(manifestoPanelEl, { autoAlpha: 1 }, 0);
+
+          if (eyebrowEl) {
+            tl.to(
+              eyebrowEl,
+              { x: 0, opacity: 1, duration: 0.8, ease: "power1.out" },
+              0.0,
             );
+          }
+          if (headingEl) {
+            tl.to(
+              headingEl,
+              { x: 0, opacity: 1, duration: 0.95, ease: "power1.out" },
+              0.04,
+            );
+          }
+          if (lineEl) {
+            tl.to(
+              lineEl,
+              { x: 0, scaleX: 1, opacity: 1, duration: 0.85, ease: "power1.out" },
+              0.08,
+            );
+          }
+          if (pEls.length) {
+            tl.to(
+              pEls,
+              {
+                x: 0,
+                y: 0,
+                opacity: 1,
+                duration: 1.0,
+                stagger: 0.08,
+                ease: "power1.out",
+              },
+              0.12,
+            );
+          }
+
+          tl.to(
+            stageEl,
+            { "--name-presence": 0, ...quickFade },
+            0.1,
+          );
 
           // Hero controls (arrows + position counter) fade out smoothly as you leave Hero
           if (controlsEl) {
@@ -180,11 +235,7 @@ export function OpeningStage() {
           // In Manifesto:
           // Mobile: bottle drifts up to the top half to let Manifesto text sit cleanly below it.
           // Desktop: bottle drifts right so the copy sits flush left and the vessel
-          // holds the right of the frame. The number is the gap between them — the
-          // copy has no indent of its own (see <Manifesto>), so this is the only
-          // thing setting the split, and it is the one to turn to widen or narrow
-          // it. 34vw puts the vessel's centre at 84vw, clear of the column and
-          // still inside the frame.
+          // holds the right of the frame.
           if (isMobile) {
             tl.to(stageEl, { "--vessel-y": -20, ...beat }, 0);
           } else {
@@ -193,12 +244,62 @@ export function OpeningStage() {
 
           // 1.0 → 2.0: MANIFESTO READING WINDOW (held still at 100% opacity for 1 full screen)
 
-          // 2.0 → 2.4: Manifesto smoothly fades out completely to the left
-          tl.to(
-            manifestoPanelEl,
-            { autoAlpha: 0, x: slide, duration: 0.4, ease: "power1.inOut" },
-            2.0,
-          );
+          // 2.0 → 2.45: Manifesto Dual-Speed Parallax Peel-Away Exit toward top-left
+          if (eyebrowEl) {
+            tl.to(
+              eyebrowEl,
+              {
+                x: still ? 0 : -45 * mult,
+                y: still ? 0 : -18,
+                opacity: 0,
+                duration: 0.32,
+                ease: "power1.in",
+              },
+              2.0,
+            );
+          }
+          if (headingEl) {
+            tl.to(
+              headingEl,
+              {
+                x: still ? 0 : -70 * mult,
+                y: still ? 0 : -25,
+                opacity: 0,
+                duration: 0.36,
+                ease: "power1.in",
+              },
+              2.02,
+            );
+          }
+          if (lineEl) {
+            tl.to(
+              lineEl,
+              {
+                x: still ? 0 : -55 * mult,
+                y: still ? 0 : -20,
+                scaleX: still ? 1 : 0.3,
+                opacity: 0,
+                duration: 0.34,
+                ease: "power1.in",
+              },
+              2.04,
+            );
+          }
+          if (pEls.length) {
+            tl.to(
+              pEls,
+              {
+                x: still ? 0 : -95 * mult,
+                y: still ? 0 : -32,
+                opacity: 0,
+                duration: 0.38,
+                stagger: 0.04,
+                ease: "power1.in",
+              },
+              2.06,
+            );
+          }
+          tl.to(manifestoPanelEl, { autoAlpha: 0, duration: 0.05 }, 2.45);
 
           // 2.0 → 2.9: Bottle drifts to Ritual position (desktop & mobile)
           tl.to(
