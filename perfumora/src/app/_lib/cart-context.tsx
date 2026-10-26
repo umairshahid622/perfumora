@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -91,6 +92,17 @@ const CartContext = createContext<CartContextValue | null>(null);
  *  than half-read into a new build. */
 const STORAGE_KEY = "perfumora.cart.v1";
 
+export const CART_COUNT_COOKIE = "perfumora_cart_count";
+
+function syncCartCookie(count: number) {
+  if (typeof document === "undefined") return;
+  try {
+    document.cookie = `${CART_COUNT_COOKIE}=${count}; path=/; max-age=2592000; SameSite=Lax`;
+  } catch {
+    // Storage or cookie restricted.
+  }
+}
+
 /** One shared empty array: snapshots are compared by identity, so handing back a
  *  fresh `[]` on every read would re-render for ever. */
 const EMPTY: CartLine[] = [];
@@ -141,6 +153,7 @@ function commit(next: CartLine[]) {
     // Full, or refused: the in-memory bag is still correct, it just won't survive the
     // next reload. Dropping the click as well would be the worse of the two.
   }
+  syncCartCookie(next.length);
   for (const listener of listeners) listener();
 }
 
@@ -166,6 +179,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [isOpen, setIsOpen] = useState(false);
   const { showToast } = useToast();
+
+  useEffect(() => {
+    syncCartCookie(lines.length);
+  }, []);
 
   const openCart = useCallback(() => {
     setIsOpen(true);

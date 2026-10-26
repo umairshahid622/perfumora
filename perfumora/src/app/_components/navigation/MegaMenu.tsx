@@ -134,7 +134,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         tabIndex={open ? 0 : -1}
         onClick={onClose}
         className={cn(
-          "fixed inset-0 z-[70] bg-backdrop backdrop-blur-[3px]",
+          "fixed inset-0 z-[70] bg-black/60 backdrop-blur-[3px]",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       />
@@ -147,7 +147,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
         aria-label="Fragrances"
         data-lenis-prevent
         className={cn(
-          "bg-surface text-foreground border border-border fixed inset-x-3 top-19 z-[80] overflow-hidden rounded-3xl md:inset-x-6 shadow-2xl",
+          "bg-bg-dark text-paper border border-hairline-on-dark fixed inset-x-3 top-19 z-[80] overflow-hidden rounded-3xl md:inset-x-6 shadow-2xl",
           open ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
@@ -157,7 +157,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
           aria-label="Close menu"
           tabIndex={open ? 0 : -1}
           onClick={onClose}
-          className="border-border text-foreground absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full border bg-secondary transition-colors hover:bg-secondary-hover md:top-6 md:right-6"
+          className="border-hairline-on-dark text-paper absolute top-4 right-4 z-10 flex size-10 items-center justify-center rounded-full border bg-white/10 transition-colors hover:bg-white/20 md:top-6 md:right-6"
         >
           <svg
             aria-hidden="true"
@@ -174,7 +174,7 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
 
         <div className="grid h-full min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-10 p-8 md:grid-cols-[1fr_1.4fr] md:grid-rows-[minmax(0,1fr)] md:p-14">
           <div className="relative flex flex-col">
-            <span className="text-micro text-muted font-medium uppercase">
+            <span className="text-micro text-muted-on-dark font-medium uppercase">
               The Collection
             </span>
 
@@ -207,10 +207,10 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
 
             {/* Previewed name + catalogue position. */}
             <div className="hidden md:block">
-              <p className="font-display text-4xl leading-none uppercase">
+              <p className="font-display text-4xl leading-none uppercase text-paper">
                 {displayVariant.name}
               </p>
-              <span className="text-micro text-muted mt-2 block font-medium uppercase">
+              <span className="text-micro text-muted-on-dark mt-2 block font-medium uppercase">
                 {String(displayIndex + 1).padStart(2, "0")} / {displayVariant.concentration ?? "Eau de Parfum"}
               </span>
             </div>
@@ -229,11 +229,11 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
             >
               {categoryGroups.map(({ category, items }) => (
                 <div key={category} className="flex flex-col gap-2.5">
-                  <div className="flex items-center gap-2 border-b border-border-subtle pb-1.5">
-                    <span className="font-display text-xs uppercase tracking-[0.16em] text-accent">
+                  <div className="flex items-center gap-2 border-b border-hairline-on-dark pb-1.5">
+                    <span className="font-display text-xs uppercase tracking-[0.16em] text-accent-on-dark">
                       {category}
                     </span>
-                    <span className="text-micro text-subtle">({items.length})</span>
+                    <span className="text-micro text-muted-on-dark">({items.length})</span>
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {items.map(({ variant, originalIndex }) => (
@@ -245,20 +245,20 @@ export function MegaMenu({ open, onClose, onClosed, onSelect }: MegaMenuProps) {
                         onFocus={() => setHovered(originalIndex)}
                         className={cn(
                           "group flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition-colors",
-                          "hover:bg-secondary",
-                          originalIndex === index && "bg-secondary",
+                          "hover:bg-white/10",
+                          originalIndex === index ? "bg-white/10" : "bg-white/[0.03]",
                         )}
                       >
                         <span
                           aria-hidden="true"
-                          className="border-border size-8 shrink-0 rounded-full border"
+                          className="border-hairline-on-dark size-8 shrink-0 rounded-full border shadow-sm"
                           style={{ backgroundColor: variant.hex }}
                         />
                         <span className="flex flex-col">
-                          <span className="text-foreground text-base leading-tight font-medium">
+                          <span className="text-paper text-base leading-tight font-medium group-hover:text-white transition-colors">
                             {variant.name}
                           </span>
-                          <span className="text-micro text-muted font-medium uppercase">
+                          <span className="text-micro text-muted-on-dark font-medium uppercase">
                             {String(originalIndex + 1).padStart(2, "0")} / {variant.concentration ?? "Eau de Parfum"}
                           </span>
                         </span>

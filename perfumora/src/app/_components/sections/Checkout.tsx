@@ -7,6 +7,7 @@ import {
   useTransition,
   type FormEvent,
 } from "react";
+import { useRouter } from "next/navigation";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { currentCustomer } from "../../_lib/auth";
@@ -217,6 +218,8 @@ function CheckField({
 export function Checkout() {
   const { items, subtotal, removeItem, clear } = useCart();
   const { navigate } = useRouteTransition();
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [details, setDetails] = useState<CustomerDetails>(EMPTY_DETAILS);
@@ -237,6 +240,18 @@ export function Checkout() {
   const [offering, setOffering] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Guard: if the cart is empty and no order has just been placed, redirect
+  // away to the home page so a shopper cannot navigate to or stay on /checkout.
+  useEffect(() => {
+    if (mounted && items.length === 0 && !order) {
+      router.replace("/");
+    }
+  }, [mounted, items.length, order, router]);
+
   // Direction is recorded by whoever moves the step, never derived from the index
   // delta — the same reason <ScentProvider> takes a `towards`. "Back to details"
   // and "start a new order" both travel backwards, and only the caller knows it.
@@ -255,7 +270,7 @@ export function Checkout() {
 
       // Skipped outright rather than run at `duration: 0`: a `fromTo` that never
       // plays would leave the from-values applied with nothing to clear them.
-      if (prefersReducedMotion()) return;
+      if (prefersReducedMotion() || !panelRef.current) return;
 
       // The panel already holds the new step; slide it in from the side we
       // travelled toward. `xPercent` so the offset scales with the column, and
@@ -397,8 +412,14 @@ export function Checkout() {
     setDetails({ ...EMPTY_DETAILS, name: accountName, email: accountEmail });
     setOrder(null);
     setFailure(null);
-    go(0, -1);
+    navigate("/");
   };
+
+  // Guard the render: until mounted and confirmed to have items in the bag (or a
+  // completed order), do not render the checkout flow to prevent layout flashing.
+  if (!mounted || (items.length === 0 && !order)) {
+    return null;
+  }
 
   return (
     <Container>
@@ -451,36 +472,22 @@ export function Checkout() {
         {/* A floor under the panel so the short steps don't drag the centred
             layout up and down as the flow advances. */}
         <div ref={panelRef} className="min-h-[22rem]">
-          {step === 0 &&
-            (items.length === 0 ? (
-              <div className="flex flex-col items-start gap-8">
-                <p className="text-body text-muted-on-light">
-                  Your cart is empty.
-                </p>
-                <RippleButton
-                  onClick={() => navigate("/")}
-                  aria-label="Explore the collection"
-                  silent
-                >
-                  Explore the collection
-                </RippleButton>
+          {step === 0 && (
+            <div className="flex flex-col gap-8">
+              <OrderLines items={items} onRemove={removeItem} />
+              <div className="border-hairline-on-light border-t pt-6">
+                <TotalRow label="Subtotal" value={subtotal} />
               </div>
-            ) : (
-              <div className="flex flex-col gap-8">
-                <OrderLines items={items} onRemove={removeItem} />
-                <div className="border-hairline-on-light border-t pt-6">
-                  <TotalRow label="Subtotal" value={subtotal} />
-                </div>
-                <RippleButton
-                  onClick={() => go(1, 1)}
-                  className="self-start"
-                  aria-label="Continue to delivery details"
-                  silent
-                >
-                  Continue to details
-                </RippleButton>
-              </div>
-            ))}
+              <RippleButton
+                onClick={() => go(1, 1)}
+                className="self-start"
+                aria-label="Continue to delivery details"
+                silent
+              >
+                Continue to details
+              </RippleButton>
+            </div>
+          )}
 
           {step === 1 && (
             /* `lg:gap-5` rather than one gap everywhere: from `lg` this step is meant
